@@ -8,7 +8,7 @@ import c4d
 import base64
 
 PLUGIN_ID   = 1068839
-PLUGIN_NAME = "Center2World XZ v1.0"
+PLUGIN_NAME = "Center2World XZ v1.1"
 PLUGIN_HELP = "Центрировать выделенные объекты по X и Z в мировом пространстве (Y не меняется)"
 
 
@@ -143,18 +143,24 @@ class Center2WorldXZCommand(c4d.plugins.CommandData):
 
         for obj in objects:
             center_x, center_z = _get_world_center_xz(obj)
+            world_pos = obj.GetMg().off
+            parent = obj.GetUp()
 
             if center_x is None:
-                # Нет геометрии — просто зануляем X и Z позиции объекта
-                pos = obj.GetAbsPos()
-                doc.AddUndo(c4d.UNDOTYPE_CHANGE, obj)
-                obj.SetAbsPos(c4d.Vector(0.0, pos.y, 0.0))
-                continue
+                # Нет геометрии — перемещаем pivot в X=0, Z=0 мирового пространства
+                target_world = c4d.Vector(0.0, world_pos.y, 0.0)
+            else:
+                # Смещаем так, чтобы центр BBox оказался в X=0, Z=0
+                target_world = c4d.Vector(world_pos.x - center_x, world_pos.y, world_pos.z - center_z)
 
-            pos = obj.GetAbsPos()
+            # Конвертируем в локальное пространство родителя
+            if parent:
+                target_local = ~parent.GetMg() * target_world
+            else:
+                target_local = target_world
+
             doc.AddUndo(c4d.UNDOTYPE_CHANGE, obj)
-            # Смещаем объект так, чтобы центр BBox оказался в X=0, Z=0
-            obj.SetAbsPos(c4d.Vector(pos.x - center_x, pos.y, pos.z - center_z))
+            obj.SetRelPos(target_local)
 
         doc.EndUndo()
         c4d.EventAdd()

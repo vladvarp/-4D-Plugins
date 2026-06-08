@@ -7,7 +7,7 @@ import c4d
 import base64
 
 PLUGIN_ID   = 1068826
-PLUGIN_NAME = "Drop2Floor v1.2"
+PLUGIN_NAME = "Drop2Floor v1.3"
 PLUGIN_HELP = "Опустить выделенные объекты на уровень пола (Y = 0)"
 
 
@@ -172,9 +172,18 @@ class Drop2FloorCommand(c4d.plugins.CommandData):
             if min_y == float("inf"):
                 continue   # нет геометрии — пропускаем (пустой Null и т.п.)
 
-            pos = obj.GetAbsPos()
+            # Текущая мировая позиция pivot-а объекта
+            world_pos = obj.GetMg().off
+            # Целевая мировая позиция: двигаем только Y
+            target_world = c4d.Vector(world_pos.x, world_pos.y - min_y, world_pos.z)
+            # Конвертируем в локальное пространство родителя
+            parent = obj.GetUp()
+            if parent:
+                target_local = ~parent.GetMg() * target_world
+            else:
+                target_local = target_world
             doc.AddUndo(c4d.UNDOTYPE_CHANGE, obj)
-            obj.SetAbsPos(c4d.Vector(pos.x, pos.y - min_y, pos.z))
+            obj.SetRelPos(target_local)
 
         doc.EndUndo()
         c4d.EventAdd()

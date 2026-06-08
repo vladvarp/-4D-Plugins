@@ -15,7 +15,7 @@ import c4d
 import base64
 
 PLUGIN_ID     = 1068838
-PLUGIN_NAME = "Center2Parent XZ v1.0"
+PLUGIN_NAME = "Center2Parent XZ v1.1"
 PLUGIN_HELP   = "Центрировать по X и Z в позицию родителя (мировое пространство, Y не меняется)"
 
 
@@ -151,9 +151,9 @@ class Center2ParentXZCommand(c4d.plugins.CommandData):
             # Мировая позиция родителя (только X и Z).
             # GetMg().off — это мировая позиция объекта независимо от поворота.
             # Если родителя нет — целевая точка (0, 0).
-            parent = obj.GetUp()
-            if parent:
-                parent_world_pos = parent.GetMg().off   # мировые координаты
+            parent_obj = obj.GetUp()
+            if parent_obj:
+                parent_world_pos = parent_obj.GetMg().off   # мировые координаты
                 target_x = parent_world_pos.x
                 target_z = parent_world_pos.z
             else:
@@ -161,18 +161,28 @@ class Center2ParentXZCommand(c4d.plugins.CommandData):
                 target_z = 0.0
 
             center_x, center_z = _get_world_center_xz(obj)
+            world_pos = obj.GetMg().off
 
-            pos = obj.GetAbsPos()
             doc.AddUndo(c4d.UNDOTYPE_CHANGE, obj)
 
             if center_x is None:
-                # Нет геометрии — перемещаем сам pivot объекта к родителю
-                obj.SetAbsPos(c4d.Vector(target_x, pos.y, target_z))
+                # Нет геометрии — перемещаем pivot к мировой XZ-позиции родителя
+                target_world = c4d.Vector(target_x, world_pos.y, target_z)
             else:
                 # Смещаем так, чтобы центр BBox совпал с мировой XZ-позицией родителя
-                offset_x = center_x - target_x
-                offset_z = center_z - target_z
-                obj.SetAbsPos(c4d.Vector(pos.x - offset_x, pos.y, pos.z - offset_z))
+                target_world = c4d.Vector(
+                    world_pos.x - (center_x - target_x),
+                    world_pos.y,
+                    world_pos.z - (center_z - target_z)
+                )
+
+            # Конвертируем в локальное пространство родителя
+            if parent_obj:
+                target_local = ~parent_obj.GetMg() * target_world
+            else:
+                target_local = target_world
+
+            obj.SetRelPos(target_local)
 
         doc.EndUndo()
         c4d.EventAdd()

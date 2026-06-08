@@ -8,7 +8,7 @@ import c4d
 import base64
 
 PLUGIN_ID   = 1068827
-PLUGIN_NAME = "Drop2Floor 0(XZ) v1.2"
+PLUGIN_NAME = "Drop2Floor 0(XZ) v1.3"
 PLUGIN_HELP = "Опустить выделенные объекты на пол (Y=0) и центрировать по X, Z"
 
 
@@ -168,16 +168,23 @@ class Drop2FloorXZCommand(c4d.plugins.CommandData):
             if min_y == float("inf"):
                 continue   # нет геометрии — пропускаем
 
-            pos = obj.GetAbsPos()
-            doc.AddUndo(c4d.UNDOTYPE_CHANGE, obj)
-
-            # Новая позиция: X и Z — смещаем так, чтобы центр BBox оказался в 0,
+            # Целевая позиция в мировых координатах:
+            # X и Z — смещаем pivot так, чтобы центр BBox оказался в (0, 0),
             # Y — опускаем нижнюю грань на пол (Y = 0)
-            new_x = pos.x - center_x
-            new_z = pos.z - center_z
-            new_y = pos.y - min_y
-
-            obj.SetAbsPos(c4d.Vector(new_x, new_y, new_z))
+            world_pos = obj.GetMg().off
+            target_world = c4d.Vector(
+                world_pos.x - center_x,
+                world_pos.y - min_y,
+                world_pos.z - center_z
+            )
+            # Конвертируем в локальное пространство родителя
+            parent = obj.GetUp()
+            if parent:
+                target_local = ~parent.GetMg() * target_world
+            else:
+                target_local = target_world
+            doc.AddUndo(c4d.UNDOTYPE_CHANGE, obj)
+            obj.SetRelPos(target_local)
 
         doc.EndUndo()
         c4d.EventAdd()
