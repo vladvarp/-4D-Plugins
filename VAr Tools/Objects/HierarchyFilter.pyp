@@ -2,17 +2,6 @@
 """
 HierarchyFilter — Cinema 4D ObjectData Plugin
 ID: 1068852
-
-Объект-Ноль с расширенными UserData для фильтрации и обхода иерархии.
-Используется совместно с Xpresso для динамической выборки дочерних объектов.
-
-UserData:
-  - Dropdown "Тип объекта"    : динамически собирает типы из дочерних объектов
-  - Dropdown "Режим обхода"   : Все / Текущий уровень / Рекурсивно
-  - Integer  "Глубина"        : видим только при режиме "Рекурсивно"
-  - Dropdown "Родит. объект"  : дочерние у которых есть свои дети
-                                (видим только при "Текущий уровень" / "Рекурсивно")
-  - InExclude "Результат"     : заполняется автоматически, только для чтения
 """
 
 import c4d
@@ -23,28 +12,33 @@ import tempfile
 __res__ = c4d.plugins.GeResource()
 __res__.Init(os.path.dirname(__file__))
 
-# ─── Константы ───────────────────────────────────────────────────────────────
 PLUGIN_ID   = 1068852
 PLUGIN_NAME = "HierarchyFilter v1.0"
 PLUGIN_HELP = "Объект-фильтр иерархии для использования в Xpresso"
 
-# SubID наших UserData-параметров (1-based, порядок создания)
-UD_OBJECT_TYPE   = 1
-UD_TRAVERSE_MODE = 2
-UD_DEPTH         = 3
-UD_PARENT_OBJ    = 4
-UD_INEXCLUDE     = 5
+# SubID UserData
+UD_OBJECT_TYPE    = 1
+UD_TRAVERSE_MODE  = 2
+UD_DEPTH          = 3
+UD_PARENT_OBJ     = 4
+UD_INEXCLUDE      = 5   # Результат фильтрации (только чтение)
+UD_IE2_INEX_MODE  = 6   # Включить / Исключить
+UD_IE2_OBJ_MODE   = 7   # Объект / Тип
+UD_INEXCLUDE2     = 8   # Второй InExclude (пользовательский)
 
-# Значения Dropdown "Режим обхода"
 MODE_ALL       = 0
-MODE_LEVEL     = 1
-MODE_RECURSIVE = 2
+MODE_RECURSIVE = 1
+
+IE2_INCLUDE = 0
+IE2_EXCLUDE = 1
+
+IE2_OBJECT = 0
+IE2_TYPE   = 1
 
 
 # ─── Вспомогательные функции ─────────────────────────────────────────────────
 
 def _get_type_name(obj):
-    """Возвращает человекочитаемое имя типа объекта через C4D API."""
     try:
         name = obj.GetTypeName()
         if name:
@@ -55,7 +49,6 @@ def _get_type_name(obj):
 
 
 def _collect_direct_children(obj):
-    """Прямые дочерние объекты (один уровень)."""
     children = []
     child = obj.GetDown()
     while child:
@@ -65,11 +58,7 @@ def _collect_direct_children(obj):
 
 
 def _collect_recursive(obj, depth=0, max_depth=-1):
-    """
-    Рекурсивно собирает всех потомков obj.
-    max_depth=-1 — без ограничения глубины.
-    Возвращает список (object, depth_level).
-    """
+    """Возвращает список (object, depth_level)."""
     result = []
     child = obj.GetDown()
     while child:
@@ -80,12 +69,27 @@ def _collect_recursive(obj, depth=0, max_depth=-1):
     return result
 
 
+def _collect_parents_recursive(obj, depth=0, max_depth=-1):
+    """
+    Собирает все объекты у которых есть хоть один ребёнок, рекурсивно по всей иерархии.
+    Возвращает список (object, depth_level).
+    """
+    result = []
+    child = obj.GetDown()
+    while child:
+        if child.GetDown() is not None:
+            result.append((child, depth))
+            if max_depth < 0 or depth < max_depth - 1:
+                result.extend(_collect_parents_recursive(child, depth + 1, max_depth))
+        child = child.GetNext()
+    return result
+
+
 def _has_children(obj):
     return obj.GetDown() is not None
 
 
 def _ud_descid(op, uid):
-    """Возвращает (DescID, BaseContainer) UserData по нашему SubID или (None, None)."""
     for descid, bc in op.GetUserDataContainer():
         if descid[1].id == uid:
             return descid, bc
@@ -93,7 +97,6 @@ def _ud_descid(op, uid):
 
 
 def _ud_get(op, uid):
-    """Значение UserData-параметра по SubID."""
     did, _ = _ud_descid(op, uid)
     if did is not None:
         return op[did]
@@ -106,14 +109,16 @@ class UserDataManager:
 
     TRAVERSE_LABELS = [
         "Все объекты",
-        "Только текущая иерархия",
         "Рекурсивно",
     ]
+
+    IE2_INEX_LABELS = ["Включить", "Исключить"]
+    IE2_OBJ_LABELS  = ["Объект", "Тип"]
 
     def __init__(self, op):
         self.op = op
 
-    # ── Фабрики BaseContainer ─────────────────────────────────────────────────
+    # ── Фабрики ───────────────────────────────────────────────────────────────
 
     def _cycle_bc(self, name, items):
         bc = c4d.GetCustomDatatypeDefault(c4d.DTYPE_LONG)
@@ -137,43 +142,49 @@ class UserDataManager:
         bc[c4d.DESC_ANIMATE]    = c4d.DESC_ANIMATE_ON
         return bc
 
-    def _inexclude_bc(self, name):
+    def _inexclude_bc(self, name, editable=False):
         bc = c4d.GetCustomDatatypeDefault(c4d.CUSTOMDATATYPE_INEXCLUDE_LIST)
         bc[c4d.DESC_NAME]       = name
         bc[c4d.DESC_SHORT_NAME] = name
         bc[c4d.DESC_ANIMATE]    = c4d.DESC_ANIMATE_OFF
-        # Пометим как только для чтения через DESC_EDITABLE
-        # (будем дополнительно защищать через Message)
-        bc[c4d.DESC_EDITABLE]   = False
+        bc[c4d.DESC_EDITABLE]   = editable
         return bc
 
-    # ── Создание (первый запуск) ──────────────────────────────────────────────
+    # ── Создание ──────────────────────────────────────────────────────────────
 
     def ensure_created(self):
-        """Создаёт все UserData если их ещё нет. Безопасно вызывать многократно."""
         did, _ = _ud_descid(self.op, UD_OBJECT_TYPE)
         if did is not None:
-            return  # уже создано
+            return
 
+        # 1. Тип объекта
         self.op.AddUserData(self._cycle_bc("Тип объекта", ["Все типы"]))
+        # 2. Режим обхода
         self.op.AddUserData(self._cycle_bc("Режим обхода", self.TRAVERSE_LABELS))
+        # 3. Глубина
         self.op.AddUserData(self._int_bc("Глубина", default=3))
+        # 4. Родительский объект
         self.op.AddUserData(self._cycle_bc("Родительский объект", ["(нет)"]))
-        self.op.AddUserData(self._inexclude_bc("Результат фильтрации"))
+        # 5. Результат фильтрации — только чтение
+        self.op.AddUserData(self._inexclude_bc("Результат фильтрации", editable=False))
+        # 6. Включить / Исключить
+        self.op.AddUserData(self._cycle_bc("Действие", self.IE2_INEX_LABELS))
+        # 7. Объект / Тип
+        self.op.AddUserData(self._cycle_bc("Режим фильтра", self.IE2_OBJ_LABELS))
+        # 8. Второй InExclude — пользователь заполняет сам
+        self.op.AddUserData(self._inexclude_bc("Включить / Исключить", editable=True))
 
         # Значения по умолчанию
         did, _ = _ud_descid(self.op, UD_TRAVERSE_MODE)
         if did:
             self.op[did] = MODE_ALL
-
         did, _ = _ud_descid(self.op, UD_DEPTH)
         if did:
             self.op[did] = 3
 
-    # ── Обновление Dropdown-ов ────────────────────────────────────────────────
+    # ── Обновление дропдаунов ─────────────────────────────────────────────────
 
     def _update_cycle(self, uid, items):
-        """Меняет пункты Dropdown не трогая текущее значение."""
         did, bc = _ud_descid(self.op, uid)
         if did is None:
             return
@@ -184,11 +195,10 @@ class UserDataManager:
         self.op.SetUserDataContainer(did, bc)
 
     def refresh_dropdowns(self):
-        """Обновляет динамические Dropdown-ы под текущую иерархию."""
         children = _collect_direct_children(self.op)
 
-        # Dropdown 1 — типы объектов (из всей вложенной иерархии)
-        seen = {}  # type_id → label
+        # Dropdown 1 — типы из всей иерархии
+        seen = {}
         for obj in children:
             tid = obj.GetType()
             if tid not in seen:
@@ -201,19 +211,19 @@ class UserDataManager:
         type_labels = ["Все типы"] + sorted(seen.values())
         self._update_cycle(UD_OBJECT_TYPE, type_labels)
 
-        # Dropdown 4 — родительские объекты (у которых есть хотя бы один ребёнок)
-        parents = [c for c in children if _has_children(c)]
-        parent_labels = ["(нет)"] + [obj.GetName() for obj in parents]
+        # Dropdown 4 — все родители по всей глубине иерархии
+        # Глубина показывается через префикс "-", "--", "---" и т.д.
+        all_parents = _collect_parents_recursive(self.op)
+        parent_labels = ["(нет)"]
+        for obj, depth in all_parents:
+            prefix = "-" * depth if depth > 0 else ""
+            label = (prefix + " " + obj.GetName()) if prefix else obj.GetName()
+            parent_labels.append(label)
         self._update_cycle(UD_PARENT_OBJ, parent_labels)
 
-    # ── Заполнение InExclude ──────────────────────────────────────────────────
+    # ── Применение фильтра → InExclude 1 (только чтение) ─────────────────────
 
     def apply_filter(self):
-        """
-        Вычисляет список объектов по настройкам фильтра
-        и записывает результат в InExclude-поле.
-        Пользователь не имеет доступа к этому полю — только для чтения.
-        """
         did_ie, _ = _ud_descid(self.op, UD_INEXCLUDE)
         if did_ie is None:
             return
@@ -223,9 +233,15 @@ class UserDataManager:
         type_idx      = _ud_get(self.op, UD_OBJECT_TYPE) or 0
         parent_idx    = _ud_get(self.op, UD_PARENT_OBJ) or 0
 
+        # Второй InExclude — фильтр включения/исключения
+        ie2_inex_mode = _ud_get(self.op, UD_IE2_INEX_MODE) or IE2_INCLUDE
+        ie2_obj_mode  = _ud_get(self.op, UD_IE2_OBJ_MODE)  or IE2_OBJECT
+        did_ie2, _    = _ud_descid(self.op, UD_INEXCLUDE2)
+        ie2_data      = self.op[did_ie2] if did_ie2 else None
+
         children = _collect_direct_children(self.op)
 
-        # Строим карту индекс→type_id для Dropdown 1
+        # Карта тип → имя для фильтра
         seen = {}
         for obj in children:
             tid = obj.GetType()
@@ -236,39 +252,61 @@ class UserDataManager:
                 if stid not in seen:
                     seen[stid] = _get_type_name(sub)
 
-        sorted_types = sorted(seen.items(), key=lambda x: x[1])  # сортируем по имени
-        # type_idx=0 → "Все типы" → нет фильтра
+        sorted_types = sorted(seen.items(), key=lambda x: x[1])
         filter_type_id = None
         if type_idx > 0 and (type_idx - 1) < len(sorted_types):
             filter_type_id = sorted_types[type_idx - 1][0]
 
-        # Определяем стартовый объект для обхода (Dropdown 4)
-        parents = [c for c in children if _has_children(c)]
-        if parent_idx > 0 and (parent_idx - 1) < len(parents):
-            start_obj = parents[parent_idx - 1]
+        # Стартовый объект из Dropdown 4 (с учётом всей иерархии родителей)
+        all_parents = _collect_parents_recursive(self.op)
+        if parent_idx > 0 and (parent_idx - 1) < len(all_parents):
+            start_obj = all_parents[parent_idx - 1][0]
         else:
             start_obj = self.op
 
-        # Собираем объекты согласно режиму обхода
+        # Сбор кандидатов
         candidates = []
         if traverse_mode == MODE_ALL:
             for obj, _ in _collect_recursive(self.op):
                 candidates.append(obj)
-        elif traverse_mode == MODE_LEVEL:
-            candidates = _collect_direct_children(start_obj)
         elif traverse_mode == MODE_RECURSIVE:
             for obj, _ in _collect_recursive(start_obj, max_depth=depth_val):
                 candidates.append(obj)
 
-        # Фильтр по типу
+        # Фильтр по типу (Dropdown 1)
         if filter_type_id is not None:
             candidates = [o for o in candidates if o.GetType() == filter_type_id]
 
-        # Записываем в InExclude
+        # Применяем второй InExclude
+        if ie2_data is not None:
+            count = ie2_data.GetObjectCount()
+            ie2_objects = []
+            ie2_types   = set()
+            for i in range(count):
+                obj = ie2_data.ObjectFromIndex(self.op.GetDocument(), i)
+                if obj:
+                    ie2_objects.append(obj)
+                    ie2_types.add(obj.GetType())
+
+            if ie2_inex_mode == IE2_INCLUDE:
+                # Оставляем только те что в списке
+                if ie2_obj_mode == IE2_OBJECT:
+                    ie2_set = set(id(o) for o in ie2_objects)
+                    candidates = [o for o in candidates if id(o) in ie2_set]
+                else:  # IE2_TYPE
+                    candidates = [o for o in candidates if o.GetType() in ie2_types]
+            else:  # IE2_EXCLUDE
+                # Убираем те что в списке
+                if ie2_obj_mode == IE2_OBJECT:
+                    ie2_set = set(id(o) for o in ie2_objects)
+                    candidates = [o for o in candidates if id(o) not in ie2_set]
+                else:  # IE2_TYPE
+                    candidates = [o for o in candidates if o.GetType() not in ie2_types]
+
+        # Записываем в InExclude 1
         ie_data = c4d.InExcludeData()
         for obj in candidates:
-            ie_data.InsertObject(obj, 1)  # 1 = включён
-
+            ie_data.InsertObject(obj, 1)
         self.op[did_ie] = ie_data
 
 
@@ -281,8 +319,6 @@ class HierarchyFilterObject(c4d.plugins.ObjectData):
         udm.ensure_created()
         return True
 
-    # ── Скрытие/показ полей ───────────────────────────────────────────────────
-
     def GetDDescription(self, op, description, flags):
         if not description.LoadDescription(op.GetType()):
             return False, flags
@@ -293,37 +329,30 @@ class HierarchyFilterObject(c4d.plugins.ObjectData):
 
         traverse_mode = _ud_get(op, UD_TRAVERSE_MODE) or MODE_ALL
 
-        # Итерируемся по UserData и управляем видимостью
         for descid, bc in op.GetUserDataContainer():
             uid = descid[1].id
 
             if uid == UD_DEPTH:
-                # "Глубина" — только при рекурсивном режиме
+                # Показываем только при рекурсивном режиме
                 bc[c4d.DESC_HIDE] = (traverse_mode != MODE_RECURSIVE)
                 description.SetParameter(descid, bc, c4d.DESCID_ROOT)
 
             elif uid == UD_PARENT_OBJ:
-                # "Родительский объект" — только при MODE_LEVEL или MODE_RECURSIVE
-                bc[c4d.DESC_HIDE] = (traverse_mode == MODE_ALL)
+                # Показываем только при рекурсивном режиме
+                bc[c4d.DESC_HIDE] = (traverse_mode != MODE_RECURSIVE)
                 description.SetParameter(descid, bc, c4d.DESCID_ROOT)
 
         return True, flags | c4d.DESCFLAGS_DESC_LOADED
 
-    # ── Реакция на изменения ──────────────────────────────────────────────────
-
     def Message(self, op, type_, data):
         if type_ == c4d.MSG_DESCRIPTION_POSTSETPARAMETER:
-            # Перехватываем любые изменения InExclude-поля и откатываем их.
-            # Пользователь не должен редактировать это поле вручную.
+            # Откатываем ручное редактирование первого InExclude
             if data and "descid" in data:
                 changed_id = data["descid"]
                 if changed_id and changed_id[1].id == UD_INEXCLUDE:
-                    # Перезаписываем вычисленным значением
                     udm = UserDataManager(op)
                     udm.apply_filter()
                     return True
-
-            # При любом другом изменении параметра — обновляем всё
             udm = UserDataManager(op)
             udm.ensure_created()
             udm.refresh_dropdowns()
@@ -339,8 +368,6 @@ class HierarchyFilterObject(c4d.plugins.ObjectData):
 
         return True
 
-    # ── Виртуальный объект ────────────────────────────────────────────────────
-
     def GetVirtualObjects(self, op, hh):
         udm = UserDataManager(op)
         udm.ensure_created()
@@ -349,15 +376,13 @@ class HierarchyFilterObject(c4d.plugins.ObjectData):
         return c4d.BaseObject(c4d.Onull)
 
     def CheckDirty(self, op, doc):
-        # Помечаем объект грязным каждый кадр — чтобы динамические списки
-        # всегда отражали актуальную иерархию
         op.SetDirty(c4d.DIRTYFLAGS_DATA)
 
     def Draw(self, op, drawpass, bd, bh):
         return c4d.DRAWRESULT_OK
 
 
-# ─── Встроенная иконка (base64 PNG 32×32) ────────────────────────────────────
+# ─── Иконка ──────────────────────────────────────────────────────────────────
 _ICON_B64 = (
     "iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAABSUlEQVR4nNVXIRaC"
     "QBBd9nkTi0WDBgtWs5lkMBnsnsBuMBm8hMUqhSBBioWzaNoVlhl2ZkB4/jS7Dvu/"
