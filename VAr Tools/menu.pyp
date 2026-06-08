@@ -10,7 +10,8 @@ MENU_NAME = "VAr Tools"
 
 MENU_ITEMS = [
     1068825,    # Object Renamer Pro
-    1068834,    # Camera Resolution Manager
+    1068834,    # Camera Resolution 
+    1068837,
     None,
     {"name": "Tools", "items": [
         {"name": "Axis", "items": [
