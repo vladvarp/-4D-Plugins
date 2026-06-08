@@ -8,7 +8,7 @@ import c4d
 import base64
 
 PLUGIN_ID   = 1068828
-PLUGIN_NAME = "Axis2Center v1.0"
+PLUGIN_NAME = "Axis2Center v1.1"
 PLUGIN_HELP = "Переместить ось объекта в центр его bounding box"
 
 _ICON_B64 = (
@@ -88,29 +88,42 @@ def _get_bbox_center_local(obj):
 
 def _move_axis(doc, obj, local_offset):
     """
-    Смещает pivot объекта на local_offset (в локальных координатах obj),
-    компенсируя смещение всех прямых потомков, чтобы геометрия не двигалась.
+    Смещает pivot объекта на local_offset (в локальных координатах obj).
+    Геометрия объекта и его дочерние объекты визуально не двигаются.
+
+    Стратегия:
+      1. Сдвигаем точки меша (если есть) в обратную сторону.
+      2. Обновляем мировую матрицу объекта (смещаем origin).
+      3. Компенсируем прямых потомков, пересчитывая их RelPos.
     """
     mg = obj.GetMg()
 
-    # 1. Новая мировая матрица объекта (смещаем origin на local_offset)
+    # Новая мировая матрица — origin сдвинут на local_offset в локальном пространстве
     new_mg = c4d.Matrix(mg * local_offset, mg.v1, mg.v2, mg.v3)
 
     doc.AddUndo(c4d.UNDOTYPE_CHANGE, obj)
+
+    # ── 1. Компенсируем геометрию (точки) самого объекта ─────────────────────
+    # Если объект имеет редактируемые точки — сдвигаем их в обратную сторону,
+    # чтобы меш не смещался вместе с осью.
+    point_offset = -local_offset
+    point_count = obj.GetPointCount() if hasattr(obj, "GetPointCount") else 0
+    if point_count > 0:
+        pts = obj.GetAllPoints()
+        pts = [p + point_offset for p in pts]
+        obj.SetAllPoints(pts)
+        obj.Message(c4d.MSG_UPDATE)
+
+    # ── 2. Обновляем матрицу объекта ─────────────────────────────────────────
     obj.SetMg(new_mg)
 
-    # 2. Компенсируем смещение у прямых потомков
+    # ── 3. Компенсируем прямых потомков ──────────────────────────────────────
     child = obj.GetDown()
     while child:
         doc.AddUndo(c4d.UNDOTYPE_CHANGE, child)
-        # Позиция потомка в мировых координатах не изменилась,
-        # пересчитываем её в новом локальном пространстве родителя
-        child_world = mg * child.GetRelPos()
-        new_local   = ~new_mg * child_world
-        child.SetRelPos(new_local)
+        child_world_pos = mg * child.GetRelPos()
+        child.SetRelPos(~new_mg * child_world_pos)
         child = child.GetNext()
-
-
 # ─── КОМАНДА ─────────────────────────────────────────────────────────────────
 
 class AxisToCenterCommand(c4d.plugins.CommandData):

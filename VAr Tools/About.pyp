@@ -38,16 +38,16 @@ VAr Tools - набор инструментов для Cinema 4D,
 
   Axis
 
-  * Axis2Bottom v1.0
+  * Axis2Bottom v1.1
     Смещает ось (pivot) выделенных объектов
     в нижнюю центральную точку их bounding box.
     По X и Z — центр, по Y — нижняя грань.
 
-  * Axis2Center v1.0
+  * Axis2Center v1.1
     Смещает ось (pivot) выделенных объектов
     в геометрический центр их bounding box.
   
-  * AxisDrop v1.0
+  * AxisDrop v1.1
     Опускает ось (pivot) выделенных объектов
     на нижнюю грань их bounding box,
     сохраняя X и Z позицию оси нетронутыми.
