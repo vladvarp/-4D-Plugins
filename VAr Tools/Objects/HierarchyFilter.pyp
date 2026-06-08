@@ -14,6 +14,7 @@ __res__.Init(os.path.dirname(__file__))
 
 PLUGIN_ID   = 1068852
 PLUGIN_NAME = "HierarchyFilter v1.3"
+OBJECT_NAME = "HierarchyFilter"
 PLUGIN_HELP = "Объект-фильтр иерархии для использования в Xpresso"
 
 # SubID UserData
@@ -157,22 +158,37 @@ class UserDataManager:
         if did is not None:
             return
 
+        # Группа "Данные" (отображается как вкладка в User Data)
+        grp_bc = c4d.GetCustomDatatypeDefault(c4d.DTYPE_GROUP)
+        grp_bc[c4d.DESC_NAME]       = "Данные"
+        grp_bc[c4d.DESC_SHORT_NAME] = "Данные"
+        grp_bc[c4d.DESC_TITLEBAR]   = 1
+        grp_did = self.op.AddUserData(grp_bc)
+        grp_id  = grp_did[0].id   # SubID родительской группы
+
+        def _add_in_group(bc):
+            bc[c4d.DESC_PARENTGROUP] = c4d.DescID(
+                c4d.DescLevel(c4d.ID_USERDATA, c4d.DTYPE_SUBCONTAINER, 0),
+                c4d.DescLevel(grp_id)
+            )
+            return self.op.AddUserData(bc)
+
         # 1. Тип объекта
-        self.op.AddUserData(self._cycle_bc("Тип объекта", ["Все типы"]))
+        _add_in_group(self._cycle_bc("Тип объекта", ["Все типы"]))
         # 2. Режим обхода
-        self.op.AddUserData(self._cycle_bc("Режим обхода", self.TRAVERSE_LABELS))
+        _add_in_group(self._cycle_bc("Режим обхода", self.TRAVERSE_LABELS))
         # 3. Глубина
-        self.op.AddUserData(self._int_bc("Глубина", default=3))
+        _add_in_group(self._int_bc("Глубина", default=3))
         # 4. Родительский объект
-        self.op.AddUserData(self._cycle_bc("Родительский объект", ["(нет)"]))
+        _add_in_group(self._cycle_bc("Родительский объект", ["HierarchyFilter"]))
         # 5. Результат фильтрации — только чтение
-        self.op.AddUserData(self._inexclude_bc("Результат фильтрации", editable=False))
+        _add_in_group(self._inexclude_bc("Результат фильтрации", editable=False))
         # 6. Включить / Исключить
-        self.op.AddUserData(self._cycle_bc("Действие", self.IE2_INEX_LABELS))
+        _add_in_group(self._cycle_bc("Действие", self.IE2_INEX_LABELS))
         # 7. Объект / Тип
-        self.op.AddUserData(self._cycle_bc("Режим фильтра", self.IE2_OBJ_LABELS))
+        _add_in_group(self._cycle_bc("Режим фильтра", self.IE2_OBJ_LABELS))
         # 8. Второй InExclude — пользователь заполняет сам
-        self.op.AddUserData(self._inexclude_bc("Включить / Исключить", editable=True))
+        _add_in_group(self._inexclude_bc("Включить / Исключить", editable=True))
 
         # Значения по умолчанию
         did, _ = _ud_descid(self.op, UD_TRAVERSE_MODE)
@@ -231,7 +247,7 @@ class UserDataManager:
         # Dropdown 4 — все родители по всей глубине иерархии
         # Глубина показывается через префикс "-", "--", "---" и т.д.
         all_parents = _collect_parents_recursive(self.op)
-        parent_labels = ["(нет)"]
+        parent_labels = ["HierarchyFilter"]
         for obj, depth in all_parents:
             prefix = "-" * depth if depth > 0 else ""
             label = (prefix + " " + obj.GetName()) if prefix else obj.GetName()
@@ -330,6 +346,8 @@ class UserDataManager:
 class HierarchyFilterObject(c4d.plugins.ObjectData):
 
     def Init(self, op, isload=False):
+        if not isload:
+            op.SetName(OBJECT_NAME)
         udm = UserDataManager(op)
         udm.ensure_created()
         return True
