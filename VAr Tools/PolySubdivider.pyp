@@ -127,8 +127,8 @@ def ensure_quad(poly):
 def subdivide_uniform(src_obj, p):
     """Равномерная UV-сетка — аналог Dmitris."""
     div   = max(1, p["iterations"])
-    sx    = p["slider_x"] / 100.0 - 0.5
-    sy    = p["slider_y"] / 100.0 - 0.5
+    sx    = p["slider_x"] - 0.5
+    sy    = p["slider_y"] - 0.5
     noise = p["noise_amt"]
     freq  = max(0.01, p["noise_freq"])
     rng   = random.Random(p["random_seed"])
@@ -166,7 +166,7 @@ def subdivide_uniform(src_obj, p):
 def subdivide_random(src_obj, p):
     """Случайные горизонтальные / вертикальные разрезы."""
     iters = max(1, p["iterations"])
-    bias  = p["slider_x"] / 100.0
+    bias  = p["slider_x"]
     noise = p["noise_amt"]
     rng   = random.Random(p["random_seed"])
     mb    = MeshBuilder()
@@ -206,8 +206,8 @@ def subdivide_random(src_obj, p):
 def subdivide_diagonal(src_obj, p):
     """Рекурсивное fan-деление через смещённый центр."""
     iters = max(1, p["iterations"])
-    sx    = p["slider_x"] / 100.0
-    sy    = p["slider_y"] / 100.0
+    sx    = p["slider_x"]
+    sy    = p["slider_y"]
     noise = p["noise_amt"]
     freq  = max(0.01, p["noise_freq"])
     rng   = random.Random(p["random_seed"])
@@ -244,8 +244,8 @@ def subdivide_diagonal(src_obj, p):
 def subdivide_herringbone(src_obj, p):
     """Паркетный паттерн «Ёлочка» со смещением чётных строк."""
     div   = max(1, p["iterations"])
-    sx    = p["slider_x"] / 100.0
-    sy    = p["slider_y"] / 100.0
+    sx    = p["slider_x"]
+    sy    = p["slider_y"]
     noise = p["noise_amt"]
     freq  = max(0.01, p["noise_freq"])
     rng   = random.Random(p["random_seed"])
@@ -281,8 +281,8 @@ def subdivide_herringbone(src_obj, p):
 def subdivide_radial(src_obj, p):
     """Радиальные секторы из смещённого центра полигона."""
     iters   = max(1, p["iterations"])
-    cx      = p["slider_x"] / 100.0
-    cy      = p["slider_y"] / 100.0
+    cx      = p["slider_x"]
+    cy      = p["slider_y"]
     sectors = iters * 2 + 4
     noise   = p["noise_amt"]
     freq    = max(0.01, p["noise_freq"])
@@ -371,9 +371,9 @@ class PolySubdividerObject(plugins.ObjectData):
         """Значения атрибутов по умолчанию."""
         op[PAR_ALGORITHM]   = ALG_UNIFORM
         op[PAR_ITERATIONS]  = 3
-        op[PAR_SLIDER_X]    = 18.0
-        op[PAR_SLIDER_Y]    = 35.0
-        op[PAR_SLIDER_Z]    = 50.0
+        op[PAR_SLIDER_X]    = 0.18
+        op[PAR_SLIDER_Y]    = 0.35
+        op[PAR_SLIDER_Z]    = 0.50
         op[PAR_RANDOM_SEED] = 1235
         op[PAR_NOISE_AMT]   = 0.5
         op[PAR_NOISE_FREQ]  = 3.0
@@ -484,10 +484,10 @@ class PolySubdividerObject(plugins.ObjectData):
         bc = c4d.GetCustomDataTypeDefault(c4d.DTYPE_REAL)
         bc[c4d.DESC_NAME]    = "Смещение X"
         bc[c4d.DESC_MIN]     = 0.0
-        bc[c4d.DESC_MAX]     = 100.0
-        bc[c4d.DESC_STEP]    = 1.0
+        bc[c4d.DESC_MAX]     = 1.0
+        bc[c4d.DESC_STEP]    = 0.01
         bc[c4d.DESC_UNIT]    = c4d.DESC_UNIT_PERCENT
-        bc[c4d.DESC_DEFAULT] = 18.0
+        bc[c4d.DESC_DEFAULT] = 0.18
         description.SetParameter(
             c4d.DescID(c4d.DescLevel(PAR_SLIDER_X, c4d.DTYPE_REAL, 0)),
             bc, gid
@@ -497,10 +497,10 @@ class PolySubdividerObject(plugins.ObjectData):
         bc = c4d.GetCustomDataTypeDefault(c4d.DTYPE_REAL)
         bc[c4d.DESC_NAME]    = "Смещение Y"
         bc[c4d.DESC_MIN]     = 0.0
-        bc[c4d.DESC_MAX]     = 100.0
-        bc[c4d.DESC_STEP]    = 1.0
+        bc[c4d.DESC_MAX]     = 1.0
+        bc[c4d.DESC_STEP]    = 0.01
         bc[c4d.DESC_UNIT]    = c4d.DESC_UNIT_PERCENT
-        bc[c4d.DESC_DEFAULT] = 35.0
+        bc[c4d.DESC_DEFAULT] = 0.35
         description.SetParameter(
             c4d.DescID(c4d.DescLevel(PAR_SLIDER_Y, c4d.DTYPE_REAL, 0)),
             bc, gid
@@ -510,10 +510,10 @@ class PolySubdividerObject(plugins.ObjectData):
         bc = c4d.GetCustomDataTypeDefault(c4d.DTYPE_REAL)
         bc[c4d.DESC_NAME]    = "Смещение Z"
         bc[c4d.DESC_MIN]     = 0.0
-        bc[c4d.DESC_MAX]     = 100.0
-        bc[c4d.DESC_STEP]    = 1.0
+        bc[c4d.DESC_MAX]     = 1.0
+        bc[c4d.DESC_STEP]    = 0.01
         bc[c4d.DESC_UNIT]    = c4d.DESC_UNIT_PERCENT
-        bc[c4d.DESC_DEFAULT] = 50.0
+        bc[c4d.DESC_DEFAULT] = 0.50
         description.SetParameter(
             c4d.DescID(c4d.DescLevel(PAR_SLIDER_Z, c4d.DTYPE_REAL, 0)),
             bc, gid
@@ -583,8 +583,8 @@ class PolySubdividerObject(plugins.ObjectData):
         bc = c4d.GetCustomDataTypeDefault(c4d.DTYPE_REAL)
         bc[c4d.DESC_NAME]    = "Петля шума"
         bc[c4d.DESC_MIN]     = 0.0
-        bc[c4d.DESC_MAX]     = 100.0
-        bc[c4d.DESC_STEP]    = 1.0
+        bc[c4d.DESC_MAX]     = 1.0
+        bc[c4d.DESC_STEP]    = 0.01
         bc[c4d.DESC_UNIT]    = c4d.DESC_UNIT_PERCENT
         bc[c4d.DESC_DEFAULT] = 0.0
         description.SetParameter(
@@ -606,7 +606,7 @@ if __name__ == "__main__":
         id          = PLUGIN_ID,
         str         = "PolySubdivider",
         g           = PolySubdividerObject,
-        description = "Opolysubdivider",
+        description = "Obase",
         icon        = None,
         info        = c4d.OBJECT_GENERATOR | c4d.OBJECT_INPUT,
     )

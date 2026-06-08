@@ -1,5 +1,4 @@
-OBJECTPLUGIN Opolysubdivider
+CONTAINER Opolysubdivider
 {
   NAME Opolysubdivider;
-  INCLUDE Obase;
 }
