@@ -34,6 +34,10 @@ MENU_ITEMS = [
 
     ]},
 
+    {"name": "Objects", "items": [
+        1068852,    # HierarchyFilter
+    ]},
+
     {"name": "Deformers", "items": [
         1068837,    # PolySubdivider
     ]},
