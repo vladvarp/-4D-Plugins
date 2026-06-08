@@ -158,37 +158,22 @@ class UserDataManager:
         if did is not None:
             return
 
-        # Группа "Данные" (отображается как вкладка в User Data)
-        grp_bc = c4d.GetCustomDatatypeDefault(c4d.DTYPE_GROUP)
-        grp_bc[c4d.DESC_NAME]       = "Данные"
-        grp_bc[c4d.DESC_SHORT_NAME] = "Данные"
-        grp_bc[c4d.DESC_TITLEBAR]   = 1
-        grp_did = self.op.AddUserData(grp_bc)
-        grp_id  = grp_did[0].id   # SubID родительской группы
-
-        def _add_in_group(bc):
-            bc[c4d.DESC_PARENTGROUP] = c4d.DescID(
-                c4d.DescLevel(c4d.ID_USERDATA, c4d.DTYPE_SUBCONTAINER, 0),
-                c4d.DescLevel(grp_id)
-            )
-            return self.op.AddUserData(bc)
-
         # 1. Тип объекта
-        _add_in_group(self._cycle_bc("Тип объекта", ["Все типы"]))
+        self.op.AddUserData(self._cycle_bc("Тип объекта", ["Все типы"]))
         # 2. Режим обхода
-        _add_in_group(self._cycle_bc("Режим обхода", self.TRAVERSE_LABELS))
+        self.op.AddUserData(self._cycle_bc("Режим обхода", self.TRAVERSE_LABELS))
         # 3. Глубина
-        _add_in_group(self._int_bc("Глубина", default=3))
+        self.op.AddUserData(self._int_bc("Глубина", default=3))
         # 4. Родительский объект
-        _add_in_group(self._cycle_bc("Родительский объект", ["HierarchyFilter"]))
+        self.op.AddUserData(self._cycle_bc("Родительский объект", ["HierarchyFilter"]))
         # 5. Результат фильтрации — только чтение
-        _add_in_group(self._inexclude_bc("Результат фильтрации", editable=False))
+        self.op.AddUserData(self._inexclude_bc("Результат фильтрации", editable=False))
         # 6. Включить / Исключить
-        _add_in_group(self._cycle_bc("Действие", self.IE2_INEX_LABELS))
+        self.op.AddUserData(self._cycle_bc("Действие", self.IE2_INEX_LABELS))
         # 7. Объект / Тип
-        _add_in_group(self._cycle_bc("Режим фильтра", self.IE2_OBJ_LABELS))
+        self.op.AddUserData(self._cycle_bc("Режим фильтра", self.IE2_OBJ_LABELS))
         # 8. Второй InExclude — пользователь заполняет сам
-        _add_in_group(self._inexclude_bc("Включить / Исключить", editable=True))
+        self.op.AddUserData(self._inexclude_bc("Включить / Исключить", editable=True))
 
         # Значения по умолчанию
         did, _ = _ud_descid(self.op, UD_TRAVERSE_MODE)
@@ -212,20 +197,6 @@ class UserDataManager:
             cycle_bc[i] = label
         bc[c4d.DESC_CYCLE] = cycle_bc
         self.op.SetUserDataContainer(did, bc)
-
-    def update_traverse_visibility(self):
-        """Записывает DESC_HIDE напрямую в контейнер UserData для UD_DEPTH и UD_PARENT_OBJ."""
-        traverse_mode = _ud_get(self.op, UD_TRAVERSE_MODE)
-        if traverse_mode is None:
-            traverse_mode = MODE_ALL
-        hide = (traverse_mode == MODE_ALL)
-
-        for uid in (UD_DEPTH, UD_PARENT_OBJ):
-            did, bc = _ud_descid(self.op, uid)
-            if did is None:
-                continue
-            bc[c4d.DESC_HIDE] = hide
-            self.op.SetUserDataContainer(did, bc)
 
     def refresh_dropdowns(self):
         children = _collect_direct_children(self.op)
@@ -359,7 +330,25 @@ class HierarchyFilterObject(c4d.plugins.ObjectData):
         udm = UserDataManager(op)
         udm.ensure_created()
         udm.refresh_dropdowns()
-        udm.update_traverse_visibility()
+
+        traverse_mode = _ud_get(op, UD_TRAVERSE_MODE)
+        if traverse_mode is None:
+            traverse_mode = MODE_ALL
+
+        is_all_mode = (traverse_mode == MODE_ALL)
+
+        for descid, bc in op.GetUserDataContainer():
+            uid = descid[1].id
+
+            if uid == UD_DEPTH:
+                # Неактивны при "Все объекты", активны при "Рекурсивно"
+                bc[c4d.DESC_EDITABLE] = not is_all_mode
+                description.SetParameter(descid, bc, c4d.DESCID_ROOT)
+
+            elif uid == UD_PARENT_OBJ:
+                # Неактивны при "Все объекты", активны при "Рекурсивно"
+                bc[c4d.DESC_EDITABLE] = not is_all_mode
+                description.SetParameter(descid, bc, c4d.DESCID_ROOT)
 
         return True, flags | c4d.DESCFLAGS_DESC_LOADED
 
