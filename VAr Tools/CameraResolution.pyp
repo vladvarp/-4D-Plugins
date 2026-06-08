@@ -11,7 +11,8 @@ import base64
 
 # ─── ID ───────────────────────────────────────────────────────────────────────
 PLUGIN_ID   = 1068834
-PLUGIN_NAME = "Resolution Manager v1.4"
+PLUGIN_NAME = "Resolution Manager"
+PLUGIN_NAME_V = "Resolution Manager v1.4"
 PLUGIN_HELP = "Управление разрешением рендера для каждой камеры"
 
 ID_BASE           = 10000
@@ -712,7 +713,7 @@ class CamResCommand(c4d.plugins.CommandData):
 if __name__ == "__main__":
     c4d.plugins.RegisterCommandPlugin(
         id   = PLUGIN_ID,
-        str  = "Resolution Manager",
+        str  = PLUGIN_NAME_V,
         info = 0,
         icon = _make_icon(),
         help = PLUGIN_HELP,

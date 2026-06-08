@@ -38,6 +38,8 @@ import tempfile
 
 # ─── Идентификатор плагина ────────────────────────────────────────────────────
 PLUGIN_ID = 1068825
+PLUGIN_NAME = "Object Renamer PRO"
+PLUGIN_NAME_V = "Object Renamer PRO v2.4"
 
 # ─── Размеры окна ─────────────────────────────────────────────────────────────
 DIALOG_DEFAULT_W = 100   # ширина окна по умолчанию (px)
@@ -147,7 +149,7 @@ class RenamerDialog(gui.GeDialog):
     #  РАЗМЕТКА ИНТЕРФЕЙСА
     # ══════════════════════════════════════════════════════════════════════════
     def CreateLayout(self):
-        self.SetTitle("OBJECT RENAMER PRO v2.4")
+        self.SetTitle(PLUGIN_NAME)
 
         # ── Внешняя рамка с отступами ─────────────────────────────────────────
         self.GroupBegin(GRP_ROOT, c4d.BFH_SCALEFIT | c4d.BFV_SCALEFIT, 1, 0)
@@ -1635,7 +1637,7 @@ def _make_icon():
 if __name__ == '__main__':
     c4d.plugins.RegisterCommandPlugin(
         id   = PLUGIN_ID,
-        str  = "Object Renamer Pro",
+        str  = PLUGIN_NAME_V,
         info = 0,
         icon = _make_icon(),
         help = "Пакетное переименование объектов сцены",

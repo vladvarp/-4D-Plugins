@@ -20,7 +20,8 @@ import tempfile
 
 # ── ID плагина ──
 PLUGIN_ID = 1068837
-MENU_NAME = "PolySubdivider v1.0 (Experimental)"
+MENU_NAME = "PolySubdivider"
+MENU_NAME_V = "PolySubdivider v1.0 (Experimental)"
 
 # ============================================================
 #  ID параметров (должны быть > 999, не пересекаться с C4D)
@@ -647,7 +648,7 @@ def _make_icon():
 if __name__ == "__main__":
     ok = plugins.RegisterObjectPlugin(
         id          = PLUGIN_ID,
-        str         = MENU_NAME,
+        str         = MENU_NAME_V,
         g           = PolySubdividerObject,
         description = "Obase",
         icon        = _make_icon(),

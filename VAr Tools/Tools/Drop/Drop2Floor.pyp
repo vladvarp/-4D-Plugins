@@ -7,7 +7,7 @@ import c4d
 import base64
 
 PLUGIN_ID   = 1068826
-PLUGIN_NAME = "Drop2Floor v1.0"
+PLUGIN_NAME = "Drop2Floor v1.2"
 PLUGIN_HELP = "Опустить выделенные объекты на уровень пола (Y = 0)"
 
 
@@ -46,34 +46,103 @@ def _make_icon():
 
 # ─── ВЫЧИСЛЕНИЕ BOUNDING BOX ─────────────────────────────────────────────────
 
+def _collect_min_y(o, result):
+    """
+    Рекурсивно обходит объект o внутри кешированного мира C4D.
+
+    Логика на каждом узле:
+      1. Деформ-кеш есть → идём только в него (финальная деформированная геометрия).
+      2. Кеш генератора есть → идём только в него (SDS, Extrude, Cloner и т.п.),
+         реальные дети сцены игнорируются.
+      3. PointObject без кеша → читаем вершины.
+      4. Прочее → ничего не берём.
+
+    После обработки текущего узла ВСЕГДА спускаемся в GetDown(),
+    потому что кеш может быть иерархичным (например SDS с Null внутри
+    порождает дерево сглаженных мешей, а не плоский список).
+    """
+    # Деформированный кеш — наивысший приоритет
+    dc = o.GetDeformCache()
+    if dc:
+        _collect_min_y(dc, result)
+        # После деформ-кеша дочерние объекты не нужны
+        return
+
+    # Кеш генератора (SDS, Extrude, Cloner, ...)
+    cache = o.GetCache()
+    if cache:
+        c = cache
+        while c:
+            _collect_min_y(c, result)
+            c = c.GetNext()
+        # Кеш генератора заменяет реальных детей сцены — не идём в GetDown()
+        return
+
+    # Нет кеша — если PointObject, берём вершины
+    if o.IsInstanceOf(c4d.Opoint):
+        mg  = o.GetMg()
+        pts = o.GetAllPoints()
+        for p in pts:
+            wy = (mg * p).y
+            if wy < result[0]:
+                result[0] = wy
+        # Продолжаем вниз: у PointObject в кеше могут быть дочерние объекты
+
+    # Спускаемся в дочерние объекты текущего кеш-узла (обязательно для
+    # иерархичных кешей: SDS(Null(Куб, Куб.1, ...)) → дерево сглаженных мешей)
+    child = o.GetDown()
+    while child:
+        _collect_min_y(child, result)
+        child = child.GetNext()
+
+
 def _min_world_y(obj):
     """
-    Рекурсивно обходит obj и всех его потомков.
-    Возвращает минимальную Y-координату bounding box в мировых координатах.
-    Учитывает вращение и масштаб через трансформацию всех 8 углов AABB.
+    Возвращает минимальную мировую Y-координату для obj и всей его иерархии.
+
+    Ключевое отличие от наивного подхода: обход ведётся по КЕШУ, а не по
+    реальной иерархии сцены. Это означает, что:
+    - Subdivision Surface → берётся сглаженный меш (кеш SDS), а не куб внутри.
+    - Bend/Twist/FFD → берётся деформированная геометрия (деформ-кеш).
+    - Cloner → берётся кеш всех клонов.
+    - Обычный меш без генераторов → вершины напрямую.
+
+    Реальная иерархия сцены обходится только для объектов, у которых нет
+    собственного кеша (например, Null с несколькими дочерними мешами).
     """
     result = [float("inf")]
 
-    def _traverse(o):
-        mg  = o.GetMg()    # матрица объекта в мировых координатах
-        rad = o.GetRad()   # полуразмеры AABB в локальных координатах
-        mp  = o.GetMp()    # центр AABB в локальных координатах
+    def _scene_traverse(o):
+        """Обход по реальной иерархии сцены (верхний уровень)."""
+        dc    = o.GetDeformCache()
+        cache = o.GetCache()
 
-        if rad.x + rad.y + rad.z > 0.0:
-            for sx in (-1, 1):
-                for sy in (-1, 1):
-                    for sz in (-1, 1):
-                        local_pt = mp + c4d.Vector(sx * rad.x, sy * rad.y, sz * rad.z)
-                        world_y  = (mg * local_pt).y
-                        if world_y < result[0]:
-                            result[0] = world_y
+        if dc:
+            _collect_min_y(dc, result)
+        elif cache:
+            c = cache
+            while c:
+                _collect_min_y(c, result)
+                c = c.GetNext()
+        elif o.IsInstanceOf(c4d.Opoint):
+            mg  = o.GetMg()
+            pts = o.GetAllPoints()
+            for p in pts:
+                wy = (mg * p).y
+                if wy < result[0]:
+                    result[0] = wy
+        else:
+            # Null или подобный контейнер — спускаемся по реальным детям
+            child = o.GetDown()
+            while child:
+                _scene_traverse(child)
+                child = child.GetNext()
+            return  # дети уже обойдены выше
 
-        child = o.GetDown()
-        while child:
-            _traverse(child)
-            child = child.GetNext()
+        # Если объект имеет кеш/геометрию, его реальные дети — это входные
+        # данные генератора, а не самостоятельные объекты; их не обходим.
 
-    _traverse(obj)
+    _scene_traverse(obj)
     return result[0]
 
 

@@ -20,9 +20,11 @@ MENU_ITEMS = [
             1068830,   # Axis Drop
         ]},
 
-        {"name": "Drop", "items": [
+        {"name": "Location", "items": [
             1068826,   # Drop2Floor
             1068827,   # Drop2Floor 0(XZ)
+            1068838,   # Center2Parent XZ
+            1068839,   # Center2World XZ
         ]},
 
         {"name": "Clean", "items": [
@@ -33,7 +35,7 @@ MENU_ITEMS = [
     ]},
 
     {"name": "Deformers", "items": [
-        1068837,    # PolySubdivider v1.0 (Experimental)
+        1068837,    # PolySubdivider
     ]},
 
     None,

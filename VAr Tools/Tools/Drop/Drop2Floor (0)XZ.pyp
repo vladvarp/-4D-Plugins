@@ -8,7 +8,7 @@ import c4d
 import base64
 
 PLUGIN_ID   = 1068827
-PLUGIN_NAME = "Drop2Floor 0(XZ) v1.0"
+PLUGIN_NAME = "Drop2Floor 0(XZ) v1.2"
 PLUGIN_HELP = "Опустить выделенные объекты на пол (Y=0) и центрировать по X, Z"
 
 
@@ -47,46 +47,102 @@ def _make_icon():
 
 # ─── ВЫЧИСЛЕНИЕ BOUNDING BOX ─────────────────────────────────────────────────
 
+def _collect_bounds(o, mn_y, mn_x, mx_x, mn_z, mx_z):
+    """
+    Рекурсивно обходит объект o внутри кешированного мира C4D.
+
+    Логика на каждом узле:
+      1. Деформ-кеш есть → идём только в него.
+      2. Кеш генератора есть → идём только в него (SDS, Extrude, Cloner),
+         реальные дети сцены игнорируются.
+      3. PointObject без кеша → читаем вершины.
+      4. Прочее → ничего не берём.
+
+    После обработки текущего узла ВСЕГДА спускаемся в GetDown(),
+    потому что кеш может быть иерархичным (SDS с Null внутри
+    порождает дерево сглаженных мешей, а не плоский список).
+    """
+    dc = o.GetDeformCache()
+    if dc:
+        _collect_bounds(dc, mn_y, mn_x, mx_x, mn_z, mx_z)
+        return
+
+    cache = o.GetCache()
+    if cache:
+        c = cache
+        while c:
+            _collect_bounds(c, mn_y, mn_x, mx_x, mn_z, mx_z)
+            c = c.GetNext()
+        return
+
+    if o.IsInstanceOf(c4d.Opoint):
+        mg  = o.GetMg()
+        pts = o.GetAllPoints()
+        for p in pts:
+            wp = mg * p
+            if wp.y < mn_y[0]: mn_y[0] = wp.y
+            if wp.x < mn_x[0]: mn_x[0] = wp.x
+            if wp.x > mx_x[0]: mx_x[0] = wp.x
+            if wp.z < mn_z[0]: mn_z[0] = wp.z
+            if wp.z > mx_z[0]: mx_z[0] = wp.z
+
+    # Всегда спускаемся в дочерние узлы кеша
+    child = o.GetDown()
+    while child:
+        _collect_bounds(child, mn_y, mn_x, mx_x, mn_z, mx_z)
+        child = child.GetNext()
+
+
 def _get_world_bounds(obj):
     """
-    Рекурсивно обходит obj и всех его потомков.
-    Возвращает (min_y, center_x, center_z) в мировых координатах,
-    где center_x/center_z — центр bounding box по горизонтали.
+    Возвращает (min_y, center_x, center_z) в мировых координатах.
+
+    Обход ведётся по КЕШУ, поэтому учитываются генераторы (SDS, Extrude,
+    Cloner) и деформеры (Bend, Twist, FFD) — берётся финальная геометрия,
+    а не исходный меш.
+
+    Реальная иерархия сцены обходится только для контейнеров без кеша (Null).
     """
-    min_y   = [float("inf")]
-    min_x   = [float("inf")]
-    max_x   = [float("-inf")]
-    min_z   = [float("inf")]
-    max_z   = [float("-inf")]
+    mn_y = [float("inf")]
+    mn_x = [float("inf")]
+    mx_x = [float("-inf")]
+    mn_z = [float("inf")]
+    mx_z = [float("-inf")]
 
-    def _traverse(o):
-        mg  = o.GetMg()
-        rad = o.GetRad()
-        mp  = o.GetMp()
+    def _scene_traverse(o):
+        dc    = o.GetDeformCache()
+        cache = o.GetCache()
 
-        if rad.x + rad.y + rad.z > 0.0:
-            for sx in (-1, 1):
-                for sy in (-1, 1):
-                    for sz in (-1, 1):
-                        local_pt = mp + c4d.Vector(sx * rad.x, sy * rad.y, sz * rad.z)
-                        world_pt = mg * local_pt
-                        if world_pt.y < min_y[0]: min_y[0] = world_pt.y
-                        if world_pt.x < min_x[0]: min_x[0] = world_pt.x
-                        if world_pt.x > max_x[0]: max_x[0] = world_pt.x
-                        if world_pt.z < min_z[0]: min_z[0] = world_pt.z
-                        if world_pt.z > max_z[0]: max_z[0] = world_pt.z
+        if dc:
+            _collect_bounds(dc, mn_y, mn_x, mx_x, mn_z, mx_z)
+        elif cache:
+            c = cache
+            while c:
+                _collect_bounds(c, mn_y, mn_x, mx_x, mn_z, mx_z)
+                c = c.GetNext()
+        elif o.IsInstanceOf(c4d.Opoint):
+            mg  = o.GetMg()
+            pts = o.GetAllPoints()
+            for p in pts:
+                wp = mg * p
+                if wp.y < mn_y[0]: mn_y[0] = wp.y
+                if wp.x < mn_x[0]: mn_x[0] = wp.x
+                if wp.x > mx_x[0]: mx_x[0] = wp.x
+                if wp.z < mn_z[0]: mn_z[0] = wp.z
+                if wp.z > mx_z[0]: mx_z[0] = wp.z
+        else:
+            child = o.GetDown()
+            while child:
+                _scene_traverse(child)
+                child = child.GetNext()
+            return
 
-        child = o.GetDown()
-        while child:
-            _traverse(child)
-            child = child.GetNext()
+    _scene_traverse(obj)
 
-    _traverse(obj)
+    center_x = (mn_x[0] + mx_x[0]) / 2.0 if mn_x[0] != float("inf") else 0.0
+    center_z = (mn_z[0] + mx_z[0]) / 2.0 if mn_z[0] != float("inf") else 0.0
 
-    center_x = (min_x[0] + max_x[0]) / 2.0 if min_x[0] != float("inf") else 0.0
-    center_z = (min_z[0] + max_z[0]) / 2.0 if min_z[0] != float("inf") else 0.0
-
-    return min_y[0], center_x, center_z
+    return mn_y[0], center_x, center_z
 
 
 # ─── КОМАНДА ─────────────────────────────────────────────────────────────────
