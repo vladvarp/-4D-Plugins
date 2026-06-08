@@ -388,6 +388,9 @@ class PolySubdividerObject(plugins.ObjectData):
         if child is None:
             return None
 
+        # Скрываем child во вьюпорте, в списке объектов остаётся
+        child[c4d.ID_BASEOBJECT_VISIBILITY_EDITOR] = 1  # 1 = off
+
         # Получаем кэш / полигональное представление потомка
         src = child.GetDeformCache()
         if src is None:
