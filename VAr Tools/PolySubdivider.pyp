@@ -399,8 +399,8 @@ class PolySubdividerObject(plugins.ObjectData):
 
         # Скрываем дочерний объект в редакторе и рендере (0=default, 1=on, 2=off)
         # Проверка состояния исключает бесконечный пересчёт
-        if child[c4d.ID_BASEOBJECT_VISIBILITY_EDITOR] != 1 or \
-           child[c4d.ID_BASEOBJECT_VISIBILITY_RENDER] != 1:
+        if child[c4d.ID_BASEOBJECT_VISIBILITY_EDITOR] != 2 or \
+           child[c4d.ID_BASEOBJECT_VISIBILITY_RENDER] != 2:
             child[c4d.ID_BASEOBJECT_VISIBILITY_EDITOR] = 2
             child[c4d.ID_BASEOBJECT_VISIBILITY_RENDER] = 2
             c4d.EventAdd()
