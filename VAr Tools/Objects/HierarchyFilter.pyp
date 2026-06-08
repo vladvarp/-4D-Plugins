@@ -332,19 +332,19 @@ class HierarchyFilterObject(c4d.plugins.ObjectData):
         if traverse_mode is None:
             traverse_mode = MODE_ALL
 
-        hide_depth_parent = (traverse_mode == MODE_ALL)
+        is_all_mode = (traverse_mode == MODE_ALL)
 
         for descid, bc in op.GetUserDataContainer():
             uid = descid[1].id
 
             if uid == UD_DEPTH:
-                # Показываем только при рекурсивном режиме
-                bc[c4d.DESC_HIDE] = hide_depth_parent
+                # Неактивны при "Все объекты", активны при "Рекурсивно"
+                bc[c4d.DESC_EDITABLE] = not is_all_mode
                 description.SetParameter(descid, bc, c4d.DESCID_ROOT)
 
             elif uid == UD_PARENT_OBJ:
-                # Показываем только при рекурсивном режиме
-                bc[c4d.DESC_HIDE] = hide_depth_parent
+                # Неактивны при "Все объекты", активны при "Рекурсивно"
+                bc[c4d.DESC_EDITABLE] = not is_all_mode
                 description.SetParameter(descid, bc, c4d.DESCID_ROOT)
 
         return True, flags | c4d.DESCFLAGS_DESC_LOADED
