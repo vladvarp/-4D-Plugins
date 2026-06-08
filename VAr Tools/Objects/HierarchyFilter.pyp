@@ -16,7 +16,6 @@ UserData:
 """
 
 import c4d
-from c4d import plugins
 import os
 import base64
 import tempfile
@@ -46,41 +45,6 @@ MODE_ALL       = 0
 MODE_LEVEL     = 1
 MODE_RECURSIVE = 2
 
-# ─── Иконка (base64 PNG 32×32, нарисована программно через PIL-совместимый raw)
-# Простая иконка: синий фон, белая решётка иерархии
-_ICON_B64 = (
-    "iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAB2UlEQVR4nO2Wv0oDQRDGf5de"
-    "YmFhYSoLC0E8gZWIhYiksLGwsLCwsLCwsLDQJiBiYWFhYSoLC0E8gbWIhYWFhYWFhYWFhY"
-    "WFrYFkl2Rnd29v75IJDCz77e7MN99mdi8hIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIi"
-    "IiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIi"
-    "IiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIi"
-    "IiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIi"
-    "IiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIi"
-    "IiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIi"
-    "IiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIi"
-    "IiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiLSBv4AGQD"
-    "XZVtptwAAAABJRU5ErkJggg=="
-)
-
-
-def _make_icon():
-    """Декодирует встроенный base64 PNG во временный файл и возвращает BaseBitmap."""
-    bmp = c4d.bitmaps.BaseBitmap()
-    try:
-        data = base64.b64decode(_ICON_B64.replace(" ", ""))
-        fd, tmp = tempfile.mkstemp(suffix=".png")
-        try:
-            os.write(fd, data)
-            os.close(fd)
-            bmp.InitWith(tmp)
-        finally:
-            try:
-                os.unlink(tmp)
-            except OSError:
-                pass
-    except Exception:
-        return None
-    return bmp
 
 
 # ─── Вспомогательные функции ─────────────────────────────────────────────────
@@ -364,18 +328,44 @@ class HierarchyFilterObject(c4d.plugins.ObjectData):
     def Draw(self, op, drawpass, bd, bh):
         return c4d.DRAWRESULT_OK
 
+# ─── Встроенная иконка (base64 PNG 32×32) ────────────────────────────────────
+_ICON_B64 = (
+    "iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAABSUlEQVR4nNVXIRaC"
+    "QBBd9nkTi0WDBgtWs5lkMBnsnsBuMBm8hMUqhSBBioWzaNoVlhl2ZkB4/jS7Dvu/"
+    "w8wHAlXAeBq+VQfI0jgwsQ245M/H3caT2UIsQjclh9YUGM6gKXkRkkpo9hUt4/8E"
+    "YGWWlF8kACKTkosFGNJrkjciV0qpAfbDPFzaOIlvosOHu+/E5EdYKFiBIjm05pJD"
+    "a1QARsYRgZFB++gtgHA4XUh75xf9TJaA/XZNysMqAKFyC7CG4zQi1nDQPtiELplk"
+    "Clwy1hQY0lUUiUfQkG5GOUpeK6Ar2Cb0GQ/FmHw5kDFp90LJmpKDGZP2GQ/FmHw5"
+    "dcbUew/UCqAaT5MztM94KMbky6kzJg0dwF1TcjBjYr8Vt43Kw4jzIJHArUSpCX9N"
+    "DnH0P4bFD8WukaVxoE2gFD4ubcJwGM7Sv+/j8/wDsOykd7X786wAAAAASUVORK5C"
+    "YII="
+)
+
+def _make_icon():
+    png_data = base64.b64decode(_ICON_B64)
+    try:
+        bmp = c4d.bitmaps.BaseBitmap()
+    except AttributeError:
+        bmp = c4d.BaseBitmap()
+    import tempfile, os
+    tmp = tempfile.NamedTemporaryFile(suffix=".png", delete=False)
+    try:
+        tmp.write(png_data)
+        tmp.close()
+        bmp.InitWith(tmp.name)
+    finally:
+        os.unlink(tmp.name)
+    return bmp
+
 
 # ─── Регистрация ─────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
-    ok = plugins.RegisterObjectPlugin(
+    c4d.plugins.RegisterObjectPlugin(
         id          = PLUGIN_ID,
         str         = PLUGIN_NAME,
         g           = HierarchyFilterObject,
         description = "",
         icon        = _make_icon(),
-        info        = 0,
+        info        = c4d.OBJECT_GENERATOR | c4d.OBJECT_INPUT,
     )
-    if not ok:
-        raise RuntimeError("HierarchyFilter: регистрация не удалась")
-    print("HierarchyFilter: плагин зарегистрирован (ID={})".format(PLUGIN_ID))

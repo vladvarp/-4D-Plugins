@@ -1,0 +1,35 @@
+# ─── Иконка (base64 PNG 32×32, нарисована программно через PIL-совместимый raw)
+# Простая иконка: синий фон, белая решётка иерархии
+_ICON_B64 = (
+    "iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAB2UlEQVR4nO2Wv0oDQRDGf5de"
+    "YmFhYSoLC0E8gZWIhYiksLGwsLCwsLCwsLDQJiBiYWFhYSoLC0E8gbWIhYWFhYWFhYWFhY"
+    "WFrYFkl2Rnd29v75IJDCz77e7MN99mdi8hIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIi"
+    "IiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIi"
+    "IiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIi"
+    "IiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIi"
+    "IiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIi"
+    "IiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIi"
+    "IiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIi"
+    "IiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiLSBv4AGQD"
+    "XZVtptwAAAABJRU5ErkJggg=="
+)
+
+
+def _make_icon():
+    """Декодирует встроенный base64 PNG во временный файл и возвращает BaseBitmap."""
+    bmp = c4d.bitmaps.BaseBitmap()
+    try:
+        data = base64.b64decode(_ICON_B64.replace(" ", ""))
+        fd, tmp = tempfile.mkstemp(suffix=".png")
+        try:
+            os.write(fd, data)
+            os.close(fd)
+            bmp.InitWith(tmp)
+        finally:
+            try:
+                os.unlink(tmp)
+            except OSError:
+                pass
+    except Exception:
+        return None
+    return bmp
