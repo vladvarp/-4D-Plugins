@@ -13,15 +13,15 @@ __res__ = c4d.plugins.GeResource()
 __res__.Init(os.path.dirname(__file__))
 
 PLUGIN_ID   = 1068852
-PLUGIN_NAME = "HierarchyFilter v1.3"
+PLUGIN_NAME = "HierarchyFilter v1.4"
 OBJECT_NAME = "HierarchyFilter"
 PLUGIN_HELP = "Объект-фильтр иерархии для использования в Xpresso"
 
 # SubID UserData
 UD_OBJECT_TYPE    = 1
 UD_TRAVERSE_MODE  = 2
-UD_DEPTH          = 3
-UD_PARENT_OBJ     = 4
+UD_DEPTH          = 4
+UD_PARENT_OBJ     = 3
 UD_INEXCLUDE      = 5   # Результат фильтрации (только чтение)
 UD_IE2_INEX_MODE  = 6   # Включить / Исключить
 UD_IE2_OBJ_MODE   = 7   # Объект / Тип
@@ -113,7 +113,7 @@ class UserDataManager:
         "Рекурсивно",
     ]
 
-    IE2_INEX_LABELS = ["Включить", "Исключить"]
+    IE2_INEX_LABELS = ["Учета", "Исключения"]
     IE2_OBJ_LABELS  = ["Объект", "Тип"]
 
     def __init__(self, op):
@@ -162,18 +162,20 @@ class UserDataManager:
         self.op.AddUserData(self._cycle_bc("Тип объекта", ["Все типы"]))
         # 2. Режим обхода
         self.op.AddUserData(self._cycle_bc("Режим обхода", self.TRAVERSE_LABELS))
-        # 3. Глубина
-        self.op.AddUserData(self._int_bc("Глубина", default=3))
         # 4. Родительский объект
-        self.op.AddUserData(self._cycle_bc("Родительский объект", ["HierarchyFilter"]))
+        self.op.AddUserData(self._cycle_bc("Рекурсивно начиная с", [self.op.GetName()]))
+
+        # 3. Глубина
+        self.op.AddUserData(self._int_bc("Рекурсивная глубина", default=3))
+
         # 5. Результат фильтрации — только чтение
-        self.op.AddUserData(self._inexclude_bc("Результат фильтрации", editable=False))
+        self.op.AddUserData(self._inexclude_bc(" ", editable=False))
         # 6. Включить / Исключить
-        self.op.AddUserData(self._cycle_bc("Действие", self.IE2_INEX_LABELS))
+        self.op.AddUserData(self._cycle_bc("Метод", self.IE2_INEX_LABELS))
         # 7. Объект / Тип
         self.op.AddUserData(self._cycle_bc("Режим фильтра", self.IE2_OBJ_LABELS))
         # 8. Второй InExclude — пользователь заполняет сам
-        self.op.AddUserData(self._inexclude_bc("Включить / Исключить", editable=True))
+        self.op.AddUserData(self._inexclude_bc(" ", editable=True))
 
         # Значения по умолчанию
         did, _ = _ud_descid(self.op, UD_TRAVERSE_MODE)
@@ -218,10 +220,10 @@ class UserDataManager:
         # Dropdown 4 — все родители по всей глубине иерархии
         # Глубина показывается через префикс "-", "--", "---" и т.д.
         all_parents = _collect_parents_recursive(self.op)
-        parent_labels = ["HierarchyFilter"]
+        parent_labels = [self.op.GetName()]
         for obj, depth in all_parents:
-            prefix = "-" * depth if depth > 0 else ""
-            label = (prefix + " " + obj.GetName()) if prefix else obj.GetName()
+            prefix = "-" * (depth + 1)
+            label = prefix + " " + obj.GetName()
             parent_labels.append(label)
         self._update_cycle(UD_PARENT_OBJ, parent_labels)
 
@@ -317,8 +319,6 @@ class UserDataManager:
 class HierarchyFilterObject(c4d.plugins.ObjectData):
 
     def Init(self, op, isload=False):
-        if not isload:
-            op.SetName(OBJECT_NAME)
         udm = UserDataManager(op)
         udm.ensure_created()
         return True
@@ -353,6 +353,11 @@ class HierarchyFilterObject(c4d.plugins.ObjectData):
         return True, flags | c4d.DESCFLAGS_DESC_LOADED
 
     def Message(self, op, type_, data):
+
+        if type_ == c4d.MSG_MENUPREPARE:
+            if op.GetName() == PLUGIN_NAME:
+                op.SetName(OBJECT_NAME)
+
         if type_ == c4d.MSG_DESCRIPTION_POSTSETPARAMETER:
             # Откатываем ручное редактирование первого InExclude
             if data and "descid" in data:
@@ -367,8 +372,7 @@ class HierarchyFilterObject(c4d.plugins.ObjectData):
             udm.apply_filter()
 
         elif type_ in (c4d.MSG_UPDATE,
-                       c4d.MSG_DOCUMENTINFO,
-                       c4d.MSG_MENUPREPARE):
+                    c4d.MSG_DOCUMENTINFO):
             udm = UserDataManager(op)
             udm.ensure_created()
             udm.refresh_dropdowns()

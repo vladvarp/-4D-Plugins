@@ -12,7 +12,7 @@ PLUGIN_ID   = 1068833
 PLUGIN_NAME = "About"
 PLUGIN_HELP = "Информация о наборе плагинов VAr Tools"
 
-AUTHOR_URL  = "https://your-website.com"
+AUTHOR_URL  = "https://github.com/vladvarp/-4D-Plugins"
 
 # --- ID элементов диалога -----------------------------------------------------
 ID_BTN_WEBSITE = 1001
@@ -90,7 +90,7 @@ VAr Tools - набор инструментов для Cinema 4D,
 
   Objects
 
-  * HierarchyFilter v1.3
+  * HierarchyFilter v1.4
     Объект-Ноль с расширенными UserData для
     фильтрации и обхода иерархии. Используется
     совместно с Xpresso для динамической выборки
