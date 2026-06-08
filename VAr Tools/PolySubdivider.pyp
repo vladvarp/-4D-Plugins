@@ -138,7 +138,6 @@ def subdivide_uniform(src_obj, p):
     for poly in get_source_polys(src_obj):
         poly = ensure_quad(poly)
         p0, p1, p2, p3 = poly
-        # Нормаль полигона для смещения по Z
         edge_u = p1 - p0
         edge_v = p3 - p0
         poly_normal = edge_u.Cross(edge_v)
@@ -162,7 +161,6 @@ def subdivide_uniform(src_obj, p):
                     n = simple_noise(pt.x, pt.y, pt.z, freq)
                     j = noise * rng.uniform(0.8, 1.2)
                     pt = pt + c4d.Vector(n * j, n * j * 0.5, n * j)
-                # Смещение Z: поднимаем внутренние точки по нормали полигона
                 if sz != 0.0 and 0 < row < div and 0 < col < div:
                     pt = pt + poly_normal * sz
                 grid_row.append(mb.add_vert(pt))
@@ -399,16 +397,37 @@ class PolySubdividerObject(plugins.ObjectData):
         if child is None:
             return None
 
-        # Забираем child через HierarchyClone — как дефолтные генераторы C4D.
-        # Child автоматически скрыт во вьюпорте пока генератор активен,
-        # без изменения его параметров видимости.
-        dirty = op.CheckCache(hh) or op.IsDirty(c4d.DIRTYFLAGS_DATA)
-        if not dirty:
+        # Получаем полигональный клон child — C4D скрывает child автоматически
+        # когда его клон используется генератором через этот метод
+        res_clone = op.GetAndCheckHierarchyClone(hh, child, c4d.HIERARCHYCLONEFLAGS_ASPOLY, False)
+        if res_clone is None:
+            return None
+
+        # Если ничего не изменилось — возвращаем существующий кэш
+        if not res_clone["dirty"] and not op.IsDirty(c4d.DIRTY_DATA):
             return op.GetCache(hh)
 
-        src = hh.GetHierarchyClone(op, child, c4d.HIERARCHYCLONEFLAGS_ASPOLY, None, None)
-        if src is None:
+        # Клон живёт только в рамках этого вызова — сразу читаем геометрию
+        src_clone = res_clone["clone"]
+        if src_clone is None:
             return None
+
+        # Защита от деактивированного объекта без геометрии
+        if not hasattr(src_clone, 'GetPointCount') or src_clone.GetPointCount() == 0:
+            return None
+
+        # Копируем точки и полигоны в независимый объект чтобы клон можно было отпустить
+        pts = [src_clone.GetPoint(i) for i in range(src_clone.GetPointCount())]
+        polys_raw = [src_clone.GetPolygon(i) for i in range(src_clone.GetPolygonCount())]
+
+        # Собираем src как простой контейнер данных
+        class _SrcProxy(object):
+            def GetPointCount(self_):    return len(pts)
+            def GetPolygonCount(self_):  return len(polys_raw)
+            def GetPoint(self_, i):      return pts[i]
+            def GetPolygon(self_, i):    return polys_raw[i]
+
+        src = _SrcProxy()
 
         params = {
             "iterations":  op[PAR_ITERATIONS],
