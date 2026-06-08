@@ -16,7 +16,14 @@ UserData:
 """
 
 import c4d
+from c4d import plugins
+import os
 import base64
+import tempfile
+
+# Обязательно для RegisterObjectPlugin
+__res__ = c4d.plugins.GeResource()
+__res__.Init(os.path.dirname(__file__))
 
 # ─── Константы ───────────────────────────────────────────────────────────────
 PLUGIN_ID   = 1068852
@@ -57,49 +64,22 @@ _ICON_B64 = (
 
 
 def _make_icon():
-    """Генерирует иконку через растровый рисунок (без PIL)."""
+    """Декодирует встроенный base64 PNG во временный файл и возвращает BaseBitmap."""
+    bmp = c4d.bitmaps.BaseBitmap()
     try:
-        bmp = c4d.bitmaps.BaseBitmap()
-    except AttributeError:
-        bmp = c4d.BaseBitmap()
-
-    bmp.Init(32, 32, 24)
-
-    # Фон — тёмно-синий
-    for y in range(32):
-        for x in range(32):
-            bmp.SetPixel(x, y, 20, 50, 100)
-
-    # Рисуем схему иерархии (белые блоки и линии)
-    def rect(x1, y1, x2, y2, r, g, b):
-        for yy in range(y1, y2 + 1):
-            for xx in range(x1, x2 + 1):
-                bmp.SetPixel(xx, yy, r, g, b)
-
-    def hline(y, x1, x2, r, g, b):
-        for xx in range(x1, x2 + 1):
-            bmp.SetPixel(xx, y, r, g, b)
-
-    def vline(x, y1, y2, r, g, b):
-        for yy in range(y1, y2 + 1):
-            bmp.SetPixel(x, yy, r, g, b)
-
-    # Корневой блок (верх по центру)
-    rect(11, 3, 20, 8, 255, 255, 255)
-    # Вертикаль вниз от корня
-    vline(15, 8, 14, 200, 220, 255)
-    # Горизонталь
-    hline(14, 5, 25, 200, 220, 255)
-    # Левый дочерний блок
-    vline(5, 14, 18, 200, 220, 255)
-    rect(2, 18, 9, 23, 180, 210, 255)
-    # Правый дочерний блок
-    vline(25, 14, 18, 200, 220, 255)
-    rect(21, 18, 29, 23, 180, 210, 255)
-    # Левый дочерний второго уровня
-    vline(5, 23, 27, 150, 190, 240)
-    rect(2, 27, 9, 30, 120, 170, 230)
-
+        data = base64.b64decode(_ICON_B64.replace(" ", ""))
+        fd, tmp = tempfile.mkstemp(suffix=".png")
+        try:
+            os.write(fd, data)
+            os.close(fd)
+            bmp.InitWith(tmp)
+        finally:
+            try:
+                os.unlink(tmp)
+            except OSError:
+                pass
+    except Exception:
+        return None
     return bmp
 
 
@@ -368,6 +348,15 @@ class HierarchyFilterObject(c4d.plugins.ObjectData):
             udm.refresh()
         return True
 
+    # ObjectData должен возвращать виртуальный объект (Null просто возвращает None)
+    def GetVirtualObjects(self, op, hh):
+        # Обновляем данные при каждом пересчёте
+        udm = UserDataManager(op)
+        udm.ensure_created()
+        udm.refresh()
+        # Возвращаем None — объект не генерирует полигонов
+        return c4d.BaseObject(c4d.Onull)
+
     def CheckDirty(self, op, doc):
         # Пересчитываем каждый кадр чтобы динамические списки были актуальны
         op.SetDirty(c4d.DIRTYFLAGS_DATA)
@@ -379,11 +368,14 @@ class HierarchyFilterObject(c4d.plugins.ObjectData):
 # ─── Регистрация ─────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
-    c4d.plugins.RegisterObjectPlugin(
+    ok = plugins.RegisterObjectPlugin(
         id          = PLUGIN_ID,
         str         = PLUGIN_NAME,
         g           = HierarchyFilterObject,
-        description = "Onull",     # используем стандартное описание Null — не требует .res файла
+        description = "",
         icon        = _make_icon(),
-        info        = c4d.OBJECT_ISNULL,  # объект типа Null, не генератор
+        info        = 0,
     )
+    if not ok:
+        raise RuntimeError("HierarchyFilter: регистрация не удалась")
+    print("HierarchyFilter: плагин зарегистрирован (ID={})".format(PLUGIN_ID))
