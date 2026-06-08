@@ -129,6 +129,7 @@ def subdivide_uniform(src_obj, p):
     div   = max(1, p["iterations"])
     sx    = p["slider_x"] - 0.5
     sy    = p["slider_y"] - 0.5
+    sz    = (p["slider_z"] - 0.5) * 200.0
     noise = p["noise_amt"]
     freq  = max(0.01, p["noise_freq"])
     rng   = random.Random(p["random_seed"])
@@ -137,6 +138,13 @@ def subdivide_uniform(src_obj, p):
     for poly in get_source_polys(src_obj):
         poly = ensure_quad(poly)
         p0, p1, p2, p3 = poly
+        # Нормаль полигона для смещения по Z
+        edge_u = p1 - p0
+        edge_v = p3 - p0
+        poly_normal = edge_u.Cross(edge_v)
+        n_len = poly_normal.GetLength()
+        if n_len > 0.0001:
+            poly_normal = poly_normal / n_len
         grid = []
         for row in range(div + 1):
             tv = row / float(div)
@@ -154,6 +162,9 @@ def subdivide_uniform(src_obj, p):
                     n = simple_noise(pt.x, pt.y, pt.z, freq)
                     j = noise * rng.uniform(0.8, 1.2)
                     pt = pt + c4d.Vector(n * j, n * j * 0.5, n * j)
+                # Смещение Z: поднимаем внутренние точки по нормали полигона
+                if sz != 0.0 and 0 < row < div and 0 < col < div:
+                    pt = pt + poly_normal * sz
                 grid_row.append(mb.add_vert(pt))
             grid.append(grid_row)
         for row in range(div):
@@ -388,27 +399,16 @@ class PolySubdividerObject(plugins.ObjectData):
         if child is None:
             return None
 
-        # Скрываем child во вьюпорте, в списке объектов остаётся
-        child[c4d.ID_BASEOBJECT_VISIBILITY_EDITOR] = 1  # 1 = off
+        # Забираем child через HierarchyClone — как дефолтные генераторы C4D.
+        # Child автоматически скрыт во вьюпорте пока генератор активен,
+        # без изменения его параметров видимости.
+        dirty = op.CheckCache(hh) or op.IsDirty(c4d.DIRTYFLAGS_DATA)
+        if not dirty:
+            return op.GetCache(hh)
 
-        # Получаем кэш / полигональное представление потомка
-        src = child.GetDeformCache()
+        src = hh.GetHierarchyClone(op, child, c4d.HIERARCHYCLONEFLAGS_ASPOLY, None, None)
         if src is None:
-            src = child.GetCache(hh)
-        if src is None:
-            src = child
-
-        # Конвертируем примитивы в полигоны
-        if not src.CheckType(c4d.Opolygon):
-            res = utils.SendModelingCommand(
-                command = c4d.MCOMMAND_CURRENTSTATETOOBJECT,
-                list    = [src.GetClone()],
-                mode    = c4d.MODELINGCOMMANDMODE_ALL,
-                doc     = op.GetDocument()
-            )
-            if not res:
-                return None
-            src = res[0]
+            return None
 
         params = {
             "iterations":  op[PAR_ITERATIONS],
@@ -525,9 +525,9 @@ class PolySubdividerObject(plugins.ObjectData):
         # Угол паттерна
         bc = c4d.GetCustomDataTypeDefault(c4d.DTYPE_REAL)
         bc[c4d.DESC_NAME]    = "Угол паттерна"
-        bc[c4d.DESC_MIN]     = -180.0
-        bc[c4d.DESC_MAX]     = 180.0
-        bc[c4d.DESC_STEP]    = 1.0
+        bc[c4d.DESC_MIN]     = -math.pi
+        bc[c4d.DESC_MAX]     = math.pi
+        bc[c4d.DESC_STEP]    = math.radians(1.0)
         bc[c4d.DESC_UNIT]    = c4d.DESC_UNIT_DEGREE
         bc[c4d.DESC_DEFAULT] = 0.0
         description.SetParameter(
