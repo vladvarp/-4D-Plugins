@@ -14,49 +14,6 @@ PLUGIN_HELP = "Информация о наборе плагинов VAr Tools"
 
 AUTHOR_URL  = "https://your-website.com"
 
-
-# --- Иконка: рисуем программно 32x32 -----------------------------------------
-
-def _make_icon():
-    """
-    Рисует иконку 'i' (информация) на синем круге.
-    Без внешних файлов - совместимо с R26+.
-    """
-    SIZE = 32
-    try:
-        bmp = c4d.bitmaps.BaseBitmap()
-    except AttributeError:
-        bmp = c4d.BaseBitmap()
-
-    bmp.Init(SIZE, SIZE, 32)
-
-    BG     = (40,  40,  40)
-    CIRCLE = (60, 130, 220)
-    TEXT   = (255, 255, 255)
-
-    cx, cy, r = SIZE // 2, SIZE // 2, SIZE // 2 - 1
-
-    for y in range(SIZE):
-        for x in range(SIZE):
-            dx, dy = x - cx, y - cy
-            if dx * dx + dy * dy <= r * r:
-                bmp.SetPixel(x, y, CIRCLE[0], CIRCLE[1], CIRCLE[2])
-            else:
-                bmp.SetPixel(x, y, BG[0], BG[1], BG[2])
-
-    # Точка над буквой 'i'
-    for dy in range(-1, 2):
-        for dx in range(-1, 2):
-            bmp.SetPixel(cx + dx, cy - 7 + dy, TEXT[0], TEXT[1], TEXT[2])
-
-    # Палочка буквы 'i'
-    for dy in range(0, 9):
-        for dx in range(-1, 1):
-            bmp.SetPixel(cx + dx, cy - 2 + dy, TEXT[0], TEXT[1], TEXT[2])
-
-    return bmp
-
-
 # --- ID элементов диалога -----------------------------------------------------
 ID_BTN_WEBSITE = 1001
 ID_BTN_CLOSE   = 1002
@@ -123,6 +80,15 @@ VAr Tools - набор инструментов для Cinema 4D,
 
 ------------------------------------------
 
+  DEFORMRES
+
+  * PolySubdivider v1.0 (Experimental)
+    Эксперементальный налог Divider: несколько
+    алгоритмов разбиения полигонов с возможностью
+    лёгкого добавления новых типов.
+
+------------------------------------------
+
 Версия: 2.4
 Автор:  V.Ar Production
 """
@@ -179,7 +145,6 @@ class AboutDialog(gui.GeDialog):
             self.Close()
         return True
 
-
 # --- Команда ------------------------------------------------------------------
 
 class AboutCommand(c4d.plugins.CommandData):
@@ -196,6 +161,47 @@ class AboutCommand(c4d.plugins.CommandData):
 
     def GetState(self, doc):
         return c4d.CMD_ENABLED
+
+# --- Иконка: рисуем программно 32x32 -----------------------------------------
+
+def _make_icon():
+    """
+    Рисует иконку 'i' (информация) на синем круге.
+    Без внешних файлов - совместимо с R26+.
+    """
+    SIZE = 32
+    try:
+        bmp = c4d.bitmaps.BaseBitmap()
+    except AttributeError:
+        bmp = c4d.BaseBitmap()
+
+    bmp.Init(SIZE, SIZE, 32)
+
+    BG     = (40,  40,  40)
+    CIRCLE = (60, 130, 220)
+    TEXT   = (255, 255, 255)
+
+    cx, cy, r = SIZE // 2, SIZE // 2, SIZE // 2 - 1
+
+    for y in range(SIZE):
+        for x in range(SIZE):
+            dx, dy = x - cx, y - cy
+            if dx * dx + dy * dy <= r * r:
+                bmp.SetPixel(x, y, CIRCLE[0], CIRCLE[1], CIRCLE[2])
+            else:
+                bmp.SetPixel(x, y, BG[0], BG[1], BG[2])
+
+    # Точка над буквой 'i'
+    for dy in range(-1, 2):
+        for dx in range(-1, 2):
+            bmp.SetPixel(cx + dx, cy - 7 + dy, TEXT[0], TEXT[1], TEXT[2])
+
+    # Палочка буквы 'i'
+    for dy in range(0, 9):
+        for dx in range(-1, 1):
+            bmp.SetPixel(cx + dx, cy - 2 + dy, TEXT[0], TEXT[1], TEXT[2])
+
+    return bmp
 
 
 # --- Регистрация --------------------------------------------------------------

@@ -11,7 +11,7 @@ MENU_NAME = "VAr Tools"
 MENU_ITEMS = [
     1068825,    # Object Renamer Pro
     1068834,    # Camera Resolution 
-    1068837,
+
     None,
     {"name": "Tools", "items": [
         {"name": "Axis", "items": [
@@ -30,6 +30,10 @@ MENU_ITEMS = [
             1068832,   # Clean Empty Nulls
         ]},
 
+    ]},
+
+    {"name": "Deformers", "items": [
+        1068837,    # PolySubdivider v1.0 (Experimental)
     ]},
 
     None,

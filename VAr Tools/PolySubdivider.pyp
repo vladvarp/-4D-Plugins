@@ -1,6 +1,6 @@
 # ============================================================
 #  PolySubdivider — плагин для Cinema 4D R26
-#  Расширенный аналог Divider: несколько алгоритмов разбиения
+#  Эксперементальный налог Divider: несколько алгоритмов разбиения
 #  полигонов с возможностью лёгкого добавления новых типов.
 #
 #  Установка:
@@ -14,9 +14,13 @@ import c4d
 from c4d import plugins, utils
 import math
 import random
+import os
+import base64
+import tempfile
 
 # ── ID плагина ──
 PLUGIN_ID = 1068837
+MENU_NAME = "PolySubdivider v1.0 (Experimental)"
 
 # ============================================================
 #  ID параметров (должны быть > 999, не пересекаться с C4D)
@@ -397,14 +401,6 @@ class PolySubdividerObject(plugins.ObjectData):
         if child is None:
             return None
 
-        # Скрываем дочерний объект в редакторе и рендере (0=default, 1=on, 2=off)
-        # Проверка состояния исключает бесконечный пересчёт
-        if child[c4d.ID_BASEOBJECT_VISIBILITY_EDITOR] != 2 or \
-           child[c4d.ID_BASEOBJECT_VISIBILITY_RENDER] != 2:
-            child[c4d.ID_BASEOBJECT_VISIBILITY_EDITOR] = 2
-            child[c4d.ID_BASEOBJECT_VISIBILITY_RENDER] = 2
-            c4d.EventAdd()
-
         # Получаем полигональное представление child
         src = child.GetDeformCache()
         if src is None:
@@ -615,6 +611,32 @@ class PolySubdividerObject(plugins.ObjectData):
 
         return True, flags | c4d.DESCFLAGS_DESC_LOADED
 
+# ─── Встроенная иконка (base64 PNG 32×32) ────────────────────────────────────
+_ICON_B64 = (
+    "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"
+
+)
+
+def _make_icon():
+    """Декодирует встроенный base64 PNG во временный файл и возвращает BaseBitmap."""
+    bmp = c4d.bitmaps.BaseBitmap()
+    try:
+        data = base64.b64decode(_ICON_B64.replace(" ", ""))
+        fd, tmp = tempfile.mkstemp(suffix=".png")
+        try:
+            os.write(fd, data)
+            os.close(fd)
+            bmp.InitWith(tmp)
+        finally:
+            try:
+                os.unlink(tmp)
+            except OSError:
+                pass
+    except Exception:
+        return None
+    return bmp
+
+
 
 # ============================================================
 #  Регистрация плагина
@@ -625,10 +647,10 @@ class PolySubdividerObject(plugins.ObjectData):
 if __name__ == "__main__":
     ok = plugins.RegisterObjectPlugin(
         id          = PLUGIN_ID,
-        str         = "PolySubdivider",
+        str         = MENU_NAME,
         g           = PolySubdividerObject,
         description = "Obase",
-        icon        = None,
+        icon        = _make_icon(),
         info        = c4d.OBJECT_GENERATOR | c4d.OBJECT_INPUT,
     )
     if not ok:
