@@ -15,42 +15,37 @@ from c4d import plugins, utils
 import math
 import random
 
-# ── ID плагина (зарегистрирован на plugincafe.maxon.net) ──
+# ── ID плагина ──
 PLUGIN_ID = 1068837
 
 # ============================================================
-#  ID параметров панели Атрибуты
-#  Значения > 1000 чтобы не конфликтовать с базовыми ID C4D
+#  ID параметров (должны быть > 999, не пересекаться с C4D)
 # ============================================================
-PAR_ALGORITHM   = 1100   # Тип алгоритма (cycle/dropdown)
-PAR_ITERATIONS  = 1101   # Количество итераций
-PAR_SLIDER_X    = 1102   # Смещение / параметр X (0..100 %)
-PAR_SLIDER_Y    = 1103   # Смещение / параметр Y (0..100 %)
-PAR_SLIDER_Z    = 1104   # Смещение / параметр Z (0..100 %)
-PAR_RANDOM_SEED = 1105   # Зерно генератора случайных чисел
-PAR_NOISE_AMT   = 1106   # Величина шума
-PAR_NOISE_FREQ  = 1107   # Частота шума
-PAR_NOISE_LOOP  = 1108   # Петля шума (%)
-PAR_PATTERN_ROT = 1109   # Угол паттерна (градусы)
-PAR_GRID_SCALE  = 1110   # Масштаб сетки
+PAR_ALGORITHM   = 1100
+PAR_ITERATIONS  = 1101
+PAR_SLIDER_X    = 1102
+PAR_SLIDER_Y    = 1103
+PAR_SLIDER_Z    = 1104
+PAR_RANDOM_SEED = 1105
+PAR_NOISE_AMT   = 1106
+PAR_NOISE_FREQ  = 1107
+PAR_NOISE_LOOP  = 1108
+PAR_PATTERN_ROT = 1109
+PAR_GRID_SCALE  = 1110
 
-# ── ID групп в описании ──
 GRP_SETTINGS    = 1200
 GRP_NOISE       = 1201
 
 # ============================================================
 #  Индексы алгоритмов
-#  Чтобы добавить новый: ALG_MYALG = 6, имя в ALG_NAMES,
-#  функция subdivide_myalg, запись в ALGORITHM_REGISTRY
 # ============================================================
-ALG_UNIFORM     = 0   # Равномерная UV-сетка (аналог Dmitris)
-ALG_RANDOM      = 1   # Случайные прямолинейные разрезы
-ALG_DIAGONAL    = 2   # Диагональное деление (fan из центра)
-ALG_HERRINGBONE = 3   # Паттерн «Ёлочка»
-ALG_RADIAL      = 4   # Радиальное деление (секторы)
-ALG_VORONOI     = 5   # Вороной-подобная сетка
+ALG_UNIFORM     = 0
+ALG_RANDOM      = 1
+ALG_DIAGONAL    = 2
+ALG_HERRINGBONE = 3
+ALG_RADIAL      = 4
+ALG_VORONOI     = 5
 
-# Названия для выпадающего списка (порядок = индекс)
 ALG_NAMES = [
     "Равномерное",
     "Случайное",
@@ -65,54 +60,36 @@ ALG_NAMES = [
 # ============================================================
 
 def lerp(a, b, t):
-    """Линейная интерполяция двух векторов c4d.Vector."""
     return a + (b - a) * t
 
-
 def mid_pt(a, b):
-    """Средняя точка отрезка."""
     return (a + b) * 0.5
 
-
 def simple_noise(x, y, z, freq=1.0):
-    """
-    Детерминированный псевдошум через синус.
-    Не требует внешних библиотек (perlin и т.п.).
-    Возвращает значение в диапазоне [-1 .. 1].
-    """
     x, y, z = x * freq, y * freq, z * freq
     return math.sin(x * 127.1 + y * 311.7 + z * 74.9)
 
 # ============================================================
-#  Строитель полигонального меша
+#  Строитель меша
 # ============================================================
 
-class MeshBuilder:
-    """
-    Накапливает вершины и полигоны, затем создаёт
-    готовый c4d.PolygonObject одним вызовом build().
-    """
-
+class MeshBuilder(object):
     def __init__(self):
-        self.verts = []   # список c4d.Vector
-        self.polys = []   # список кортежей (a, b, c, d)
+        self.verts = []
+        self.polys = []
 
     def add_vert(self, v):
-        """Добавляет вершину и возвращает её индекс."""
         idx = len(self.verts)
         self.verts.append(c4d.Vector(v.x, v.y, v.z))
         return idx
 
     def add_quad(self, a, b, c, d):
-        """Добавляет четырёхугольник."""
         self.polys.append((a, b, c, d))
 
     def add_tri(self, a, b, c):
-        """Добавляет треугольник (вырожденный quad: c==d)."""
         self.polys.append((a, b, c, c))
 
     def build(self):
-        """Создаёт и возвращает c4d.PolygonObject."""
         if not self.verts or not self.polys:
             return None
         obj = c4d.PolygonObject(len(self.verts), len(self.polys))
@@ -124,15 +101,10 @@ class MeshBuilder:
         return obj
 
 # ============================================================
-#  Утилита: извлечь полигоны исходного объекта
+#  Утилиты
 # ============================================================
 
 def get_source_polys(src_obj):
-    """
-    Возвращает список полигонов как список списков c4d.Vector.
-    Треугольники возвращаются как список из 3 элементов,
-    квады — из 4.
-    """
     pts = [src_obj.GetPoint(i) for i in range(src_obj.GetPointCount())]
     result = []
     for i in range(src_obj.GetPolygonCount()):
@@ -143,27 +115,19 @@ def get_source_polys(src_obj):
             result.append([pts[p.a], pts[p.b], pts[p.c], pts[p.d]])
     return result
 
-
 def ensure_quad(poly):
-    """Дополняет треугольник до вырожденного quad."""
     if len(poly) == 3:
         return [poly[0], poly[1], poly[2], poly[2]]
-    return poly
+    return list(poly)
 
 # ============================================================
 #  Алгоритмы подразделения
-#  Сигнатура каждой функции: subdivide_*(src_obj, p) -> MeshBuilder
-#  p — словарь параметров (iterations, slider_x, ... noise_amt, ...)
 # ============================================================
 
 def subdivide_uniform(src_obj, p):
-    """
-    Равномерная UV-сетка.
-    Каждый полигон делится на (iter+1)^2 ячеек.
-    slider_x / slider_y смещают внутренние рёбра сетки.
-    """
-    div   = max(1, p["iterations"])       # делений по каждой оси
-    sx    = p["slider_x"] / 100.0 - 0.5  # [-0.5 .. 0.5]
+    """Равномерная UV-сетка — аналог Dmitris."""
+    div   = max(1, p["iterations"])
+    sx    = p["slider_x"] / 100.0 - 0.5
     sy    = p["slider_y"] / 100.0 - 0.5
     noise = p["noise_amt"]
     freq  = max(0.01, p["noise_freq"])
@@ -173,102 +137,74 @@ def subdivide_uniform(src_obj, p):
     for poly in get_source_polys(src_obj):
         poly = ensure_quad(poly)
         p0, p1, p2, p3 = poly
-
-        # Строим сетку (div+1) x (div+1) вершин
         grid = []
         for row in range(div + 1):
-            tv = row / div
+            tv = row / float(div)
             if 0 < row < div:
                 tv = max(0.0, min(1.0, tv + sy / div))
             grid_row = []
             for col in range(div + 1):
-                tu = col / div
+                tu = col / float(div)
                 if 0 < col < div:
                     tu = max(0.0, min(1.0, tu + sx / div))
-                # Билинейная интерполяция
                 bot = lerp(p0, p1, tu)
                 top = lerp(p3, p2, tu)
                 pt  = lerp(bot, top, tv)
-                # Добавляем шум
                 if noise > 0:
                     n = simple_noise(pt.x, pt.y, pt.z, freq)
-                    jitter = noise * rng.uniform(0.8, 1.2)
-                    pt = pt + c4d.Vector(n * jitter, n * jitter * 0.5, n * jitter)
+                    j = noise * rng.uniform(0.8, 1.2)
+                    pt = pt + c4d.Vector(n * j, n * j * 0.5, n * j)
                 grid_row.append(mb.add_vert(pt))
             grid.append(grid_row)
-
-        # Создаём квады по сетке
         for row in range(div):
             for col in range(div):
-                a = grid[row][col]
-                b = grid[row][col + 1]
-                c = grid[row + 1][col + 1]
-                d = grid[row + 1][col]
-                mb.add_quad(a, b, c, d)
-
+                mb.add_quad(grid[row][col], grid[row][col+1],
+                            grid[row+1][col+1], grid[row+1][col])
     return mb
 
 
 def subdivide_random(src_obj, p):
-    """
-    Случайное подразделение.
-    Каждый полигон режется iter случайными горизонтальными
-    или вертикальными разрезами.
-    slider_x управляет смещением точки разреза.
-    """
+    """Случайные горизонтальные / вертикальные разрезы."""
     iters = max(1, p["iterations"])
-    bias  = p["slider_x"] / 100.0        # смещение от центра [0..1]
+    bias  = p["slider_x"] / 100.0
     noise = p["noise_amt"]
     rng   = random.Random(p["random_seed"])
     mb    = MeshBuilder()
 
     def split_h(quad, t):
-        """Горизонтальный разрез quad по параметру t."""
         a, b, c, d = quad
-        ab = lerp(a, d, t)
-        bc = lerp(b, c, t)
-        return [a, b, bc, ab], [ab, bc, c, d]
+        return [a, b, lerp(b, c, t), lerp(a, d, t)], \
+               [lerp(a, d, t), lerp(b, c, t), c, d]
 
     def split_v(quad, t):
-        """Вертикальный разрез quad по параметру t."""
         a, b, c, d = quad
-        ad = lerp(a, b, t)
-        dc = lerp(d, c, t)
-        return [a, ad, dc, d], [ad, b, c, dc]
+        return [a, lerp(a, b, t), lerp(d, c, t), d], \
+               [lerp(a, b, t), b, c, lerp(d, c, t)]
 
     for poly in get_source_polys(src_obj):
         pieces = [ensure_quad(poly)]
         for _ in range(iters):
-            next_pieces = []
+            nxt = []
             for piece in pieces:
-                # Точка разреза: смещаем в сторону slider_x
                 t = rng.uniform(0.15, 0.85)
                 t = t * (1.0 - bias) + bias * rng.uniform(0.4, 0.6)
                 t = max(0.1, min(0.9, t))
                 if noise > 0:
-                    t += simple_noise(
-                        piece[0].x, piece[0].y, piece[0].z
-                    ) * noise * 0.15
+                    t += simple_noise(piece[0].x, piece[0].y,
+                                      piece[0].z) * noise * 0.1
                     t = max(0.1, min(0.9, t))
                 if rng.random() < 0.5:
-                    next_pieces.extend(split_h(piece, t))
+                    nxt.extend(split_h(piece, t))
                 else:
-                    next_pieces.extend(split_v(piece, t))
-            pieces = next_pieces
-
+                    nxt.extend(split_v(piece, t))
+            pieces = nxt
         for piece in pieces:
-            idxs = [mb.add_vert(v) for v in piece]
-            mb.add_quad(*idxs)
-
+            mb.add_quad(*[mb.add_vert(v) for v in piece])
     return mb
 
 
 def subdivide_diagonal(src_obj, p):
-    """
-    Диагональное (fan) деление.
-    Каждый полигон рекурсивно делится на 4 части
-    через смещённый центр. Создаёт органичный паттерн.
-    """
+    """Рекурсивное fan-деление через смещённый центр."""
     iters = max(1, p["iterations"])
     sx    = p["slider_x"] / 100.0
     sy    = p["slider_y"] / 100.0
@@ -279,55 +215,37 @@ def subdivide_diagonal(src_obj, p):
 
     def diag_split(quad, depth):
         p0, p1, p2, p3 = quad
-        # Центр со смещением от слайдеров
-        center = lerp(
-            lerp(p0, p1, sx),
-            lerp(p3, p2, sx),
-            sy
-        )
+        center = lerp(lerp(p0, p1, sx), lerp(p3, p2, sx), sy)
         if noise > 0:
             n = simple_noise(center.x, center.y, center.z, freq)
-            jitter = noise * rng.uniform(0.5, 1.5)
-            center = center + c4d.Vector(
-                n * jitter, n * jitter * 0.3, n * jitter
-            )
+            j = noise * rng.uniform(0.5, 1.5)
+            center = center + c4d.Vector(n*j, n*j*0.3, n*j)
         if depth <= 1:
-            # Конечный уровень: добавляем 4 треугольника
             ci = mb.add_vert(center)
-            i0 = mb.add_vert(p0)
-            i1 = mb.add_vert(p1)
-            i2 = mb.add_vert(p2)
-            i3 = mb.add_vert(p3)
+            i0, i1 = mb.add_vert(p0), mb.add_vert(p1)
+            i2, i3 = mb.add_vert(p2), mb.add_vert(p3)
             mb.add_tri(i0, i1, ci)
             mb.add_tri(i1, i2, ci)
             mb.add_tri(i2, i3, ci)
             mb.add_tri(i3, i0, ci)
         else:
-            # Делим на 4 подквада и уходим рекурсивно
-            m01 = mid_pt(p0, p1)
-            m12 = mid_pt(p1, p2)
-            m23 = mid_pt(p2, p3)
-            m30 = mid_pt(p3, p0)
-            diag_split([p0,  m01, center, m30], depth - 1)
-            diag_split([m01, p1,  m12, center], depth - 1)
-            diag_split([center, m12, p2,  m23], depth - 1)
-            diag_split([m30, center, m23, p3 ], depth - 1)
+            m01, m12 = mid_pt(p0,p1), mid_pt(p1,p2)
+            m23, m30 = mid_pt(p2,p3), mid_pt(p3,p0)
+            diag_split([p0,  m01, center, m30], depth-1)
+            diag_split([m01, p1,  m12, center], depth-1)
+            diag_split([center, m12, p2,  m23], depth-1)
+            diag_split([m30, center, m23, p3 ], depth-1)
 
     for poly in get_source_polys(src_obj):
         diag_split(ensure_quad(poly), iters)
-
     return mb
 
 
 def subdivide_herringbone(src_obj, p):
-    """
-    Паттерн «Ёлочка» (Herringbone).
-    Чётные и нечётные строки смещаются на slider_x,
-    создавая паркетный эффект.
-    """
+    """Паркетный паттерн «Ёлочка» со смещением чётных строк."""
     div   = max(1, p["iterations"])
-    sx    = p["slider_x"] / 100.0   # смещение чётных строк
-    sy    = p["slider_y"] / 100.0   # степень сжатия по V
+    sx    = p["slider_x"] / 100.0
+    sy    = p["slider_y"] / 100.0
     noise = p["noise_amt"]
     freq  = max(0.01, p["noise_freq"])
     rng   = random.Random(p["random_seed"])
@@ -338,48 +256,34 @@ def subdivide_herringbone(src_obj, p):
         p0, p1, p2, p3 = poly
         grid = []
         for row in range(div + 1):
-            tv = row / div
-            # Сжатие строк регулируется slider_y
+            tv     = row / float(div)
             tv_adj = min(tv * (0.5 + sy * 0.5) * 2.0, 1.0)
-            # Чётные строки смещаются вправо на sx/div
-            shift = sx * 0.5 if (row % 2 == 1) else 0.0
+            shift  = sx * 0.5 if (row % 2 == 1) else 0.0
             grid_row = []
             for col in range(div + 1):
-                tu = (col / div + shift) % 1.0
+                tu  = (col / float(div) + shift) % 1.0
                 bot = lerp(p0, p1, tu)
                 top = lerp(p3, p2, tu)
                 pt  = lerp(bot, top, tv_adj)
                 if noise > 0:
                     n = simple_noise(pt.x, pt.y, pt.z, freq)
-                    jitter = noise * rng.uniform(0.7, 1.3)
-                    pt = pt + c4d.Vector(
-                        n * jitter, n * jitter * 0.4, n * jitter
-                    )
+                    j = noise * rng.uniform(0.7, 1.3)
+                    pt = pt + c4d.Vector(n*j, n*j*0.4, n*j)
                 grid_row.append(mb.add_vert(pt))
             grid.append(grid_row)
-
         for row in range(div):
             for col in range(div):
-                a = grid[row][col]
-                b = grid[row][col + 1]
-                c = grid[row + 1][col + 1]
-                d = grid[row + 1][col]
-                mb.add_quad(a, b, c, d)
-
+                mb.add_quad(grid[row][col], grid[row][col+1],
+                            grid[row+1][col+1], grid[row+1][col])
     return mb
 
 
 def subdivide_radial(src_obj, p):
-    """
-    Радиальное деление.
-    Из смещённого центра полигона расходятся лучи.
-    Количество секторов = iterations * 2 + 4.
-    slider_x / slider_y задают положение центра.
-    """
+    """Радиальные секторы из смещённого центра полигона."""
     iters   = max(1, p["iterations"])
-    cx_bias = p["slider_x"] / 100.0   # X-позиция центра [0..1]
-    cy_bias = p["slider_y"] / 100.0   # Y-позиция центра [0..1]
-    sectors = iters * 2 + 4            # минимум 6 секторов
+    cx      = p["slider_x"] / 100.0
+    cy      = p["slider_y"] / 100.0
+    sectors = iters * 2 + 4
     noise   = p["noise_amt"]
     freq    = max(0.01, p["noise_freq"])
     rng     = random.Random(p["random_seed"])
@@ -388,99 +292,60 @@ def subdivide_radial(src_obj, p):
     for poly in get_source_polys(src_obj):
         poly = ensure_quad(poly)
         p0, p1, p2, p3 = poly
-
-        # Центр со смещением
-        center = lerp(
-            lerp(p0, p1, cx_bias),
-            lerp(p3, p2, cx_bias),
-            cy_bias
-        )
+        center = lerp(lerp(p0, p1, cx), lerp(p3, p2, cx), cy)
         if noise > 0:
             n = simple_noise(center.x, center.y, center.z, freq)
-            jitter = noise * rng.uniform(0.4, 1.2)
-            center = center + c4d.Vector(
-                n * jitter, n * jitter * 0.3, n * jitter
-            )
-        ci = mb.add_vert(center)
-
-        # Периметр: обходим 4 ребра, равномерно набирая точки
-        seg = sectors // 4  # точек на каждое ребро
-        rim_pts = []
-        edges = [(p0, p1), (p1, p2), (p2, p3), (p3, p0)]
-        for ea, eb in edges:
+            j = noise * rng.uniform(0.4, 1.2)
+            center = center + c4d.Vector(n*j, n*j*0.3, n*j)
+        ci  = mb.add_vert(center)
+        seg = max(1, sectors // 4)
+        rim = []
+        for ea, eb in [(p0,p1),(p1,p2),(p2,p3),(p3,p0)]:
             for k in range(seg):
-                t = k / seg
-                rim_pts.append(lerp(ea, eb, t))
-
-        rim_ids = [mb.add_vert(v) for v in rim_pts]
+                rim.append(lerp(ea, eb, k / float(seg)))
+        rim_ids = [mb.add_vert(v) for v in rim]
         n_rim   = len(rim_ids)
         for k in range(n_rim):
-            a = rim_ids[k]
-            b = rim_ids[(k + 1) % n_rim]
-            mb.add_tri(ci, a, b)
-
+            mb.add_tri(ci, rim_ids[k], rim_ids[(k+1) % n_rim])
     return mb
 
 
 def subdivide_voronoi(src_obj, p):
-    """
-    Вороной-подобное деление.
-    Случайные точки-сайты размещаются внутри полигона,
-    затем каждый сайт соединяется с ближайшими соседями
-    через средние точки, аппроксимируя ячейки Вороного.
-    """
-    iters    = max(1, p["iterations"])
-    num_sites = min(iters * iters + 2, 30)  # ограничиваем сложность
-    noise    = p["noise_amt"]
-    freq     = max(0.01, p["noise_freq"])
-    rng      = random.Random(p["random_seed"])
-    mb       = MeshBuilder()
+    """Вороной-подобная сетка из случайных точек-сайтов."""
+    iters     = max(1, p["iterations"])
+    num_sites = min(iters * iters + 2, 30)
+    noise     = p["noise_amt"]
+    freq      = max(0.01, p["noise_freq"])
+    rng       = random.Random(p["random_seed"])
+    mb        = MeshBuilder()
 
     for poly in get_source_polys(src_obj):
         poly = ensure_quad(poly)
         p0, p1, p2, p3 = poly
-
-        # Генерируем сайты внутри полигона
         sites = []
         for _ in range(num_sites):
-            u = rng.uniform(0.05, 0.95)
-            v = rng.uniform(0.05, 0.95)
-            bot = lerp(p0, p1, u)
-            top = lerp(p3, p2, u)
-            pt  = lerp(bot, top, v)
+            u   = rng.uniform(0.05, 0.95)
+            v   = rng.uniform(0.05, 0.95)
+            pt  = lerp(lerp(p0, p1, u), lerp(p3, p2, u), v)
             if noise > 0:
-                n = simple_noise(pt.x, pt.y, pt.z, freq)
-                pt = pt + c4d.Vector(
-                    n * noise * rng.uniform(0.2, 0.8),
-                    n * noise * rng.uniform(0.2, 0.8),
-                    n * noise * rng.uniform(0.2, 0.8)
-                )
+                n  = simple_noise(pt.x, pt.y, pt.z, freq)
+                j  = noise * rng.uniform(0.2, 0.8)
+                pt = pt + c4d.Vector(n*j, n*j, n*j)
             sites.append(pt)
-
-        site_ids = [mb.add_vert(s) for s in sites]
-
-        # Упрощённая связность: каждый сайт соединяем
-        # с 2 ближайшими через среднюю точку → треугольники
+        sids = [mb.add_vert(s) for s in sites]
         for i, si in enumerate(sites):
             dists = sorted(
-                [(((si - sites[j]).GetLength()), j)
-                 for j in range(len(sites)) if j != i]
+                ((( si - sites[j]).GetLength(), j)
+                 for j in range(len(sites)) if j != i)
             )
-            # Берём 2-3 ближайших соседа
-            k_neighbors = min(3, len(dists))
-            for k in range(k_neighbors):
-                j = dists[k][1]
-                m = mid_pt(si, sites[j])
-                mi = mb.add_vert(m)
-                mb.add_tri(site_ids[i], site_ids[j], mi)
-
+            for k in range(min(3, len(dists))):
+                j  = dists[k][1]
+                mi = mb.add_vert(mid_pt(si, sites[j]))
+                mb.add_tri(sids[i], sids[j], mi)
     return mb
 
-
 # ============================================================
-#  Реестр алгоритмов
-#  Ключ = целочисленный индекс из ALG_* констант
-#  Значение = функция subdivide_*
+#  Реестр алгоритмов — добавьте сюда новый ALG_* + функцию
 # ============================================================
 ALGORITHM_REGISTRY = {
     ALG_UNIFORM:     subdivide_uniform,
@@ -489,35 +354,21 @@ ALGORITHM_REGISTRY = {
     ALG_HERRINGBONE: subdivide_herringbone,
     ALG_RADIAL:      subdivide_radial,
     ALG_VORONOI:     subdivide_voronoi,
-    # ── Пример добавления нового алгоритма ──
-    # ALG_MYALG:    subdivide_myalg,
 }
 
 # ============================================================
-#  Класс генераторного объекта Cinema 4D
+#  Класс плагина
 # ============================================================
 
 class PolySubdividerObject(plugins.ObjectData):
     """
-    Генераторный ObjectData-плагин.
-    Берёт первого дочернего потомка (PolygonObject или
-    примитив) и применяет выбранный алгоритм подразделения.
+    Генераторный ObjectData-плагин Cinema 4D R26.
+    Берёт первого дочернего потомка и разбивает его полигоны
+    выбранным алгоритмом.
     """
 
     def Init(self, op):
-        """Устанавливает значения атрибутов по умолчанию."""
-        self.InitAttr(op, int,   [PAR_ALGORITHM])
-        self.InitAttr(op, int,   [PAR_ITERATIONS])
-        self.InitAttr(op, float, [PAR_SLIDER_X])
-        self.InitAttr(op, float, [PAR_SLIDER_Y])
-        self.InitAttr(op, float, [PAR_SLIDER_Z])
-        self.InitAttr(op, int,   [PAR_RANDOM_SEED])
-        self.InitAttr(op, float, [PAR_NOISE_AMT])
-        self.InitAttr(op, float, [PAR_NOISE_FREQ])
-        self.InitAttr(op, float, [PAR_NOISE_LOOP])
-        self.InitAttr(op, float, [PAR_PATTERN_ROT])
-        self.InitAttr(op, float, [PAR_GRID_SCALE])
-
+        """Значения атрибутов по умолчанию."""
         op[PAR_ALGORITHM]   = ALG_UNIFORM
         op[PAR_ITERATIONS]  = 3
         op[PAR_SLIDER_X]    = 18.0
@@ -532,39 +383,30 @@ class PolySubdividerObject(plugins.ObjectData):
         return True
 
     def GetVirtualObjects(self, op, hh):
-        """
-        Главный метод генерации: вызывается при каждом
-        обновлении сцены. Возвращает c4d.PolygonObject
-        или None если источника нет.
-        """
-        # Берём первого дочернего потомка
+        """Генерация геометрии при каждом обновлении сцены."""
         child = op.GetDown()
         if child is None:
             return None
 
-        # Помечаем зависимость от потомка (для кэша)
-        hh.AddDependenceList(op)
-
-        # Получаем полигональный кэш потомка
+        # Получаем кэш / полигональное представление потомка
         src = child.GetDeformCache()
         if src is None:
             src = child.GetCache(hh)
         if src is None:
             src = child
 
-        # Если не полигональный — пытаемся конвертировать
+        # Конвертируем примитивы в полигоны
         if not src.CheckType(c4d.Opolygon):
-            result_list = utils.SendModelingCommand(
+            res = utils.SendModelingCommand(
                 command = c4d.MCOMMAND_CURRENTSTATETOOBJECT,
                 list    = [src.GetClone()],
                 mode    = c4d.MODELINGCOMMANDMODE_ALL,
                 doc     = op.GetDocument()
             )
-            if not result_list:
+            if not res:
                 return None
-            src = result_list[0]
+            src = res[0]
 
-        # Собираем словарь параметров
         params = {
             "iterations":  op[PAR_ITERATIONS],
             "slider_x":    op[PAR_SLIDER_X],
@@ -578,48 +420,42 @@ class PolySubdividerObject(plugins.ObjectData):
             "grid_scale":  op[PAR_GRID_SCALE],
         }
 
-        # Вызываем нужный алгоритм
         alg  = op[PAR_ALGORITHM]
         func = ALGORITHM_REGISTRY.get(alg)
         if func is None:
             return None
 
         try:
-            mb  = func(src, params)
-            res = mb.build()
+            res = func(src, params).build()
         except Exception as e:
-            print("[PolySubdivider] Ошибка генерации: {}".format(e))
+            print("[PolySubdivider] Ошибка: {}".format(e))
+            import traceback; traceback.print_exc()
             return None
 
         if res is None:
             return None
 
-        res.SetName("PolySubdivider [{}]".format(ALG_NAMES[alg]))
+        alg_name = ALG_NAMES[alg] if alg < len(ALG_NAMES) else str(alg)
+        res.SetName("PolySubdivider [{}]".format(alg_name))
         return res
 
     def GetDDescription(self, op, description, flags):
-        """
-        Программное описание параметров.
-        Строит панель Атрибуты без .res / .sdr файлов.
-        """
-        # Загружаем базовое описание (без него не работает)
+        """Программное построение панели Атрибуты."""
         if not description.LoadDescription(op.GetType()):
             return False
 
-        # ── Группа «Настройки подразделения» ────────────────
-        grp_bc = c4d.GetCustomDataTypeDefault(c4d.DTYPE_GROUP)
-        grp_bc[c4d.DESC_NAME]       = "Настройки подразделения"
-        grp_bc[c4d.DESC_SHORT_NAME] = "Настройки"
-        grp_bc[c4d.DESC_COLUMNS]    = 1
-        grp_bc[c4d.DESC_DEFAULT]    = 1
+        # ── Группа «Настройки подразделения» ─────────────────
+        bc = c4d.GetCustomDataTypeDefault(c4d.DTYPE_GROUP)
+        bc[c4d.DESC_NAME]    = "Настройки подразделения"
+        bc[c4d.DESC_COLUMNS] = 1
+        bc[c4d.DESC_DEFAULT] = 1
         description.SetParameter(
             c4d.DescID(c4d.DescLevel(GRP_SETTINGS, c4d.DTYPE_GROUP, 0)),
-            grp_bc,
-            c4d.ID_ROOT_CLASSID
+            bc, c4d.ID_ROOT_CLASSID
         )
         gid = c4d.DescID(c4d.DescLevel(GRP_SETTINGS, c4d.DTYPE_GROUP, 0))
 
-        # Алгоритм — выпадающий список (cycle)
+        # Алгоритм
         bc = c4d.GetCustomDataTypeDefault(c4d.DTYPE_LONG)
         bc[c4d.DESC_NAME]      = "Алгоритм"
         bc[c4d.DESC_CUSTOMGUI] = c4d.CUSTOMGUI_CYCLE
@@ -697,7 +533,7 @@ class PolySubdividerObject(plugins.ObjectData):
             bc, gid
         )
 
-        # Зерно случайных чисел
+        # Зерно случайности
         bc = c4d.GetCustomDataTypeDefault(c4d.DTYPE_LONG)
         bc[c4d.DESC_NAME]    = "Зерно случайности"
         bc[c4d.DESC_MIN]     = 0
@@ -709,16 +545,14 @@ class PolySubdividerObject(plugins.ObjectData):
             bc, gid
         )
 
-        # ── Группа «Шум» ─────────────────────────────────────
-        grp_n = c4d.GetCustomDataTypeDefault(c4d.DTYPE_GROUP)
-        grp_n[c4d.DESC_NAME]       = "Шум"
-        grp_n[c4d.DESC_SHORT_NAME] = "Шум"
-        grp_n[c4d.DESC_COLUMNS]    = 1
-        grp_n[c4d.DESC_DEFAULT]    = 1
+        # ── Группа «Шум» ──────────────────────────────────────
+        bc = c4d.GetCustomDataTypeDefault(c4d.DTYPE_GROUP)
+        bc[c4d.DESC_NAME]    = "Шум"
+        bc[c4d.DESC_COLUMNS] = 1
+        bc[c4d.DESC_DEFAULT] = 1
         description.SetParameter(
             c4d.DescID(c4d.DescLevel(GRP_NOISE, c4d.DTYPE_GROUP, 0)),
-            grp_n,
-            c4d.ID_ROOT_CLASSID
+            bc, c4d.ID_ROOT_CLASSID
         )
         nid = c4d.DescID(c4d.DescLevel(GRP_NOISE, c4d.DTYPE_GROUP, 0))
 
@@ -763,26 +597,20 @@ class PolySubdividerObject(plugins.ObjectData):
 
 
 # ============================================================
-#  Точка входа — PluginMessage (стандарт для .pyp плагинов)
+#  Регистрация плагина
+#  ВАЖНО: description должен быть "Obase" — базовый объект C4D,
+#  который существует всегда и не требует .res файлов.
+#  Весь кастомный UI строится через GetDDescription выше.
 # ============================================================
-
-def PluginMessage(id, data):
-    """
-    Вызывается Cinema 4D при старте и других событиях.
-    Регистрация плагина происходит здесь, а не в __main__.
-    """
-    if id == c4d.C4DPL_BUILDMENU:
-        pass
-    return False
-
-
-# Регистрируем плагин при загрузке модуля
 if __name__ == "__main__":
-    plugins.RegisterObjectPlugin(
+    ok = plugins.RegisterObjectPlugin(
         id          = PLUGIN_ID,
         str         = "PolySubdivider",
         g           = PolySubdividerObject,
-        description = "",          # пустая строка = без .res файла
+        description = "Opolysubdivider",
         icon        = None,
         info        = c4d.OBJECT_GENERATOR | c4d.OBJECT_INPUT,
     )
+    if not ok:
+        raise RuntimeError("PolySubdivider: регистрация не удалась")
+    print("PolySubdivider: плагин зарегистрирован (ID={})".format(PLUGIN_ID))
