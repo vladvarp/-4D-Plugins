@@ -450,7 +450,7 @@ class PolySubdividerObject(plugins.ObjectData):
         bc[c4d.DESC_DEFAULT] = 1
         description.SetParameter(
             c4d.DescID(c4d.DescLevel(GRP_SETTINGS, c4d.DTYPE_GROUP, 0)),
-            bc, c4d.ID_ROOT_CLASSID
+            bc, c4d.ID_LISTHEAD
         )
         gid = c4d.DescID(c4d.DescLevel(GRP_SETTINGS, c4d.DTYPE_GROUP, 0))
 
@@ -551,7 +551,7 @@ class PolySubdividerObject(plugins.ObjectData):
         bc[c4d.DESC_DEFAULT] = 1
         description.SetParameter(
             c4d.DescID(c4d.DescLevel(GRP_NOISE, c4d.DTYPE_GROUP, 0)),
-            bc, c4d.ID_ROOT_CLASSID
+            bc, c4d.ID_LISTHEAD
         )
         nid = c4d.DescID(c4d.DescLevel(GRP_NOISE, c4d.DTYPE_GROUP, 0))
 
