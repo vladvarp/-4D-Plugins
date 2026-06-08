@@ -181,6 +181,9 @@ class UserDataManager:
         did, _ = _ud_descid(self.op, UD_DEPTH)
         if did:
             self.op[did] = 3
+        did, _ = _ud_descid(self.op, UD_IE2_INEX_MODE)
+        if did:
+            self.op[did] = IE2_EXCLUDE
 
     # ── Обновление дропдаунов ─────────────────────────────────────────────────
 
@@ -291,15 +294,13 @@ class UserDataManager:
             if ie2_inex_mode == IE2_INCLUDE:
                 # Оставляем только те что в списке
                 if ie2_obj_mode == IE2_OBJECT:
-                    ie2_set = set(id(o) for o in ie2_objects)
-                    candidates = [o for o in candidates if id(o) in ie2_set]
+                    candidates = [o for o in candidates if any(o.IsInstanceOf(e.GetType()) and o == e for e in ie2_objects)]
                 else:  # IE2_TYPE
                     candidates = [o for o in candidates if o.GetType() in ie2_types]
             else:  # IE2_EXCLUDE
                 # Убираем те что в списке
                 if ie2_obj_mode == IE2_OBJECT:
-                    ie2_set = set(id(o) for o in ie2_objects)
-                    candidates = [o for o in candidates if id(o) not in ie2_set]
+                    candidates = [o for o in candidates if not any(o == e for e in ie2_objects)]
                 else:  # IE2_TYPE
                     candidates = [o for o in candidates if o.GetType() not in ie2_types]
 
@@ -327,19 +328,23 @@ class HierarchyFilterObject(c4d.plugins.ObjectData):
         udm.ensure_created()
         udm.refresh_dropdowns()
 
-        traverse_mode = _ud_get(op, UD_TRAVERSE_MODE) or MODE_ALL
+        traverse_mode = _ud_get(op, UD_TRAVERSE_MODE)
+        if traverse_mode is None:
+            traverse_mode = MODE_ALL
+
+        hide_depth_parent = (traverse_mode == MODE_ALL)
 
         for descid, bc in op.GetUserDataContainer():
             uid = descid[1].id
 
             if uid == UD_DEPTH:
                 # Показываем только при рекурсивном режиме
-                bc[c4d.DESC_HIDE] = (traverse_mode != MODE_RECURSIVE)
+                bc[c4d.DESC_HIDE] = hide_depth_parent
                 description.SetParameter(descid, bc, c4d.DESCID_ROOT)
 
             elif uid == UD_PARENT_OBJ:
                 # Показываем только при рекурсивном режиме
-                bc[c4d.DESC_HIDE] = (traverse_mode != MODE_RECURSIVE)
+                bc[c4d.DESC_HIDE] = hide_depth_parent
                 description.SetParameter(descid, bc, c4d.DESCID_ROOT)
 
         return True, flags | c4d.DESCFLAGS_DESC_LOADED
