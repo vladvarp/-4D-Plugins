@@ -441,8 +441,7 @@ class PolySubdividerObject(plugins.ObjectData):
 
     def GetDDescription(self, op, description, flags):
         """Программное построение панели Атрибуты."""
-        if not description.LoadDescription(op.GetType()):
-            return False
+        description.LoadDescription(op.GetType())  # игнорируем ошибку — res-файл не нужен
 
         # ── Группа «Настройки подразделения» ─────────────────
         bc = c4d.GetCustomDataTypeDefault(c4d.DTYPE_GROUP)
