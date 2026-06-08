@@ -397,37 +397,36 @@ class PolySubdividerObject(plugins.ObjectData):
         if child is None:
             return None
 
-        # Получаем полигональный клон child — C4D скрывает child автоматически
-        # когда его клон используется генератором через этот метод
-        res_clone = op.GetAndCheckHierarchyClone(hh, child, c4d.HIERARCHYCLONEFLAGS_ASPOLY, False)
-        if res_clone is None:
+        # Скрываем дочерний объект в редакторе и рендере (0=default, 1=on, 2=off)
+        # Проверка состояния исключает бесконечный пересчёт
+        if child[c4d.ID_BASEOBJECT_VISIBILITY_EDITOR] != 1 or \
+           child[c4d.ID_BASEOBJECT_VISIBILITY_RENDER] != 1:
+            child[c4d.ID_BASEOBJECT_VISIBILITY_EDITOR] = 2
+            child[c4d.ID_BASEOBJECT_VISIBILITY_RENDER] = 2
+            c4d.EventAdd()
+
+        # Получаем полигональное представление child
+        src = child.GetDeformCache()
+        if src is None:
+            src = child.GetCache(hh)
+        if src is None:
+            src = child
+
+        # Конвертируем примитив в полигоны если нужно
+        if not src.CheckType(c4d.Opolygon):
+            res_csto = utils.SendModelingCommand(
+                command = c4d.MCOMMAND_CURRENTSTATETOOBJECT,
+                list    = [src.GetClone()],
+                mode    = c4d.MODELINGCOMMANDMODE_ALL,
+                doc     = op.GetDocument()
+            )
+            if not res_csto or not res_csto[0].CheckType(c4d.Opolygon):
+                return None
+            src = res_csto[0]
+
+        # Защита: нет геометрии (объект деактивирован)
+        if src.GetPointCount() == 0:
             return None
-
-        # Если ничего не изменилось — возвращаем существующий кэш
-        if not res_clone["dirty"] and not op.IsDirty(c4d.DIRTY_DATA):
-            return op.GetCache(hh)
-
-        # Клон живёт только в рамках этого вызова — сразу читаем геометрию
-        src_clone = res_clone["clone"]
-        if src_clone is None:
-            return None
-
-        # Защита от деактивированного объекта без геометрии
-        if not hasattr(src_clone, 'GetPointCount') or src_clone.GetPointCount() == 0:
-            return None
-
-        # Копируем точки и полигоны в независимый объект чтобы клон можно было отпустить
-        pts = [src_clone.GetPoint(i) for i in range(src_clone.GetPointCount())]
-        polys_raw = [src_clone.GetPolygon(i) for i in range(src_clone.GetPolygonCount())]
-
-        # Собираем src как простой контейнер данных
-        class _SrcProxy(object):
-            def GetPointCount(self_):    return len(pts)
-            def GetPolygonCount(self_):  return len(polys_raw)
-            def GetPoint(self_, i):      return pts[i]
-            def GetPolygon(self_, i):    return polys_raw[i]
-
-        src = _SrcProxy()
 
         params = {
             "iterations":  op[PAR_ITERATIONS],
@@ -463,7 +462,7 @@ class PolySubdividerObject(plugins.ObjectData):
 
     def GetDDescription(self, op, description, flags):
         """Программное построение панели Атрибуты."""
-        description.LoadDescription(op.GetType())  # игнорируем ошибку — res-файл не нужен
+        description.LoadDescription("Obase")  # базовый дескриптор даёт вкладки «Общее» и «Координаты»
 
         # ── Группа «Настройки подразделения» ─────────────────
         bc = c4d.GetCustomDataTypeDefault(c4d.DTYPE_GROUP)
