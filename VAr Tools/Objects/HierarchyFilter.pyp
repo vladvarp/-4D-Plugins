@@ -13,7 +13,7 @@ __res__ = c4d.plugins.GeResource()
 __res__.Init(os.path.dirname(__file__))
 
 PLUGIN_ID   = 1068852
-PLUGIN_NAME = "HierarchyFilter v1.0"
+PLUGIN_NAME = "HierarchyFilter v1.3"
 PLUGIN_HELP = "Объект-фильтр иерархии для использования в Xpresso"
 
 # SubID UserData
@@ -197,6 +197,20 @@ class UserDataManager:
         bc[c4d.DESC_CYCLE] = cycle_bc
         self.op.SetUserDataContainer(did, bc)
 
+    def update_traverse_visibility(self):
+        """Записывает DESC_HIDE напрямую в контейнер UserData для UD_DEPTH и UD_PARENT_OBJ."""
+        traverse_mode = _ud_get(self.op, UD_TRAVERSE_MODE)
+        if traverse_mode is None:
+            traverse_mode = MODE_ALL
+        hide = (traverse_mode == MODE_ALL)
+
+        for uid in (UD_DEPTH, UD_PARENT_OBJ):
+            did, bc = _ud_descid(self.op, uid)
+            if did is None:
+                continue
+            bc[c4d.DESC_HIDE] = hide
+            self.op.SetUserDataContainer(did, bc)
+
     def refresh_dropdowns(self):
         children = _collect_direct_children(self.op)
 
@@ -327,25 +341,7 @@ class HierarchyFilterObject(c4d.plugins.ObjectData):
         udm = UserDataManager(op)
         udm.ensure_created()
         udm.refresh_dropdowns()
-
-        traverse_mode = _ud_get(op, UD_TRAVERSE_MODE)
-        if traverse_mode is None:
-            traverse_mode = MODE_ALL
-
-        is_all_mode = (traverse_mode == MODE_ALL)
-
-        for descid, bc in op.GetUserDataContainer():
-            uid = descid[1].id
-
-            if uid == UD_DEPTH:
-                # Неактивны при "Все объекты", активны при "Рекурсивно"
-                bc[c4d.DESC_EDITABLE] = not is_all_mode
-                description.SetParameter(descid, bc, c4d.DESCID_ROOT)
-
-            elif uid == UD_PARENT_OBJ:
-                # Неактивны при "Все объекты", активны при "Рекурсивно"
-                bc[c4d.DESC_EDITABLE] = not is_all_mode
-                description.SetParameter(descid, bc, c4d.DESCID_ROOT)
+        udm.update_traverse_visibility()
 
         return True, flags | c4d.DESCFLAGS_DESC_LOADED
 

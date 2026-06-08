@@ -90,7 +90,7 @@ VAr Tools - набор инструментов для Cinema 4D,
 
   Objects
 
-  * HierarchyFilter v1.0
+  * HierarchyFilter v1.3
     Объект-Ноль с расширенными UserData для
     фильтрации и обхода иерархии. Используется
     совместно с Xpresso для динамической выборки
