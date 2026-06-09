@@ -34,6 +34,7 @@ UD_GROUP = 1   # Группа "Параметры"
 # TriCube
 TC_SIZE    = 2
 TC_SUBDIVS = 3
+TC_NOTRI   = 4   # Галочка "Квады" (выключить триангуляцию)
 
 # HexSphere
 HS_RADIUS  = 2
@@ -51,6 +52,7 @@ TT_RADIUS_MAJOR = 2
 TT_RADIUS_MINOR = 3
 TT_SEGS_MAJOR   = 4
 TT_SEGS_MINOR   = 5
+TT_NOTRI        = 6   # Галочка "Квады" (выключить триангуляцию)
 
 # BrickPlane
 BP_WIDTH  = 2
@@ -161,11 +163,12 @@ def _midpoint_sphere(a, b):
 
 # ─── Генераторы мешей ─────────────────────────────────────────────────────────
 
-def build_tricube(size, subdivs):
+def build_tricube(size, subdivs, triangulate=True):
     """
     Куб с треугольной сеткой.
     Каждая из 6 граней делится на subdivs×subdivs ячеек,
     каждая ячейка — 2 треугольника (CPolygon с равными c и d = вырожденный квад).
+    При triangulate=False ячейки остаются квадами.
     Возвращает (points, polys) для c4d.PolygonObject.
     """
     half = size / 2.0
@@ -207,10 +210,14 @@ def build_tricube(size, subdivs):
                 br = base + row*n + (col+1)
                 tl = base + (row+1)*n + col
                 tr = base + (row+1)*n + (col+1)
-                # Треугольник 1: bl, br, tl  (d=tl — вырожденный)
-                all_polys.append(c4d.CPolygon(bl, br, tl, tl))
-                # Треугольник 2: br, tr, tl  (d=tl — вырожденный)
-                all_polys.append(c4d.CPolygon(br, tr, tl, tl))
+                if triangulate:
+                    # Треугольник 1: bl, br, tl  (d=tl — вырожденный)
+                    all_polys.append(c4d.CPolygon(bl, br, tl, tl))
+                    # Треугольник 2: br, tr, tl  (d=tl — вырожденный)
+                    all_polys.append(c4d.CPolygon(br, tr, tl, tl))
+                else:
+                    # Квад: bl, br, tr, tl
+                    all_polys.append(c4d.CPolygon(bl, br, tr, tl))
 
     return all_points, all_polys
 
@@ -414,10 +421,11 @@ def build_diamond_cylinder(radius, height, segs_r, segs_h, add_caps):
     return verts, polys
 
 
-def build_tritorus(radius_major, radius_minor, segs_major, segs_minor):
+def build_tritorus(radius_major, radius_minor, segs_major, segs_minor, triangulate=True):
     """
     Тор с треугольной сеткой.
     Каждый quad разбивается на 2 треугольника.
+    При triangulate=False ячейки остаются квадами.
     Возвращает (points, polys).
     """
     verts = []
@@ -441,10 +449,14 @@ def build_tritorus(radius_major, radius_minor, segs_major, segs_minor):
             v1 = j * segs_minor + (i + 1) % segs_minor
             v2 = ((j + 1) % segs_major) * segs_minor + (i + 1) % segs_minor
             v3 = ((j + 1) % segs_major) * segs_minor + i
-            # Треугольник 1: v0, v1, v2 (d=v2 — вырожденный quad)
-            polys.append(c4d.CPolygon(v0, v1, v2, v2))
-            # Треугольник 2: v0, v2, v3 (d=v3 — вырожденный quad)
-            polys.append(c4d.CPolygon(v0, v2, v3, v3))
+            if triangulate:
+                # Треугольник 1: v0, v1, v2 (d=v2 — вырожденный quad)
+                polys.append(c4d.CPolygon(v0, v1, v2, v2))
+                # Треугольник 2: v0, v2, v3 (d=v3 — вырожденный quad)
+                polys.append(c4d.CPolygon(v0, v2, v3, v3))
+            else:
+                # Квад: v0, v1, v2, v3
+                polys.append(c4d.CPolygon(v0, v1, v2, v3))
 
     return verts, polys
 
@@ -614,16 +626,20 @@ class TriCubeObject(_MeshPrimitiveBase):
             "Размер", 200.0, 1.0, 100000.0))
         _add_in_group(op, grp_subid, _make_int_bc(
             "Подразделения", 3, 1, 50))
+        _add_in_group(op, grp_subid, _make_bool_bc(
+            "Триангуляция", True))
 
     def _set_defaults(self, op):
         _ud_set_default(op, TC_SIZE,    200.0)
         _ud_set_default(op, TC_SUBDIVS, 3)
+        _ud_set_default(op, TC_NOTRI,   True)
 
     def _build_mesh(self, op):
-        size    = _ud_get(op, TC_SIZE,    200.0)
-        subdivs = _ud_get(op, TC_SUBDIVS, 3)
+        size       = _ud_get(op, TC_SIZE,    200.0)
+        subdivs    = _ud_get(op, TC_SUBDIVS, 3)
+        triangulate = bool(_ud_get(op, TC_NOTRI, True))
         subdivs = max(1, int(subdivs))
-        return build_tricube(size, subdivs)
+        return build_tricube(size, subdivs, triangulate)
 
 
 # ─── HexSphere ────────────────────────────────────────────────────────────────
@@ -704,19 +720,23 @@ class TriTorusObject(_MeshPrimitiveBase):
             "Сегменты (кольцо)", 24, 3, 500))
         _add_in_group(op, grp_subid, _make_int_bc(
             "Сегменты (труба)", 12, 3, 500))
+        _add_in_group(op, grp_subid, _make_bool_bc(
+            "Триангуляция", True))
 
     def _set_defaults(self, op):
         _ud_set_default(op, TT_RADIUS_MAJOR, 150.0)
         _ud_set_default(op, TT_RADIUS_MINOR,  50.0)
         _ud_set_default(op, TT_SEGS_MAJOR,    24)
         _ud_set_default(op, TT_SEGS_MINOR,    12)
+        _ud_set_default(op, TT_NOTRI,         True)
 
     def _build_mesh(self, op):
-        r_major    = _ud_get(op, TT_RADIUS_MAJOR, 150.0)
-        r_minor    = _ud_get(op, TT_RADIUS_MINOR,  50.0)
-        segs_major = max(3, int(_ud_get(op, TT_SEGS_MAJOR, 24)))
-        segs_minor = max(3, int(_ud_get(op, TT_SEGS_MINOR, 12)))
-        return build_tritorus(r_major, r_minor, segs_major, segs_minor)
+        r_major     = _ud_get(op, TT_RADIUS_MAJOR, 150.0)
+        r_minor     = _ud_get(op, TT_RADIUS_MINOR,  50.0)
+        segs_major  = max(3, int(_ud_get(op, TT_SEGS_MAJOR, 24)))
+        segs_minor  = max(3, int(_ud_get(op, TT_SEGS_MINOR, 12)))
+        triangulate = bool(_ud_get(op, TT_NOTRI, True))
+        return build_tritorus(r_major, r_minor, segs_major, segs_minor, triangulate)
 
 
 # ─── BrickPlane ───────────────────────────────────────────────────────────────
