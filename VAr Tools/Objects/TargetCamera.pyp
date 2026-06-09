@@ -10,6 +10,8 @@ PLUGIN_ID_TAG = 1068860   # TagData     — Expression-тег
 
 # Ключ ссылки на таргет в BaseContainer тега
 TAG_LINK_TARGET = 1000
+# Глобальная очередь тегов, которые надо удалить (таргет был удалён извне)
+_tags_to_remove = []
 
 
 def look_at_matrix(cam_mg, target_pos):
@@ -50,21 +52,58 @@ class TargetCamTag(c4d.plugins.TagData):
 
     def Init(self, node):
         node[TAG_LINK_TARGET] = None
+
+        # Добавляем UserData только если кнопка ещё не создана
+        for uid, bc in node.GetUserDataContainer():
+            if bc[c4d.DESC_NAME] == "Создать таргет":
+                return True
+
+        # UserData 1: кнопка «Создать таргет»
+        bc_btn = c4d.GetCustomDatatypeDefault(c4d.DTYPE_BUTTON)
+        bc_btn[c4d.DESC_NAME]       = "Создать таргет"
+        bc_btn[c4d.DESC_ANIMATE]    = c4d.DESC_ANIMATE_OFF
+        node.AddUserData(bc_btn)    # → ID_USERDATA, 1
+
         return True
 
-    def GetDDescription(self, node, description, flags):
-        if not description.LoadDescription("tbaselist2d"):
-            return False
+    def Message(self, node, msgtype, data):
+        # Нажатие кнопки «Создать таргет» (UserData 2)
+        if msgtype == c4d.MSG_DESCRIPTION_COMMAND:
+            btn_id = data["id"][0].id
+            if btn_id == c4d.ID_USERDATA:
+                sub_id = data["id"][1].id
+                if sub_id == 1:
+                    cam = node.GetObject()
+                    if cam is None:
+                        return True
+                    doc = cam.GetDocument()
+                    if doc is None:
+                        return True
+                    # Создаём таргет только если его ещё нет
+                    existing = node[TAG_LINK_TARGET]
+                    if existing is None or not existing.IsAlive():
+                        target = c4d.BaseObject(c4d.Onull)
+                        target.SetName(cam.GetName() + ".target")
+                        target[c4d.NULLOBJECT_DISPLAY] = 2
+                        target[c4d.NULLOBJECT_RADIUS]  = 30.0
+                        # Размещаем таргет в 500 единиц перед камерой (вдоль +Z камеры)
+                        cam_mg = cam.GetMg()
+                        target.SetAbsPos(cam_mg.off + cam_mg.v3 * 500.0)
+                        doc.InsertObject(target)
+                        doc.AddUndo(c4d.UNDOTYPE_NEW, target)
+                        node[TAG_LINK_TARGET] = target
+                        c4d.EventAdd()
+        return True
 
-        bc = c4d.GetCustomDatatypeDefault(c4d.DTYPE_BASELISTLINK)
-        bc[c4d.DESC_NAME]       = "Target"
-        bc[c4d.DESC_SHORT_NAME] = "Target"
-        bc[c4d.DESC_CUSTOMGUI]  = c4d.CUSTOMGUI_LINKBOX
-
-        pid = c4d.DescID(c4d.DescLevel(TAG_LINK_TARGET, c4d.DTYPE_BASELISTLINK, 0))
-        description.SetParameter(pid, bc, c4d.ID_ROOT)
-
-        return True, flags | c4d.DESCFLAGS_DESC_LOADED
+    def Free(self, node):
+        # Тег удаляется (вместе с камерой или напрямую) — удаляем таргет
+        target = node[TAG_LINK_TARGET]
+        if target is not None and target.IsAlive():
+            doc = target.GetDocument()
+            if doc is not None:
+                doc.AddUndo(c4d.UNDOTYPE_DELETE, target)
+                target.Remove()
+                c4d.EventAdd()
 
     def Execute(self, tag, doc, op, bt, priority, flags):
         cam = op
@@ -73,6 +112,10 @@ class TargetCamTag(c4d.plugins.TagData):
 
         target = tag[TAG_LINK_TARGET]
         if target is None or not target.IsAlive():
+            # Таргет удалён — откладываем удаление тега на следующий тик
+            if target is not None and not target.IsAlive():
+                _tags_to_remove.append(tag)
+                c4d.SpecialEventAdd(PLUGIN_ID_CMD)
             return c4d.EXECUTIONRESULT_OK
 
         # Синхронизация имени
@@ -124,6 +167,21 @@ class TargetCameraCmd(c4d.plugins.CommandData):
         doc.EndUndo()
         doc.SetActiveObject(cam)
         c4d.EventAdd()
+        return True
+
+    def CoreMessage(self, msgid, bc):
+        # Обрабатываем отложенное удаление тегов (таргет был удалён извне)
+        if msgid == PLUGIN_ID_CMD and _tags_to_remove:
+            doc = c4d.documents.GetActiveDocument()
+            if doc:
+                doc.StartUndo()
+                for tag in list(_tags_to_remove):
+                    if tag.IsAlive():
+                        doc.AddUndo(c4d.UNDOTYPE_DELETE, tag)
+                        tag.Remove()
+                _tags_to_remove.clear()
+                doc.EndUndo()
+                c4d.EventAdd()
         return True
 
     def GetState(self, doc):
