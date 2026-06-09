@@ -39,9 +39,9 @@ def look_at_matrix(cam_mg, target_pos):
     if abs(forward.Dot(world_up)) > 0.999:
         world_up = c4d.Vector(0, 0, 1)
 
-    # right = forward x world_up  (правосторонняя система C4D)
-    right  = forward.Cross(world_up).GetNormalized()
-    up_vec = right.Cross(forward).GetNormalized()
+    # right = world_up x forward  (правосторонняя система C4D)
+    right  = world_up.Cross(forward).GetNormalized()
+    up_vec = forward.Cross(right).GetNormalized()
 
     mg     = c4d.Matrix()
     mg.off = cam_pos
