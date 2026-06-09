@@ -84,6 +84,7 @@ def _add_group(op, name):
     bc[c4d.DESC_NAME]       = name
     bc[c4d.DESC_SHORT_NAME] = name
     bc[c4d.DESC_TITLEBAR]   = 1
+    bc[c4d.DESC_DEFAULT]    = 1  # развёрнута по умолчанию
     did = op.AddUserData(bc)
     return did[1].id   # [1] — SubID, [0] — ID_USERDATA(700)
 
