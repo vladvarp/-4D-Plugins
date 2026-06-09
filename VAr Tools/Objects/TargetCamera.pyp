@@ -8,9 +8,11 @@ Target Camera — аналог 3ds Max.
   • Camera Target  — Null-объект (цель)
   • Тег Expression — живёт на камере, каждый кадр
                      поворачивает камеру точно на таргет
+                     и синхронизирует имя таргета
 
 Таргет можно двигать/анимировать — камера всегда
-смотрит на него. Камеру тоже можно двигать.
+смотрит на него. При переименовании камеры таргет
+автоматически получает имя "<камера>.target".
 
 Установка:
   Plugins/TargetCamera/TargetCamera.pyp
@@ -18,82 +20,69 @@ Target Camera — аналог 3ds Max.
 
 import c4d
 
-# ── ID плагина (оригинальные, из старого плагина) ─────────────────────────────
+# ── ID плагина (оригинальные) ─────────────────────────────────────────────────
 PLUGIN_ID_CMD = 1068859   # CommandData — кнопка меню
 PLUGIN_ID_TAG = 1068860   # TagData     — Expression-тег
 
-# Имя параметра в теге — ссылка на таргет (храним в BaseContainer тега)
+# Ключ ссылки на таргет в BaseContainer тега
 TAG_LINK_TARGET = 1000
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-#  Вспомогательная: LookAt-матрица (камера → точка)
+#  LookAt-матрица: камера → точка
 # ══════════════════════════════════════════════════════════════════════════════
 
 def look_at_matrix(cam_mg, target_pos):
     """
-    Возвращает новую матрицу cam_mg, у которой ось -Z направлена
-    точно на target_pos.  Позиция камеры (off) не меняется.
+    Строит матрицу для камеры так, чтобы её ось -Z смотрела на target_pos.
 
-    В Cinema 4D камера смотрит вдоль своей локальной оси -Z:
-      v1 = правый вектор  (local X)
-      v2 = верхний вектор (local Y)
-      v3 = задний вектор  (local Z) = -forward
-
-    Алгоритм: строим ортонормальный базис из направления вперёд.
+    Cinema 4D — правосторонняя система:
+      v1 = right   (local +X)
+      v2 = up      (local +Y)
+      v3 = back    (local +Z)  =>  камера смотрит в -Z, т.е. v3 = -forward
     """
     cam_pos = cam_mg.off
-    forward = (target_pos - cam_pos).GetNormalized()
+    delta   = target_pos - cam_pos
 
-    # Если расстояние слишком мало — не меняем матрицу
-    if (target_pos - cam_pos).GetLength() < 0.001:
+    if delta.GetLength() < 0.001:
         return cam_mg
 
-    # Опорный «верх» мира
-    world_up = c4d.Vector(0, 1, 0)
+    forward = delta.GetNormalized()
 
-    # Если forward почти параллелен world_up — используем другую опору
+    # Опорный вектор «вверх»
+    world_up = c4d.Vector(0, 1, 0)
     if abs(forward.Dot(world_up)) > 0.999:
         world_up = c4d.Vector(0, 0, 1)
 
-    right  = forward.Cross(world_up).GetNormalized()
-    up_vec = right.Cross(forward).GetNormalized()
+    # Правая система: right = world_up x forward
+    right  = world_up.Cross(forward).GetNormalized()
+    up_vec = forward.Cross(right).GetNormalized()
 
-    new_mg      = c4d.Matrix()
-    new_mg.off  = cam_pos
-    new_mg.v1   = right        # X = вправо
-    new_mg.v2   = up_vec       # Y = вверх
-    new_mg.v3   = -forward     # Z = назад (камера смотрит в -Z)
-    return new_mg
+    mg     = c4d.Matrix()
+    mg.off = cam_pos
+    mg.v1  = right       # +X = вправо
+    mg.v2  = up_vec      # +Y = вверх
+    mg.v3  = -forward    # +Z = назад (камера смотрит в -Z)
+    return mg
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-#  TagData — Expression-тег на камере
+#  TagData — Expression-тег
 # ══════════════════════════════════════════════════════════════════════════════
 
 class TargetCamTag(c4d.plugins.TagData):
-    """
-    Тег, который живёт на камере.
-    В его BaseContainer под ключом TAG_LINK_TARGET хранится ссылка
-    на Null-объект (таргет).
-
-    Execute() вызывается каждый кадр и направляет камеру на таргет.
-    """
 
     def Init(self, node):
-        # Инициализируем слот таргета пустым значением
         node[TAG_LINK_TARGET] = None
         return True
 
     def GetDDescription(self, node, description, flags):
-        """Добавляем поле 'Таргет' в панель атрибутов тега."""
         if not description.LoadDescription("tbaselist2d"):
             return False
 
-        # Параметр: ссылка на объект-таргет
         bc = c4d.GetCustomDatatypeDefault(c4d.DTYPE_BASELISTLINK)
-        bc[c4d.DESC_NAME]       = "Таргет"
-        bc[c4d.DESC_SHORT_NAME] = "Таргет"
+        bc[c4d.DESC_NAME]       = "Target"
+        bc[c4d.DESC_SHORT_NAME] = "Target"
         bc[c4d.DESC_CUSTOMGUI]  = c4d.CUSTOMGUI_LINKBOX
 
         pid = c4d.DescID(c4d.DescLevel(TAG_LINK_TARGET, c4d.DTYPE_BASELISTLINK, 0))
@@ -102,10 +91,6 @@ class TargetCamTag(c4d.plugins.TagData):
         return True, flags | c4d.DESCFLAGS_DESC_LOADED
 
     def Execute(self, tag, doc, op, bt, priority, flags):
-        """
-        op  = объект, на котором висит тег (камера).
-        Читаем таргет из параметра тега, строим LookAt и применяем.
-        """
         cam = op
         if cam is None:
             return c4d.EXECUTIONRESULT_OK
@@ -114,15 +99,22 @@ class TargetCamTag(c4d.plugins.TagData):
         if target is None or not target.IsAlive():
             return c4d.EXECUTIONRESULT_OK
 
-        target_pos = target.GetMg().off
-        new_mg     = look_at_matrix(cam.GetMg(), target_pos)
+        # ── Синхронизация имени таргета ───────────────────────────────────────
+        # Таргет всегда называется "<имя камеры>.target"
+        expected = cam.GetName() + ".target"
+        if target.GetName() != expected:
+            target.SetName(expected)
+            c4d.EventAdd()
+
+        # ── LookAt ────────────────────────────────────────────────────────────
+        new_mg = look_at_matrix(cam.GetMg(), target.GetMg().off)
         cam.SetMg(new_mg)
 
         return c4d.EXECUTIONRESULT_OK
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-#  CommandData — кнопка «Target Camera» в меню Extensions
+#  CommandData — кнопка в меню Extensions
 # ══════════════════════════════════════════════════════════════════════════════
 
 class TargetCameraCmd(c4d.plugins.CommandData):
@@ -133,23 +125,18 @@ class TargetCameraCmd(c4d.plugins.CommandData):
         # ── 1. Камера ──────────────────────────────────────────────────────────
         cam = c4d.BaseObject(c4d.Ocamera)
         cam.SetName("Target Camera")
-        # Стандартные настройки фокуса
         cam[c4d.CAMERAOBJECT_FOCUS] = 36.0
-        # Ставим камеру чуть назад по Z, чтобы она сразу смотрела на таргет
         cam.SetAbsPos(c4d.Vector(0, 0, -500))
-
         doc.InsertObject(cam)
         doc.AddUndo(c4d.UNDOTYPE_NEW, cam)
 
         # ── 2. Таргет (Null) ──────────────────────────────────────────────────
+        # Имя сразу по правилу: "<имя камеры>.target"
         target = c4d.BaseObject(c4d.Onull)
-        target.SetName("Camera Target")
-        # Крест — наглядный маркер в вьюпорте (2 = Cross в R26)
-        target[c4d.NULLOBJECT_DISPLAY] = 2
+        target.SetName(cam.GetName() + ".target")
+        target[c4d.NULLOBJECT_DISPLAY] = 2      # 2 = Cross
         target[c4d.NULLOBJECT_RADIUS]  = 30.0
-        # Таргет — в начале координат
         target.SetAbsPos(c4d.Vector(0, 0, 0))
-
         doc.InsertObject(target)
         doc.AddUndo(c4d.UNDOTYPE_NEW, target)
 
@@ -160,11 +147,8 @@ class TargetCameraCmd(c4d.plugins.CommandData):
         doc.AddUndo(c4d.UNDOTYPE_NEW, tag)
 
         doc.EndUndo()
-
-        # Делаем камеру активной
         doc.SetActiveObject(cam)
         c4d.EventAdd()
-
         return True
 
     def GetState(self, doc):
@@ -176,18 +160,15 @@ class TargetCameraCmd(c4d.plugins.CommandData):
 # ══════════════════════════════════════════════════════════════════════════════
 
 if __name__ == "__main__":
-    # Простая иконка 32×32 — голубой квадрат
     icon = c4d.bitmaps.BaseBitmap()
     icon.Init(32, 32, 32)
     for x in range(32):
         for y in range(32):
-            # Рисуем перекрестие (символ камеры + таргет)
             if x == 16 or y == 16 or (14 <= x <= 18 and 14 <= y <= 18):
                 icon.SetPixel(x, y, 255, 200, 50)
             else:
                 icon.SetPixel(x, y, 40, 90, 160)
 
-    # Сначала регистрируем тег (CommandData использует его при создании)
     ok_tag = c4d.plugins.RegisterTagPlugin(
         id          = PLUGIN_ID_TAG,
         str         = "TargetCam Controller",
