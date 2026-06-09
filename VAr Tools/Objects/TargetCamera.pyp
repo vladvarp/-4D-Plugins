@@ -1,21 +1,5 @@
 """
 TargetCamera.pyp — Cinema 4D R26
-══════════════════════════════════════════════════════
-Target Camera — аналог 3ds Max.
-
-При нажатии на кнопку в меню Extensions создаётся:
-  • Camera         — обычная камера C4D
-  • Camera Target  — Null-объект (цель)
-  • Тег Expression — живёт на камере, каждый кадр
-                     поворачивает камеру точно на таргет
-                     и синхронизирует имя таргета
-
-Таргет можно двигать/анимировать — камера всегда
-смотрит на него. При переименовании камеры таргет
-автоматически получает имя "<камера>.target".
-
-Установка:
-  Plugins/TargetCamera/TargetCamera.pyp
 """
 
 import c4d
@@ -28,18 +12,10 @@ PLUGIN_ID_TAG = 1068860   # TagData     — Expression-тег
 TAG_LINK_TARGET = 1000
 
 
-# ══════════════════════════════════════════════════════════════════════════════
-#  LookAt-матрица: камера → точка
-# ══════════════════════════════════════════════════════════════════════════════
-
 def look_at_matrix(cam_mg, target_pos):
     """
-    Строит матрицу для камеры так, чтобы её ось -Z смотрела на target_pos.
-
-    Cinema 4D — правосторонняя система:
-      v1 = right   (local +X)
-      v2 = up      (local +Y)
-      v3 = back    (local +Z)  =>  камера смотрит в -Z, т.е. v3 = -forward
+    Cinema 4D: камера смотрит вдоль своей локальной оси +Z.
+    Значит v3 = forward (направление НА таргет).
     """
     cam_pos = cam_mg.off
     delta   = target_pos - cam_pos
@@ -54,15 +30,15 @@ def look_at_matrix(cam_mg, target_pos):
     if abs(forward.Dot(world_up)) > 0.999:
         world_up = c4d.Vector(0, 0, 1)
 
-    # Правая система: right = world_up x forward
-    right  = world_up.Cross(forward).GetNormalized()
-    up_vec = forward.Cross(right).GetNormalized()
+    # right = forward x world_up  (правосторонняя система C4D)
+    right  = forward.Cross(world_up).GetNormalized()
+    up_vec = right.Cross(forward).GetNormalized()
 
     mg     = c4d.Matrix()
     mg.off = cam_pos
-    mg.v1  = right       # +X = вправо
-    mg.v2  = up_vec      # +Y = вверх
-    mg.v3  = -forward    # +Z = назад (камера смотрит в -Z)
+    mg.v1  = right      # +X = вправо
+    mg.v2  = up_vec     # +Y = вверх
+    mg.v3  = forward    # +Z = вперёд (камера смотрит на таргет)
     return mg
 
 
@@ -99,8 +75,7 @@ class TargetCamTag(c4d.plugins.TagData):
         if target is None or not target.IsAlive():
             return c4d.EXECUTIONRESULT_OK
 
-        # ── Синхронизация имени таргета ───────────────────────────────────────
-        # Таргет всегда называется "<имя камеры>.target"
+        # Синхронизация имени
         expected = cam.GetName() + ".target"
         if target.GetName() != expected:
             target.SetName(expected)
@@ -134,7 +109,7 @@ class TargetCameraCmd(c4d.plugins.CommandData):
         # Имя сразу по правилу: "<имя камеры>.target"
         target = c4d.BaseObject(c4d.Onull)
         target.SetName(cam.GetName() + ".target")
-        target[c4d.NULLOBJECT_DISPLAY] = 2      # 2 = Cross
+        target[c4d.NULLOBJECT_DISPLAY] = 2
         target[c4d.NULLOBJECT_RADIUS]  = 30.0
         target.SetAbsPos(c4d.Vector(0, 0, 0))
         doc.InsertObject(target)
