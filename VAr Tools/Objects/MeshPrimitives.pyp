@@ -324,13 +324,37 @@ def _dual_mesh_from_tris(verts, faces):
             v = dvx*_bx + dvy*_by + dvz*_bz
             return math.atan2(v, u)
 
-        dual_polys.append(sorted(adj, key=_face_angle))
+        ordered = sorted(adj, key=_face_angle)
+        dual_polys.append(_ensure_outward_winding(ordered, dual_verts))
 
     return dual_verts, dual_polys
 
 
 def _scale_verts_to_radius(verts, radius):
     return [c4d.Vector(v[0]*radius, v[1]*radius, v[2]*radius) for v in verts]
+
+
+def _as_vector(p):
+    if isinstance(p, c4d.Vector):
+        return p
+    return c4d.Vector(p[0], p[1], p[2])
+
+
+def _ensure_outward_winding(indices, points):
+    """Разворачивает полигон, если нормаль смотрит к центру сферы (origin)."""
+    if len(indices) < 3:
+        return list(indices)
+    p0 = _as_vector(points[indices[0]])
+    p1 = _as_vector(points[indices[1]])
+    p2 = _as_vector(points[indices[2]])
+    normal = (p1 - p0).Cross(p2 - p0)
+    centroid = c4d.Vector()
+    for idx in indices:
+        centroid += _as_vector(points[idx])
+    centroid /= float(len(indices))
+    if normal.Dot(centroid) < 0.0:
+        return list(reversed(indices))
+    return list(indices)
 
 
 def _build_tri_sphere(radius, subdivisions):
@@ -399,8 +423,9 @@ def _build_penta_sphere(radius, subdivisions):
 
 def _build_banded_ngon_sphere(radius, sides, subdivisions):
     """
-    Сфера с кольцевыми n-угольниками (sides=7..16 и pentagon при subdiv>1).
-    Каждое кольцо — один n-гон; между кольцами — квады; у полюсов — треугольники.
+    Сфера по меридианам (sides=7..16 и pentagon при subdiv>1).
+    Квады между широтными кольцами, треугольники у полюсов.
+    Плоские кольцевые n-гоны не строятся — они давали «внутренние» полигоны.
     """
     sides = max(3, int(sides))
     rings = max(1, int(subdivisions))
@@ -431,26 +456,23 @@ def _build_banded_ngon_sphere(radius, sides, subdivisions):
     for seg in range(sides):
         a = first_ring + seg
         b = first_ring + (seg + 1) % sides
-        polys.append([south, b, a])
+        polys.append(_ensure_outward_winding([south, a, b], points))
 
-    for ring in range(rings):
+    for ring in range(rings - 1):
         start = ring_starts[ring]
-        polys.append([start + i for i in range(sides)])
-
-        if ring < rings - 1:
-            next_start = ring_starts[ring + 1]
-            for seg in range(sides):
-                bl = start + seg
-                br = start + (seg + 1) % sides
-                tl = next_start + seg
-                tr = next_start + (seg + 1) % sides
-                polys.append([bl, br, tr, tl])
+        next_start = ring_starts[ring + 1]
+        for seg in range(sides):
+            bl = start + seg
+            br = start + (seg + 1) % sides
+            tl = next_start + seg
+            tr = next_start + (seg + 1) % sides
+            polys.append(_ensure_outward_winding([bl, br, tr, tl], points))
 
     last_ring = ring_starts[-1]
     for seg in range(sides):
         a = last_ring + seg
         b = last_ring + (seg + 1) % sides
-        polys.append([north, a, b])
+        polys.append(_ensure_outward_winding([north, a, b], points))
 
     return points, polys
 
@@ -462,7 +484,7 @@ def build_hexsphere(radius, subdivisions, sides=6):
       4 — четырёхугольники (кубическая проекция)
       5 — пятиугольники (додекаэдр / кольцевая сетка)
       6 — гексагоны + 12 пятиугольников (dual icosphere)
-      7–16 — кольцевые n-угольники
+      7–16 — сфера по меридианам (квады + полюса)
     Возвращает (points, poly_indices) — списки индексов вершин для каждого полигона.
     """
     sides = max(3, min(16, int(sides)))
@@ -660,8 +682,37 @@ def build_brickplane(width, height, segs_w, segs_h):
 
 # ─── Создание PolygonObject из вершин и полигонов ─────────────────────────────
 
-def _indices_to_cpolygons(indices):
+def _rotate_ngon_for_fan(indices, points):
+    """Ставит в начало вершину, ближайшую к центру n-гона (стабильный веер на сфере)."""
+    if len(indices) <= 4:
+        return indices
+    cx = cy = cz = 0.0
+    for idx in indices:
+        p = _as_vector(points[idx])
+        cx += p.x
+        cy += p.y
+        cz += p.z
+    inv = 1.0 / len(indices)
+    cx *= inv
+    cy *= inv
+    cz *= inv
+    best_pos = 0
+    best_d = 1e30
+    for pos, idx in enumerate(indices):
+        p = _as_vector(points[idx])
+        d = (p.x - cx) ** 2 + (p.y - cy) ** 2 + (p.z - cz) ** 2
+        if d < best_d:
+            best_d = d
+            best_pos = pos
+    if best_pos == 0:
+        return indices
+    return indices[best_pos:] + indices[:best_pos]
+
+
+def _indices_to_cpolygons(indices, points=None):
     """Конвертирует список индексов n-гона в CPolygon(ы) без лишней триангуляции."""
+    if points is not None:
+        indices = _rotate_ngon_for_fan(indices, points)
     n = len(indices)
     if n == 3:
         return [c4d.CPolygon(indices[0], indices[1], indices[2], indices[2])]
@@ -699,8 +750,8 @@ def _make_poly_object(points, polys, name):
             cpoly_list.append(item)
             continue
         start = len(cpoly_list)
-        indices = list(item)
-        new_polys = _indices_to_cpolygons(indices)
+        indices = _ensure_outward_winding(list(item), points)
+        new_polys = _indices_to_cpolygons(indices, points)
         if len(indices) > 4:
             hidden_edges.extend(_fan_hidden_edge_indices(start, len(indices)))
         cpoly_list.extend(new_polys)
