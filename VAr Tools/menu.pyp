@@ -31,16 +31,15 @@ MENU_ITEMS = [
             1068831,   # Clean Nulls
             1068832,   # Clean Empty Nulls
         ]},
-
     ]},
 
     {"name": "Objects", "items": [
         {"name": "Primitivs", "items": [
-            1068862,
-            1068863,
-            1068864,
-            1068865,
-            1068866,
+            1068871,    # TriCube
+            1068872,    # HexSphere
+            1068873,    # DiamondCylinder
+            1068874,    # TriTorus
+            1068875,    # BrickPlane
         ]},
 
         1068852,    # HierarchyFilter

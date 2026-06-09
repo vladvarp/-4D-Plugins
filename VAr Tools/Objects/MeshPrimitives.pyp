@@ -5,7 +5,7 @@ MeshPrimitives — Cinema 4D ObjectData Plugin
 
 Примитивы:
   1. TriCube   — Куб с треугольной сеткой
-  2. HexSphere — Сфера с настраиваемым числом углов (3–16), без триангуляции
+  2. HexSphere — Сфера с настраиваемым числом углов (3–16)
   3. DiamondCylinder — Цилиндр с ромбической сеткой (смещённые ряды)
   4. TriTorus  — Тор с треугольной сеткой
   5. BrickPlane — Плоскость с кирпичной сеткой (running bond)
@@ -19,13 +19,19 @@ import os
 import base64
 import tempfile
 
-# ─── Plugin IDs ───────────────────────────────────────────────────────────────
+# ─── Plugin IDs & Names ───────────────────────────────────────────────────────────────
 
-ID_TRICUBE          = 1068862
-ID_HEXSPHERE        = 1068863
-ID_DIAMONDCYLINDER  = 1068864
-ID_TRITORUS         = 1068865
-ID_BRICKPLANE       = 1068866
+ID_TRICUBE          = 1068871
+ID_HEXSPHERE        = 1068872
+ID_DIAMONDCYLINDER  = 1068873
+ID_TRITORUS         = 1068874
+ID_BRICKPLANE       = 1068875
+
+NAME_TRICUBE          = "TriCube v1.1"
+NAME_HEXSPHERE        = "HexSphere v1.2"
+NAME_DIAMONDCYLINDER  = "DiamondCylinder v1.1"
+NAME_TRITORUS         = "TriTorus v1.1"
+NAME_BRICKPLANE       = "BrickPlane v1.0"
 
 # ─── UserData SubID (общая схема: SubID=1 — группа, поля с 2) ────────────────
 
@@ -995,16 +1001,24 @@ class BrickPlaneObject(_MeshPrimitiveBase):
         return build_brickplane(w, h, segs_w, segs_h)
 
 
-_ICON_B64_1 = (
-    "iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAIAAAD8GO2jAAAAoUlEQVR42mOQUdCi"
-    "KWIYtWDUAlpY4NZzB4JoYgHcdGrZQV8L0EzHhci0AL+hKas+QBBBO/7v0yDNAoi5"
-    "IiJyEATh4jEdgoi1AM10PHbAzYWTEAZhC5DNRWbjChk0Bj4L0Ezccuc/LjuQwwSN"
-    "TZQFENMhCC5YseAEUBeQhIc7VjSgPqB5HNAjFVEzH+DPzMg5GX/ZgDMnj9ZooxaM"
-    "WjB0LQAA/SmnUKnI7oUAAAAASUVORK5CYII="
+_ICON_TC = (
+    "iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAABaUlEQVR4nGNkQALW+Q/+M9ABHJ2owAhjM9LTYmwOYRoIi5EB40D5HgYoDoEjE+QDKdHPQq7GQFd5DPb63Q9p7wBki3HJkeIQohyAz1JC6gk5Bq8DSLUYnxm4HII1FxyZIG+MxJWj2BUMDI9gDJuCh2eRJbCGgF78KbiiSwvNkB3D0LuVAcWAYm+GwN6tDOvRxFD0SPvthOtRVNJAsQtrCHx6/xLDUfFhZlgNZ4CE0CNkAZgj+2buxDAH3QFE54KFq05BHWCGLvUIXQCbxbgAQQegRwFy9MSHmcGjANnSp5vccUYBOiCYCJEtxOVAfBagO4jiREjIQdgAvkRIMArQLUR3EKWA6FyAC2BzEL4oITsX4APoFpKSCKniAFIcRFQi5BMUZ2BgIC0qCDkIPejxOoCaDsFlMVEOQHcIsY4hZCnJDsDmGGwOIcVish2A7hByLYaBod8qHnUAxQ5A7ijSGwyOviEyZyC65wBPfJoHhPNNrQAAAABJRU5ErkJggg=="
+)
+_ICON_HS = (
+    "iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAABOklEQVR4nNVXMRKDIBBEJ72ljeML4nvMA+wt7GJtOgt7HxDfY17g2Fj6gqRy5gbugMNEzFbiAbvK3gGBALg+729xAF63R7A9B0cSY0JCH8QQga+v33BxGbTOC/o+SuLfCaBIqT62Yqw8YEPuOsYowIWcM5YUMOZNuYccihjzpqTiZBZ8gxyC8gT6B3TkU9WTX6OLUXOyCpGOgNPHScBU9WXaFp2JJG2LjiNCqQPYr9omxERAQhP5Oi+KFxQTmswHRWCiYAyDLGD3ZmQiNMH7bvjfAqaqL2XTcdNQyYIoibWZILtejm1tzBtYNURLMZUJMhE3jglgLYGN47lZcc7NSAi+mXTQzUUKyIaaVdN15NlQk8tidSp2XQ4TubUAFxG2h1LrUzGc0MuxfC8RhRBeFI/GOe6GsOHjev4BeqjHFj+lkcgAAAAASUVORK5CYII="
+)
+_ICON_DC = (
+    "iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAABVElEQVR4nGNkQAIb/A79Z6ADCNhkxwhjM9LTYmwOYRoIi5EB40D5HgYGPARGHcBCqgYFJTW88g/u3aKNAwhZjK6OWIcQdACxFpPrEIJpQL9f3F2/X9wdiV+JJo+Vj64PFyAYAhcLX+6EGYjsKJg4shg+eVyAYEF05/k9BgYGBgYXaw+Y4ZUXC1+2o/sOyaGVFwtftu85uoOBgYGBQUVSCa8DiE6EuHyIzUH6/eLue8wYqBMC/httYQYbEetYKDjHwMDAsNH/MF6HEB0FxafiUYK812zhTqh4Za/ZwnZc8oSigGgHwAAhC2HyMHGqOWDAQmA0DQzaNFCt37+TgYGBofViYWW1fn9768XCoZkGCJaEMJ/CAMzHxPLNFEzwmj/gLSKCUXDqwRmKLCAUAgSjAGYAqQ4hZDHRDiDVIcRaTLIDyLWAEGBC7ijSGwyOviEyZyC65wCo9fAZJ/PIvAAAAABJRU5ErkJggg=="
+)
+_ICON_TT = (
+    "iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAABwUlEQVR4nMVXMY6EMAw0p+vzg1VOome/QMVLqNLcvYRtqHgJFV+465E24ge84LYhyATbOOhudxogCvZkHNtJBgjfn/YXnoDrzWfhPXumY4rI2yscY2RnVm9zCwAAxg313JZdGPejTybwnupUO0dLRhUCjfOz/7AEiuZe29yyhowbKgCYlidLwuYWiuZeJxOY27Izbtj9aNxQGTdUc1v2AHCZ27IPYwzRzT6JIe6BQGJ5VstYT8zrA7noW3TOEsCyB+eUYy2RYJPamLsQCDFn40hgDc2R7cM0xKvHkvrRA3x9rPJyteEISZVwbsvOj56UMoxj55QKIoFYIm3sUxD7SFJAU93iOUcqsAT+Y/UUNs0oqlgTAFzw5B+06STY3MZZw9raEMDxoRTQNpgUO1IpVuWx5FyDDYEz/VyCRkUxC2IVjBvYDhnGEyum/kASVzhOatRFJ00W7RQQ8njiiFEkqLlUiEkF/Ojj2s52OYLQOmfXOwiIIYhll4hQY/g8wflgT8VFcz/saniDHqhSc0VMdSyXcltaoSatVc3oTH3Q/qNOQ2yQU+TUxeR688m3I+yoOOkY4I/uhtoOySHDH6+4nj8AZLs/JIvrX8wAAAAASUVORK5CYII="
+)
+_ICON_BP = (
+    "iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAApElEQVR4nO1XQQ6AIAzbCP8SH+ZFHwa+DE9LkCwyTKQe6AlIgcK6LGMqkELINAAhJZYxj7xYE+IQF5dg1OsF8B/w9cIS42HZeK7r1sM1C2htILqL7OFqgIcALkANgTW2vVwN8DTknPP+ROh1e4tbm9Zri4K3brecJ4CbEC7AE9mc/FVmwLNg1gK4CeECZi2YtQBuQriAWQtc2SiOxj96w3KCaM8vfQqEBgGNXZYAAAAASUVORK5CYII="
 )
 
-def _make_icon_1():
-    png_data = base64.b64decode(_ICON_B64_1)
+def _make_icon_tc():
+    png_data = base64.b64decode(_ICON_TC)
     try:
         bmp = c4d.bitmaps.BaseBitmap()
     except AttributeError:
@@ -1018,7 +1032,72 @@ def _make_icon_1():
         os.unlink(tmp.name)
     return bmp
 
-ICO_P_1 = _make_icon_1()
+def _make_icon_hs():
+    png_data = base64.b64decode(_ICON_HS)
+    try:
+        bmp = c4d.bitmaps.BaseBitmap()
+    except AttributeError:
+        bmp = c4d.BaseBitmap()
+    tmp = tempfile.NamedTemporaryFile(suffix=".png", delete=False)
+    try:
+        tmp.write(png_data)
+        tmp.close()
+        bmp.InitWith(tmp.name)
+    finally:
+        os.unlink(tmp.name)
+    return bmp
+
+def _make_icon_dc():
+    png_data = base64.b64decode(_ICON_DC)
+    try:
+        bmp = c4d.bitmaps.BaseBitmap()
+    except AttributeError:
+        bmp = c4d.BaseBitmap()
+    tmp = tempfile.NamedTemporaryFile(suffix=".png", delete=False)
+    try:
+        tmp.write(png_data)
+        tmp.close()
+        bmp.InitWith(tmp.name)
+    finally:
+        os.unlink(tmp.name)
+    return bmp
+
+def _make_icon_tt():
+    png_data = base64.b64decode(_ICON_TT)
+    try:
+        bmp = c4d.bitmaps.BaseBitmap()
+    except AttributeError:
+        bmp = c4d.BaseBitmap()
+    tmp = tempfile.NamedTemporaryFile(suffix=".png", delete=False)
+    try:
+        tmp.write(png_data)
+        tmp.close()
+        bmp.InitWith(tmp.name)
+    finally:
+        os.unlink(tmp.name)
+    return bmp
+    
+def _make_icon_bp():
+    png_data = base64.b64decode(_ICON_BP)
+    try:
+        bmp = c4d.bitmaps.BaseBitmap()
+    except AttributeError:
+        bmp = c4d.BaseBitmap()
+    tmp = tempfile.NamedTemporaryFile(suffix=".png", delete=False)
+    try:
+        tmp.write(png_data)
+        tmp.close()
+        bmp.InitWith(tmp.name)
+    finally:
+        os.unlink(tmp.name)
+    return bmp
+
+
+ICO_TC = _make_icon_tc()
+ICO_HS = _make_icon_hs()
+ICO_DC = _make_icon_dc()
+ICO_TT = _make_icon_tt()
+ICO_BP = _make_icon_bp()
 
 # ─── Регистрация ─────────────────────────────────────────────────────────────
 
@@ -1026,34 +1105,34 @@ if __name__ == "__main__":
 
     primitives = [
         (ID_TRICUBE,
-         "TriCube",
+         NAME_TRICUBE,
          TriCubeObject,
          "Куб с треугольной сеткой",
-         ICO_P_1),
+         ICO_TC),
 
         (ID_HEXSPHERE,
-         "HexSphere",
+         NAME_HEXSPHERE,
          HexSphereObject,
          "Сфера с гексагональной сеткой (dual icosphere)",
-         ICO_P_1),
+         ICO_HS),
 
         (ID_DIAMONDCYLINDER,
-         "DiamondCylinder",
+         NAME_DIAMONDCYLINDER,
          DiamondCylinderObject,
          "Цилиндр с ромбической сеткой",
-         ICO_P_1),
+         ICO_DC),
 
         (ID_TRITORUS,
-         "TriTorus",
+         NAME_TRITORUS,
          TriTorusObject,
          "Тор с треугольной сеткой",
-         ICO_P_1),
+         ICO_TT),
 
         (ID_BRICKPLANE,
-         "BrickPlane",
+         NAME_BRICKPLANE,
          BrickPlaneObject,
          "Плоскость с кирпичной сеткой",
-         ICO_P_1),
+         ICO_BP),
     ]
 
     for plugin_id, name, cls, help_text, ico in primitives:
