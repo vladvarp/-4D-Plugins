@@ -14,7 +14,7 @@ PLUGIN_ID_CMD = 1068859   # CommandData — кнопка меню
 PLUGIN_ID_TAG = 1068860   # TagData     — Expression-тег
 
 PLUGIN_NAME_CMD   = "Target Camera"
-PLUGIN_NAME_CMD_V = "Target Camera v1.2"
+PLUGIN_NAME_CMD_V = "Target Camera v1.3"
 PLUGIN_NAME_TAG   = "TargetCam Controller"
 
 # Ключ ссылки на таргет в BaseContainer тега
@@ -59,6 +59,7 @@ class TargetCamTag(c4d.plugins.TagData):
 
     def Init(self, node):
         node[TAG_LINK_TARGET] = None
+        self._prev_dist = None   # предыдущее расстояние для детектирования ручного изменения
         return True
 
     def GetDDescription(self, node, description, flags):
@@ -94,6 +95,22 @@ class TargetCamTag(c4d.plugins.TagData):
         new_mg = look_at_matrix(cam.GetMg(), target.GetMg().off)
         cam.SetMg(new_mg)
 
+        # ── Расстояние до цели ────────────────────────────────────────────────
+        real_dist  = (target.GetMg().off - new_mg.off).GetLength()
+        param_dist = cam[c4d.CAMERAOBJECT_TARGETDISTANCE]
+
+        # Если пользователь изменил параметр вручную — двигаем таргет вперёд по оси камеры
+        if self._prev_dist is not None and abs(param_dist - self._prev_dist) > 0.001:
+            new_target_pos = new_mg.off + new_mg.v3.GetNormalized() * param_dist
+            target.SetAbsPos(new_target_pos)
+            c4d.EventAdd()
+        else:
+            # Таргет двигали мышью — обновляем параметр по реальному расстоянию
+            cam[c4d.CAMERAOBJECT_TARGETDISTANCE] = real_dist
+            param_dist = real_dist
+
+        self._prev_dist = param_dist
+
         return c4d.EXECUTIONRESULT_OK
 
 
@@ -118,8 +135,8 @@ class TargetCameraCmd(c4d.plugins.CommandData):
         # Имя сразу по правилу: "<имя камеры>.target"
         target = c4d.BaseObject(c4d.Onull)
         target.SetName(cam.GetName() + ".target")
-        target[c4d.NULLOBJECT_DISPLAY] = 2
-        target[c4d.NULLOBJECT_RADIUS]  = 30.0
+        target[c4d.NULLOBJECT_DISPLAY] = 11
+        target[c4d.NULLOBJECT_RADIUS]  = 5.0
         target.SetAbsPos(c4d.Vector(0, 0, 0))
         doc.InsertObject(target)
         doc.AddUndo(c4d.UNDOTYPE_NEW, target)
