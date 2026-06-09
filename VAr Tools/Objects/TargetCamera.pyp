@@ -14,7 +14,7 @@ PLUGIN_ID_CMD = 1068859   # CommandData — кнопка меню
 PLUGIN_ID_TAG = 1068860   # TagData     — Expression-тег
 
 PLUGIN_NAME_CMD   = "Target Camera"
-PLUGIN_NAME_CMD_V = "Target Camera v1.3"
+PLUGIN_NAME_CMD_V = "Target Camera v1.4"
 PLUGIN_NAME_TAG   = "TargetCam Controller"
 
 # Ключ ссылки на таргет в BaseContainer тега
@@ -125,9 +125,10 @@ class TargetCameraCmd(c4d.plugins.CommandData):
 
         # ── 1. Камера ──────────────────────────────────────────────────────────
         cam = c4d.BaseObject(c4d.Ocamera)
-        cam.SetName(PLUGIN_NAME_CMD)
+        cam.SetName("Camera")
         cam[c4d.CAMERAOBJECT_FOCUS] = 36.0
         cam.SetAbsPos(c4d.Vector(0, 0, -500))
+        _set_object_icon(cam, _ICON_B64_1)   # иконка камеры
         doc.InsertObject(cam)
         doc.AddUndo(c4d.UNDOTYPE_NEW, cam)
 
@@ -138,6 +139,7 @@ class TargetCameraCmd(c4d.plugins.CommandData):
         target[c4d.NULLOBJECT_DISPLAY] = 11
         target[c4d.NULLOBJECT_RADIUS]  = 5.0
         target.SetAbsPos(c4d.Vector(0, 0, 0))
+        _set_object_icon(target, _ICON_B64_2)  # иконка таргета
         doc.InsertObject(target)
         doc.AddUndo(c4d.UNDOTYPE_NEW, target)
 
@@ -172,6 +174,19 @@ _ICON_B64_2 = (
     "l2yCsgPGP2B0Ufo5yD3J6XcR4zZNfw8YLxrjTWZMFYy5iDHZkWZT9nR9Qx/pzjY7"
     "O/Zd6AAAAABJRU5ErkJggg=="
 )
+
+
+
+def _set_object_icon(obj, icon_b64):
+    """Назначает иконку объекту сцены через временный PNG-файл (ID_BASELIST_ICON_FILE)."""
+    png_data = base64.b64decode(icon_b64)
+    tmp = tempfile.NamedTemporaryFile(suffix=".png", delete=False)
+    try:
+        tmp.write(png_data)
+        tmp.close()
+        obj[c4d.ID_BASELIST_ICON_FILE] = tmp.name
+    finally:
+        pass  # файл нужен, пока C4D не загрузил иконку; удалять сразу нельзя
 
 
 def _make_icon_plug():
@@ -213,7 +228,7 @@ if __name__ == "__main__":
     ok_tag = c4d.plugins.RegisterTagPlugin(
         id          = PLUGIN_ID_TAG,
         str         = PLUGIN_NAME_TAG,
-        info        = c4d.TAG_EXPRESSION | c4d.TAG_VISIBLE,
+        info        = c4d.TAG_EXPRESSION,
         g           = TargetCamTag,
         description = "",
         icon        = _make_icon_teg(),
