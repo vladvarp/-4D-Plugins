@@ -35,6 +35,14 @@ MENU_ITEMS = [
     ]},
 
     {"name": "Objects", "items": [
+        {"name": "Primitivs", "items": [
+            1068862,
+            1068863,
+            1068864,
+            1068865,
+            1068866,
+        ]},
+
         1068852,    # HierarchyFilter
         1068859,    # TargetCamera
     ]},
