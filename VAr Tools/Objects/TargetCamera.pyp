@@ -150,7 +150,7 @@ if __name__ == "__main__":
         info        = c4d.TAG_EXPRESSION | c4d.TAG_VISIBLE,
         g           = TargetCamTag,
         description = "",
-        icon        = None,
+        icon        = icon,
     )
 
     ok_cmd = c4d.plugins.RegisterCommandPlugin(
@@ -158,7 +158,7 @@ if __name__ == "__main__":
         str  = "Target Camera",
         info = 0,
         icon = icon,
-        help = "Создать Target Camera (аналог 3ds Max)",
+        help = "Создать Target Camera",
         dat  = TargetCameraCmd(),
     )
 
