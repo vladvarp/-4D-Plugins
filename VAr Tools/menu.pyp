@@ -36,6 +36,7 @@ MENU_ITEMS = [
 
     {"name": "Objects", "items": [
         1068852,    # HierarchyFilter
+        1068859,    # TargetCamera
     ]},
 
     {"name": "Deformers", "items": [
