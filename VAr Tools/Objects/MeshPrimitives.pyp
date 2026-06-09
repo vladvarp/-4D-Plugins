@@ -783,32 +783,32 @@ if __name__ == "__main__":
         (ID_TRICUBE,
          "TriCube",
          TriCubeObject,
-         "Куб с треугольной сеткой"),
-         ICO_P_1,
+         "Куб с треугольной сеткой",
+         ICO_P_1),
 
         (ID_HEXSPHERE,
          "HexSphere",
          HexSphereObject,
-         "Сфера с гексагональной сеткой (dual icosphere)"),
-         ICO_P_1,
+         "Сфера с гексагональной сеткой (dual icosphere)",
+         ICO_P_1),
 
         (ID_DIAMONDCYLINDER,
          "DiamondCylinder",
          DiamondCylinderObject,
-         "Цилиндр с ромбической сеткой"),
-         ICO_P_1,
+         "Цилиндр с ромбической сеткой",
+         ICO_P_1),
 
         (ID_TRITORUS,
          "TriTorus",
          TriTorusObject,
-         "Тор с треугольной сеткой"),
-         ICO_P_1,
+         "Тор с треугольной сеткой",
+         ICO_P_1),
 
         (ID_BRICKPLANE,
          "BrickPlane",
          BrickPlaneObject,
-         "Плоскость с кирпичной сеткой"),
-         ICO_P_1,
+         "Плоскость с кирпичной сеткой",
+         ICO_P_1),
     ]
 
     for plugin_id, name, cls, help_text, ico in primitives:
