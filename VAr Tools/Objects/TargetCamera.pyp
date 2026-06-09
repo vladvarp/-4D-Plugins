@@ -1,10 +1,9 @@
 """
 TargetCamera.pyp  —  Cinema 4D R26
-Создаёт группу «Target Camera System»:
-  Null (группа)
+Создаёт иерархию:
+  Cam_Target_Line  (SplineObject — корень, pivot в центре линии)
     ├─ Target Camera   (Ocamera + тег)
-    ├─ Camera Target   (Onull)
-    └─ Cam_Target_Line (SplineObject — обновляется тегом)
+    └─ Camera Target   (Onull)
 
 Тег каждый кадр:
   • LookAt: камера смотрит на таргет
@@ -21,7 +20,6 @@ PLUGIN_ID_TAG   = 1068860
 TAG_LINK_TARGET = 1000
 TAG_LINK_SPLINE = 1001
 
-NAME_GROUP  = "Target Camera System"
 NAME_CAM    = "Target Camera"
 NAME_TARGET = "Camera Target"
 NAME_SPLINE = "Cam_Target_Line"
@@ -72,8 +70,9 @@ def update_clip_rect(cam, rect_obj, dist):
     hw = dist * math.tan(fov_h * 0.5)
     hh = hw / aspect
     set_rect_points(rect_obj, hw, hh)
-    # Рамка — дочерний объект камеры, смещение по локальной -Z
-    ml     = rect_obj.GetMl()
+    # Рамка — дочерний объект камеры, смещение по локальной -Z камеры.
+    # Строим чистую матрицу: единичное вращение + только offset по Z.
+    ml     = c4d.Matrix()
     ml.off = c4d.Vector(0.0, 0.0, -dist)
     rect_obj.SetMl(ml)
 
@@ -152,13 +151,19 @@ class TargetCamTag(c4d.plugins.TagData):
         mg.v3  = -forward
         cam.SetMg(mg)
 
-        # ── Сплайн: мировые координаты, нулевая матрица объекта ───────────────
+        # ── Сплайн: pivot в центре отрезка камера↔таргет ─────────────────────
         spline = tag[TAG_LINK_SPLINE]
         if spline and spline.IsAlive():
-            # Сплайн лежит в корне/группе без вращения — пишем мировые точки
-            inv = ~spline.GetMg()           # обратная матрица сплайна
-            p0  = inv * cam_pos
-            p1  = inv * target_pos
+            center     = (cam_pos + target_pos) * 0.5
+            half_vec   = (target_pos - cam_pos) * 0.5   # вектор от центра к таргету
+            # Перемещаем pivot сплайна в центр (сохраняем вращение = единичное)
+            mg_sp      = spline.GetMg()
+            mg_sp.off  = center
+            spline.SetMg(mg_sp)
+            # Точки в локальных координатах сплайна: -half и +half вдоль мирового вектора
+            inv        = ~spline.GetMg()
+            p0         = inv * cam_pos
+            p1         = inv * target_pos
             spline.ResizeObject(2)
             spline.SetPoint(0, p0)
             spline.SetPoint(1, p1)
@@ -213,46 +218,41 @@ class TargetCameraCmd(c4d.plugins.CommandData):
     def Execute(self, doc):
         doc.StartUndo()
 
-        # ── Группа-контейнер ─────────────────────────────────────────────────
-        group = c4d.BaseObject(c4d.Onull)
-        group.SetName(NAME_GROUP)
-        group[c4d.NULLOBJECT_DISPLAY] = 0   # нет отображения
-        doc.InsertObject(group)
-        doc.AddUndo(c4d.UNDOTYPE_NEW, group)
-
-        # ── Камера (в нуле сцены) ────────────────────────────────────────────
-        cam = c4d.BaseObject(c4d.Ocamera)
-        cam.SetName(NAME_CAM)
-        cam[c4d.CAMERAOBJECT_FOCUS]               = 36.0
-        # Near/Far выключены по умолчанию — пользователь включает сам
-        cam[c4d.CAMERAOBJECT_NEAR_CLIPPING_ENABLE] = False
-        cam[c4d.CAMERAOBJECT_NEAR_CLIPPING]        = 100.0
-        cam[c4d.CAMERAOBJECT_FAR_CLIPPING_ENABLE]  = False
-        cam[c4d.CAMERAOBJECT_FAR_CLIPPING]         = 10000.0
-        cam.SetAbsPos(c4d.Vector(0, 0, 0))
-        doc.InsertObject(cam, group, None)
-        doc.AddUndo(c4d.UNDOTYPE_NEW, cam)
-
-        # ── Таргет впереди камеры (+Z в мировых = -Z взгляда → 0,0,500) ──────
-        target = c4d.BaseObject(c4d.Onull)
-        target.SetName(NAME_TARGET)
-        target[c4d.NULLOBJECT_DISPLAY] = 2      # крест
-        target[c4d.NULLOBJECT_RADIUS]  = 20.0
-        target.SetAbsPos(c4d.Vector(0, 0, 500))
-        doc.InsertObject(target, group, None)
-        doc.AddUndo(c4d.UNDOTYPE_NEW, target)
-
-        # ── Сплайн-линия (в группе, нулевая матрица) ─────────────────────────
+        # ── Сплайн-линия (корень системы, pivot в центре) ────────────────────
         spline = c4d.SplineObject(2, c4d.SPLINETYPE_LINEAR)
         spline.SetName(NAME_SPLINE)
         spline[c4d.SPLINEOBJECT_CLOSED]    = False
         spline[c4d.ID_BASEOBJECT_USECOLOR] = 2
         spline[c4d.ID_BASEOBJECT_COLOR]    = c4d.Vector(0.9, 0.85, 0.1)
-        spline.SetPoint(0, c4d.Vector(0, 0, 0))
-        spline.SetPoint(1, c4d.Vector(0, 0, 500))
+        # Начальные точки: камера слева (-Z), таргет справа (+Z)
+        spline.SetPoint(0, c4d.Vector(0, 0, -250))
+        spline.SetPoint(1, c4d.Vector(0, 0,  250))
         spline.Message(c4d.MSG_UPDATE)
-        doc.InsertObject(spline, group, None)
+        # Сплайн вставляем в корень сцены
+        doc.InsertObject(spline)
         doc.AddUndo(c4d.UNDOTYPE_NEW, spline)
+
+        # ── Камера — дочерний объект сплайна, смещена по -Z ──────────────────
+        cam = c4d.BaseObject(c4d.Ocamera)
+        cam.SetName(NAME_CAM)
+        cam[c4d.CAMERAOBJECT_FOCUS]                = 36.0
+        # Near/Far выключены по умолчанию — пользователь включает сам
+        cam[c4d.CAMERAOBJECT_NEAR_CLIPPING_ENABLE] = False
+        cam[c4d.CAMERAOBJECT_NEAR_CLIPPING]        = 100.0
+        cam[c4d.CAMERAOBJECT_FAR_CLIPPING_ENABLE]  = False
+        cam[c4d.CAMERAOBJECT_FAR_CLIPPING]         = 10000.0
+        cam.SetAbsPos(c4d.Vector(0, 0, -250))      # мировая позиция при создании
+        doc.InsertObject(cam, spline, None)
+        doc.AddUndo(c4d.UNDOTYPE_NEW, cam)
+
+        # ── Таргет впереди камеры — дочерний объект сплайна, смещён по +Z ────
+        target = c4d.BaseObject(c4d.Onull)
+        target.SetName(NAME_TARGET)
+        target[c4d.NULLOBJECT_DISPLAY] = 2         # крест
+        target[c4d.NULLOBJECT_RADIUS]  = 20.0
+        target.SetAbsPos(c4d.Vector(0, 0, 250))    # мировая позиция при создании
+        doc.InsertObject(target, spline, None)
+        doc.AddUndo(c4d.UNDOTYPE_NEW, target)
 
         # ── Тег на камере ─────────────────────────────────────────────────────
         tag = cam.MakeTag(PLUGIN_ID_TAG)
