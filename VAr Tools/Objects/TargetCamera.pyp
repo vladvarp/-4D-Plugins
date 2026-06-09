@@ -10,6 +10,7 @@ PLUGIN_ID_TAG = 1068860   # TagData     — Expression-тег
 
 # Ключ ссылки на таргет в BaseContainer тега
 TAG_LINK_TARGET = 1000
+
 # Глобальная очередь тегов, которые надо удалить (таргет был удалён извне)
 _tags_to_remove = []
 
@@ -52,47 +53,32 @@ class TargetCamTag(c4d.plugins.TagData):
 
     def Init(self, node):
         node[TAG_LINK_TARGET] = None
-
-        # Добавляем UserData только если кнопка ещё не создана
-        for uid, bc in node.GetUserDataContainer():
-            if bc[c4d.DESC_NAME] == "Создать таргет":
-                return True
-
-        # UserData 1: кнопка «Создать таргет»
-        bc_btn = c4d.GetCustomDatatypeDefault(c4d.DTYPE_BUTTON)
-        bc_btn[c4d.DESC_NAME]       = "Создать таргет"
-        bc_btn[c4d.DESC_ANIMATE]    = c4d.DESC_ANIMATE_OFF
-        node.AddUserData(bc_btn)    # → ID_USERDATA, 1
-
         return True
 
     def Message(self, node, msgtype, data):
-        # Нажатие кнопки «Создать таргет» (UserData 2)
-        if msgtype == c4d.MSG_DESCRIPTION_COMMAND:
-            btn_id = data["id"][0].id
-            if btn_id == c4d.ID_USERDATA:
-                sub_id = data["id"][1].id
-                if sub_id == 1:
-                    cam = node.GetObject()
-                    if cam is None:
-                        return True
-                    doc = cam.GetDocument()
-                    if doc is None:
-                        return True
-                    # Создаём таргет только если его ещё нет
-                    existing = node[TAG_LINK_TARGET]
-                    if existing is None or not existing.IsAlive():
-                        target = c4d.BaseObject(c4d.Onull)
-                        target.SetName(cam.GetName() + ".target")
-                        target[c4d.NULLOBJECT_DISPLAY] = 2
-                        target[c4d.NULLOBJECT_RADIUS]  = 30.0
-                        # Размещаем таргет в 500 единиц перед камерой (вдоль +Z камеры)
-                        cam_mg = cam.GetMg()
-                        target.SetAbsPos(cam_mg.off + cam_mg.v3 * 500.0)
-                        doc.InsertObject(target)
-                        doc.AddUndo(c4d.UNDOTYPE_NEW, target)
-                        node[TAG_LINK_TARGET] = target
-                        c4d.EventAdd()
+        # MSG_DOCUMENTINFO type=0: тег только что добавлен пользователем в сцену
+        if msgtype == c4d.MSG_DOCUMENTINFO and isinstance(data, dict):
+            if data.get("type", -1) == 0:
+                cam = node.GetObject()
+                if cam is None:
+                    return True
+                doc = cam.GetDocument()
+                if doc is None:
+                    return True
+                # Создаём таргет только если его ещё нет
+                existing = node[TAG_LINK_TARGET]
+                if existing is None or not existing.IsAlive():
+                    target = c4d.BaseObject(c4d.Onull)
+                    target.SetName(cam.GetName() + ".target")
+                    target[c4d.NULLOBJECT_DISPLAY] = 2
+                    target[c4d.NULLOBJECT_RADIUS]  = 30.0
+                    # Размещаем таргет в 500 единиц перед камерой (вдоль +Z камеры)
+                    cam_mg = cam.GetMg()
+                    target.SetAbsPos(cam_mg.off + cam_mg.v3 * 500.0)
+                    doc.InsertObject(target)
+                    doc.AddUndo(c4d.UNDOTYPE_NEW, target)
+                    node[TAG_LINK_TARGET] = target
+                    c4d.EventAdd()
         return True
 
     def Free(self, node):
@@ -104,6 +90,20 @@ class TargetCamTag(c4d.plugins.TagData):
                 doc.AddUndo(c4d.UNDOTYPE_DELETE, target)
                 target.Remove()
                 c4d.EventAdd()
+
+    def GetDDescription(self, node, description, flags):
+        if not description.LoadDescription("tbaselist2d"):
+            return False
+
+        bc = c4d.GetCustomDatatypeDefault(c4d.DTYPE_BASELISTLINK)
+        bc[c4d.DESC_NAME]       = "Target"
+        bc[c4d.DESC_SHORT_NAME] = "Target"
+        bc[c4d.DESC_CUSTOMGUI]  = c4d.CUSTOMGUI_LINKBOX
+
+        pid = c4d.DescID(c4d.DescLevel(TAG_LINK_TARGET, c4d.DTYPE_BASELISTLINK, 0))
+        description.SetParameter(pid, bc, c4d.ID_ROOT)
+
+        return True, flags | c4d.DESCFLAGS_DESC_LOADED
 
     def Execute(self, tag, doc, op, bt, priority, flags):
         cam = op
