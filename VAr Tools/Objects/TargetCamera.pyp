@@ -1,12 +1,21 @@
 """
 TargetCamera.pyp — Cinema 4D R26
+
+Создаёт камеру с целевой точкой (Null-объектом), на которую камера всегда смотрит. Таргет следует за камерой при переименовании и удаляется вместе с ней.
 """
 
 import c4d
+import os
+import base64
+import tempfile
 
 # ── ID плагина (оригинальные) ─────────────────────────────────────────────────
 PLUGIN_ID_CMD = 1068859   # CommandData — кнопка меню
 PLUGIN_ID_TAG = 1068860   # TagData     — Expression-тег
+
+PLUGIN_NAME_CMD   = "Target Camera"
+PLUGIN_NAME_CMD_V = "Target Camera v1.2"
+PLUGIN_NAME_TAG   = "TargetCam Controller"
 
 # Ключ ссылки на таргет в BaseContainer тега
 TAG_LINK_TARGET = 1000
@@ -99,7 +108,7 @@ class TargetCameraCmd(c4d.plugins.CommandData):
 
         # ── 1. Камера ──────────────────────────────────────────────────────────
         cam = c4d.BaseObject(c4d.Ocamera)
-        cam.SetName("Target Camera")
+        cam.SetName(PLUGIN_NAME_CMD)
         cam[c4d.CAMERAOBJECT_FOCUS] = 36.0
         cam.SetAbsPos(c4d.Vector(0, 0, -500))
         doc.InsertObject(cam)
@@ -130,34 +139,74 @@ class TargetCameraCmd(c4d.plugins.CommandData):
         return c4d.CMD_ENABLED
 
 
+_ICON_B64_1 = (
+    "iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAIAAAD8GO2jAAAAoUlEQVR42mOQUdCi"
+    "KWIYtWDUAlpY4NZzB4JoYgHcdGrZQV8L0EzHhci0AL+hKas+QBBBO/7v0yDNAoi5"
+    "IiJyEATh4jEdgoi1AM10PHbAzYWTEAZhC5DNRWbjChk0Bj4L0Ezccuc/LjuQwwSN"
+    "TZQFENMhCC5YseAEUBeQhIc7VjSgPqB5HNAjFVEzH+DPzMg5GX/ZgDMnj9ZooxaM"
+    "WjB0LQAA/SmnUKnI7oUAAAAASUVORK5CYII="
+)
+
+_ICON_B64_2 = (
+    "iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAIAAAD8GO2jAAAAx0lEQVR42r2WwQ2D"
+    "MAxFMwiHHhGD9NzBmKmTsAutFLBSYn87qP7SF4fI/s8RTuIyPZZUlaHo57r9GfB1"
+    "FO3vuapdvA/oXQRgBQwA1MwLAEQ6ACtBBeAUBQBCAQAklqC7MNyOMAGR2lsFGQ7A"
+    "srPWTQBwB6YRhgNwqx4A4PIBQGWEANeV7VXlRiqAvkPke+h0PwQif/dUKtBqxCCg"
+    "l2yCsgPGP2B0Ufo5yD3J6XcR4zZNfw8YLxrjTWZMFYy5iDHZkWZT9nR9Qx/pzjY7"
+    "O/Zd6AAAAABJRU5ErkJggg=="
+)
+
+
+def _make_icon_plug():
+    png_data = base64.b64decode(_ICON_B64_1)
+    try:
+        bmp = c4d.bitmaps.BaseBitmap()
+    except AttributeError:
+        bmp = c4d.BaseBitmap()
+    tmp = tempfile.NamedTemporaryFile(suffix=".png", delete=False)
+    try:
+        tmp.write(png_data)
+        tmp.close()
+        bmp.InitWith(tmp.name)
+    finally:
+        os.unlink(tmp.name)
+    return bmp
+
+def _make_icon_teg():
+    png_data = base64.b64decode(_ICON_B64_2)
+    try:
+        bmp = c4d.bitmaps.BaseBitmap()
+    except AttributeError:
+        bmp = c4d.BaseBitmap()
+    tmp = tempfile.NamedTemporaryFile(suffix=".png", delete=False)
+    try:
+        tmp.write(png_data)
+        tmp.close()
+        bmp.InitWith(tmp.name)
+    finally:
+        os.unlink(tmp.name)
+    return bmp
+
 # ══════════════════════════════════════════════════════════════════════════════
 #  Регистрация
 # ══════════════════════════════════════════════════════════════════════════════
 
 if __name__ == "__main__":
-    icon = c4d.bitmaps.BaseBitmap()
-    icon.Init(32, 32, 32)
-    for x in range(32):
-        for y in range(32):
-            if x == 16 or y == 16 or (14 <= x <= 18 and 14 <= y <= 18):
-                icon.SetPixel(x, y, 255, 200, 50)
-            else:
-                icon.SetPixel(x, y, 40, 90, 160)
 
     ok_tag = c4d.plugins.RegisterTagPlugin(
         id          = PLUGIN_ID_TAG,
-        str         = "TargetCam Controller",
+        str         = PLUGIN_NAME_TAG,
         info        = c4d.TAG_EXPRESSION | c4d.TAG_VISIBLE,
         g           = TargetCamTag,
         description = "",
-        icon        = icon,
+        icon        = _make_icon_teg(),
     )
 
     ok_cmd = c4d.plugins.RegisterCommandPlugin(
         id   = PLUGIN_ID_CMD,
-        str  = "Target Camera",
+        str  = PLUGIN_NAME_CMD_V,
         info = 0,
-        icon = icon,
+        icon = _make_icon_plug(),
         help = "Создать Target Camera",
         dat  = TargetCameraCmd(),
     )
