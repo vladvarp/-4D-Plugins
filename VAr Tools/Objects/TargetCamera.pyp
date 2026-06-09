@@ -144,8 +144,8 @@ class TargetCameraCmd(c4d.plugins.CommandData):
         # ── 2. Таргет (Null) ──────────────────────────────────────────────────
         target = c4d.BaseObject(c4d.Onull)
         target.SetName("Camera Target")
-        # Крест — наглядный маркер в вьюпорте
-        target[c4d.NULLOBJECT_DISPLAY] = c4d.NULLOBJECT_DISPLAY_CROSS
+        # Крест — наглядный маркер в вьюпорте (2 = Cross в R26)
+        target[c4d.NULLOBJECT_DISPLAY] = 2
         target[c4d.NULLOBJECT_RADIUS]  = 30.0
         # Таргет — в начале координат
         target.SetAbsPos(c4d.Vector(0, 0, 0))
