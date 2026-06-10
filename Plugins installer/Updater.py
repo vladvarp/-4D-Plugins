@@ -9,15 +9,16 @@ import threading
 import urllib.request
 import winreg
 from pathlib import Path
+from urllib.parse import unquote
 
 from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QLabel, QPushButton, QLineEdit, QFileDialog, QTableWidget,
     QTableWidgetItem, QHeaderView, QProgressBar, QFrame, QMessageBox,
-    QSizePolicy
+    QCheckBox, QAbstractItemView
 )
-from PyQt6.QtCore import Qt, QThread, pyqtSignal, QSize, QTimer
-from PyQt6.QtGui import QFont, QColor, QIcon, QPalette, QPixmap
+from PyQt6.QtCore import Qt, QThread, pyqtSignal, QTimer
+from PyQt6.QtGui import QColor, QPalette, QCursor
 
 # ── Конфигурация ──────────────────────────────────────────────────────────────
 
@@ -25,44 +26,53 @@ LIST_JSON_URL = (
     "https://raw.githubusercontent.com/vladvarp/-4D-Plugins/main/update_data/list.json"
 )
 CONFIG_FILE = Path(os.getenv("APPDATA")) / "C4D_PluginInstaller" / "config.json"
-GIT_INSTALLER_URL = "https://github.com/git-for-windows/git/releases/latest/download/Git-64-bit.exe"
+GIT_INSTALLER_URL = (
+    "https://github.com/git-for-windows/git/releases/latest/download/Git-64-bit.exe"
+)
 
 # ── Парсинг list.json ─────────────────────────────────────────────────────────
 
 def parse_list(raw: str) -> list[dict]:
     """
     Парсит строки вида:
-      https://github.com/.../tree/main/PluginName v1.0 {INFO}
-    Возвращает список словарей: name, url, version, repo_path
+      https://github.com/.../tree/main/PluginName%20X v1.0 {INFO}
+    repo_path — декодированный путь (пробелы вместо %20)
     """
     plugins = []
     for line in raw.strip().splitlines():
         line = line.strip()
         if not line:
             continue
-        # убираем {INFO} и подобные теги
         line = re.sub(r"\{[^}]+\}", "", line).strip()
-        # последний токен вида vX.Y — версия
         m = re.search(r"\s+(v[\d.]+)\s*$", line)
         if not m:
             continue
         version = m.group(1)
         url = line[: m.start()].strip()
-        # имя папки — последний сегмент URL (декодируем %20 → пробел)
-        from urllib.parse import unquote
+
+        # Имя папки — последний сегмент URL, декодированный
         name = unquote(url.rstrip("/").split("/")[-1])
-        # путь внутри репо для sparse-checkout
-        # URL вида: https://github.com/user/repo/tree/branch/path/to/folder
+
+        # Разбираем: https://github.com/user/repo/tree/branch/path/to/folder
         parts = url.split("/tree/", 1)
+        if len(parts) < 2:
+            continue
         repo_url = parts[0] + ".git"
-        repo_path = parts[1].split("/", 1)[1] if "/" in parts[1] else ""  # без ветки
-        plugins.append(
-            {"name": name, "version": version, "url": url,
-             "repo_url": repo_url, "repo_path": repo_path}
-        )
+        # parts[1] = "main/path/to/folder" → убираем ветку
+        after_branch = parts[1].split("/", 1)
+        # repo_path ДЕКОДИРУЕМ — git sparse-checkout требует реальные имена
+        repo_path = unquote(after_branch[1]) if len(after_branch) > 1 else unquote(after_branch[0])
+
+        plugins.append({
+            "name": name,
+            "version": version,
+            "url": url,
+            "repo_url": repo_url,
+            "repo_path": repo_path,   # «VAr Tools», не «VAr%20Tools»
+        })
     return plugins
 
-# ── Хранение конфига и состояния ──────────────────────────────────────────────
+# ── Конфиг ────────────────────────────────────────────────────────────────────
 
 def load_config() -> dict:
     if CONFIG_FILE.exists():
@@ -70,13 +80,12 @@ def load_config() -> dict:
             return json.load(f)
     return {"install_dir": "", "installed": {}}
 
-
 def save_config(cfg: dict):
     CONFIG_FILE.parent.mkdir(parents=True, exist_ok=True)
     with open(CONFIG_FILE, "w", encoding="utf-8") as f:
         json.dump(cfg, f, ensure_ascii=False, indent=2)
 
-# ── Git helpers ───────────────────────────────────────────────────────────────
+# ── Git ───────────────────────────────────────────────────────────────────────
 
 def git_available() -> bool:
     try:
@@ -85,67 +94,79 @@ def git_available() -> bool:
     except Exception:
         return False
 
-
-def git_install_path() -> str:
-    """Ищет git.exe в реестре Windows."""
+def git_exe() -> str:
     try:
-        key = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE,
-                             r"SOFTWARE\GitForWindows")
+        key = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\GitForWindows")
         path, _ = winreg.QueryValueEx(key, "InstallPath")
         return str(Path(path) / "bin" / "git.exe")
     except Exception:
         return "git"
 
-
 def install_git(progress_cb, done_cb):
-    """Скачивает и тихо устанавливает Git for Windows."""
     def worker():
         try:
             progress_cb("Скачиваю Git for Windows…")
             tmp = tempfile.mktemp(suffix=".exe")
             urllib.request.urlretrieve(GIT_INSTALLER_URL, tmp)
-            progress_cb("Устанавливаю Git (это займёт минуту)…")
+            progress_cb("Устанавливаю Git (подождите)…")
             subprocess.run(
                 [tmp, "/VERYSILENT", "/NORESTART",
                  "/COMPONENTS=icons,ext\\reg\\shellhere,assoc,assoc_sh"],
                 check=True
             )
             os.remove(tmp)
-            done_cb(True, "Git успешно установлен")
+            done_cb(True, "Git установлен")
         except Exception as e:
             done_cb(False, str(e))
     threading.Thread(target=worker, daemon=True).start()
 
-
-def sparse_clone_folder(repo_url: str, folder_path: str,
-                         dest: str, progress_cb) -> str:
+def sparse_clone_folder(repo_url: str, folder_path: str, dest: str, progress_cb):
     """
-    Клонирует только нужную папку из репозитория через sparse-checkout.
-    dest — куда положить итоговую папку.
-    Возвращает путь к установленной папке.
+    Клонирует только папку folder_path из репозитория.
+    folder_path должен быть уже декодирован (пробелы, не %20).
     """
-    git = git_install_path()
+    git = git_exe()
     tmp_dir = tempfile.mkdtemp()
     try:
         progress_cb(f"Инициализирую репозиторий…")
         subprocess.run([git, "init", tmp_dir], check=True, capture_output=True)
         subprocess.run([git, "-C", tmp_dir, "remote", "add", "origin", repo_url],
                        check=True, capture_output=True)
-        subprocess.run([git, "-C", tmp_dir, "config",
-                        "core.sparseCheckout", "true"],
+        subprocess.run([git, "-C", tmp_dir, "config", "core.sparseCheckout", "true"],
                        check=True, capture_output=True)
 
         sparse_file = Path(tmp_dir) / ".git" / "info" / "sparse-checkout"
+        # Записываем декодированный путь — git понимает пробелы
         sparse_file.write_text(folder_path + "/\n", encoding="utf-8")
 
-        progress_cb(f"Скачиваю папку {folder_path}…")
-        subprocess.run([git, "-C", tmp_dir, "pull", "--depth=1",
-                        "origin", "main"],
-                       check=True, capture_output=True)
+        progress_cb(f"Скачиваю «{folder_path}»…")
+        result = subprocess.run(
+            [git, "-C", tmp_dir, "pull", "--depth=1", "origin", "main"],
+            capture_output=True, text=True
+        )
+        if result.returncode != 0:
+            raise RuntimeError(f"git pull вернул ошибку:\n{result.stderr}")
 
         src = Path(tmp_dir) / folder_path
         if not src.exists():
-            raise FileNotFoundError(f"Папка {folder_path} не найдена в репозитории")
+            # Попробуем найти папку case-insensitive
+            parent = src.parent
+            if parent.exists():
+                found = [d for d in parent.iterdir()
+                         if d.name.lower() == src.name.lower()]
+                if found:
+                    src = found[0]
+                else:
+                    listing = [d.name for d in parent.iterdir()]
+                    raise FileNotFoundError(
+                        f"Папка «{folder_path}» не найдена. "
+                        f"Содержимое: {listing}"
+                    )
+            else:
+                raise FileNotFoundError(
+                    f"Папка «{folder_path}» не найдена в репозитории. "
+                    f"Проверьте правильность пути в list.json."
+                )
 
         target = Path(dest) / src.name
         if target.exists():
@@ -155,354 +176,296 @@ def sparse_clone_folder(repo_url: str, folder_path: str,
     finally:
         shutil.rmtree(tmp_dir, ignore_errors=True)
 
-# ── Worker-поток ──────────────────────────────────────────────────────────────
+def remove_plugin_folder(install_dir: str, name: str):
+    target = Path(install_dir) / name
+    if target.exists():
+        shutil.rmtree(target)
+
+# ── Worker ────────────────────────────────────────────────────────────────────
 
 class InstallWorker(QThread):
-    progress = pyqtSignal(str, int)   # (сообщение, % или -1 для индетерминации)
-    plugin_done = pyqtSignal(str, bool, str)   # (name, ok, message)
-    finished = pyqtSignal()
+    progress   = pyqtSignal(str)
+    plugin_done = pyqtSignal(str, bool, str)   # name, ok, info
+    finished_all = pyqtSignal()
 
-    def __init__(self, plugins: list[dict], install_dir: str, config: dict):
+    def __init__(self, plugins, install_dir, config):
         super().__init__()
         self.plugins = plugins
         self.install_dir = install_dir
         self.config = config
 
     def run(self):
-        for i, p in enumerate(self.plugins):
+        for p in self.plugins:
             name = p["name"]
-            self.progress.emit(f"Устанавливаю {name}…", -1)
+            self.progress.emit(f"Устанавливаю «{name}»…")
             try:
                 sparse_clone_folder(
-                    p["repo_url"], p["repo_path"],
-                    self.install_dir,
-                    lambda msg: self.progress.emit(msg, -1)
+                    p["repo_url"], p["repo_path"], self.install_dir,
+                    lambda msg: self.progress.emit(msg)
                 )
                 self.config["installed"][name] = {"version": p["version"]}
                 save_config(self.config)
                 self.plugin_done.emit(name, True, p["version"])
             except Exception as e:
                 self.plugin_done.emit(name, False, str(e))
-        self.finished.emit()
+        self.finished_all.emit()
 
-# ── Главное окно ──────────────────────────────────────────────────────────────
+# ── Цвета / стиль ─────────────────────────────────────────────────────────────
 
-DARK_BG   = "#141414"
-PANEL_BG  = "#1e1e1e"
-BORDER    = "#2d2d2d"
-ACCENT    = "#e8622a"        # оранжевый как C4D
-TEXT      = "#e8e8e8"
-TEXT_DIM  = "#888888"
-GREEN     = "#4caf6e"
-RED       = "#e05c5c"
-YELLOW    = "#e0a94e"
+DARK_BG  = "#141414"
+PANEL_BG = "#1e1e1e"
+BORDER   = "#2d2d2d"
+ACCENT   = "#e8622a"
+TEXT     = "#e8e8e8"
+DIM      = "#777777"
+GREEN    = "#4caf6e"
+RED      = "#e05c5c"
+YELLOW   = "#e0a94e"
 
 STYLE = f"""
-QMainWindow, QWidget#root {{
-    background: {DARK_BG};
-}}
-QLabel {{
-    color: {TEXT};
-    background: transparent;
-}}
-QLabel#dim {{
-    color: {TEXT_DIM};
-    font-size: 11px;
-}}
-QLabel#title {{
-    font-size: 22px;
-    font-weight: 700;
-    color: {TEXT};
-    letter-spacing: 1px;
-}}
-QLabel#subtitle {{
-    font-size: 11px;
-    color: {TEXT_DIM};
-    letter-spacing: 2px;
-    text-transform: uppercase;
-}}
-QLabel#accent {{
-    color: {ACCENT};
-    font-size: 22px;
-    font-weight: 700;
-}}
+QMainWindow, QWidget#root {{ background: {DARK_BG}; }}
+QWidget {{ background: transparent; color: {TEXT}; }}
+QLabel {{ color: {TEXT}; background: transparent; }}
 QPushButton {{
-    background: {PANEL_BG};
-    color: {TEXT};
-    border: 1px solid {BORDER};
-    border-radius: 6px;
-    padding: 8px 18px;
-    font-size: 13px;
+    background: {PANEL_BG}; color: {TEXT};
+    border: 1px solid {BORDER}; border-radius: 6px;
+    padding: 7px 16px; font-size: 12px;
 }}
-QPushButton:hover {{
-    background: #2a2a2a;
-    border-color: #444;
-}}
-QPushButton:pressed {{
-    background: #111;
-}}
+QPushButton:hover {{ background: #282828; border-color: #444; }}
+QPushButton:pressed {{ background: #111; }}
+QPushButton:disabled {{ color: #555; border-color: #252525; }}
 QPushButton#primary {{
-    background: {ACCENT};
-    color: white;
-    border: none;
-    font-weight: 600;
-    font-size: 13px;
-    padding: 10px 24px;
+    background: {ACCENT}; color: white; border: none;
+    font-weight: 600; font-size: 13px; padding: 9px 22px;
 }}
-QPushButton#primary:hover {{
-    background: #f07040;
+QPushButton#primary:hover {{ background: #f07040; }}
+QPushButton#primary:disabled {{ background: #5a3020; color: #996050; }}
+QPushButton#danger {{
+    background: transparent; color: {RED};
+    border: 1px solid #4a2020; border-radius: 6px;
+    padding: 5px 12px; font-size: 11px;
 }}
-QPushButton#primary:disabled {{
-    background: #5a3020;
-    color: #aa7060;
-}}
-QPushButton#small {{
-    padding: 5px 12px;
-    font-size: 11px;
-    border-radius: 4px;
-}}
+QPushButton#danger:hover {{ background: #2a1212; }}
+QPushButton#danger:disabled {{ color: #554040; border-color: #2a1818; }}
 QLineEdit {{
-    background: {PANEL_BG};
-    color: {TEXT};
-    border: 1px solid {BORDER};
-    border-radius: 6px;
-    padding: 8px 10px;
-    font-size: 12px;
-    font-family: Consolas;
+    background: {PANEL_BG}; color: {TEXT};
+    border: 1px solid {BORDER}; border-radius: 6px;
+    padding: 7px 10px; font-size: 12px; font-family: Consolas;
 }}
-QLineEdit:focus {{
-    border-color: {ACCENT};
-}}
+QLineEdit:focus {{ border-color: {ACCENT}; }}
 QTableWidget {{
-    background: {PANEL_BG};
-    color: {TEXT};
-    border: 1px solid {BORDER};
-    border-radius: 8px;
-    gridline-color: {BORDER};
-    font-size: 12px;
-    outline: none;
+    background: {PANEL_BG}; color: {TEXT};
+    border: 1px solid {BORDER}; border-radius: 8px;
+    gridline-color: transparent; outline: none; font-size: 12px;
 }}
-QTableWidget::item {{
-    padding: 8px 10px;
-    border: none;
-}}
-QTableWidget::item:selected {{
-    background: #2a2a2a;
-    color: {TEXT};
-}}
+QTableWidget::item {{ padding: 0 10px; border: none; }}
+QTableWidget::item:selected {{ background: #252525; color: {TEXT}; }}
 QHeaderView::section {{
-    background: #181818;
-    color: {TEXT_DIM};
-    border: none;
-    border-bottom: 1px solid {BORDER};
-    padding: 8px 10px;
-    font-size: 11px;
-    font-weight: 600;
+    background: #181818; color: {DIM};
+    border: none; border-bottom: 1px solid {BORDER};
+    padding: 7px 10px; font-size: 10px; font-weight: 700;
     letter-spacing: 1px;
-    text-transform: uppercase;
+}}
+QCheckBox::indicator {{
+    width: 16px; height: 16px;
+    border: 1px solid #555; border-radius: 3px;
+    background: {PANEL_BG};
+}}
+QCheckBox::indicator:checked {{
+    background: {ACCENT}; border-color: {ACCENT};
+    image: none;
 }}
 QProgressBar {{
-    background: {PANEL_BG};
-    border: 1px solid {BORDER};
-    border-radius: 4px;
-    height: 6px;
-    text-align: center;
-    color: transparent;
+    background: {PANEL_BG}; border: 1px solid {BORDER};
+    border-radius: 3px; height: 5px;
 }}
-QProgressBar::chunk {{
-    background: {ACCENT};
-    border-radius: 4px;
-}}
-QFrame#divider {{
-    background: {BORDER};
-    max-height: 1px;
-}}
+QProgressBar::chunk {{ background: {ACCENT}; border-radius: 3px; }}
 QScrollBar:vertical {{
-    background: {PANEL_BG};
-    width: 6px;
-    border-radius: 3px;
+    background: {PANEL_BG}; width: 5px; border-radius: 3px;
 }}
 QScrollBar::handle:vertical {{
-    background: #444;
-    border-radius: 3px;
-    min-height: 20px;
+    background: #444; border-radius: 3px; min-height: 20px;
 }}
-QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{
-    height: 0;
-}}
+QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{ height: 0; }}
+QFrame#divider {{ background: {BORDER}; max-height: 1px; }}
 """
+
+# ── Главное окно ──────────────────────────────────────────────────────────────
 
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("4D Plugin Installer")
-        self.setMinimumSize(780, 580)
-        self.resize(860, 620)
+        self.setMinimumSize(820, 560)
+        self.resize(900, 620)
 
         self.config = load_config()
         self.remote_plugins: list[dict] = []
         self.worker: InstallWorker | None = None
+        self._row_checks: list[QCheckBox] = []   # чекбоксы строк
 
         root = QWidget()
         root.setObjectName("root")
         self.setCentralWidget(root)
-        layout = QVBoxLayout(root)
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(0)
+        lay = QVBoxLayout(root)
+        lay.setContentsMargins(0, 0, 0, 0)
+        lay.setSpacing(0)
 
-        layout.addWidget(self._build_header())
-        layout.addWidget(self._build_path_bar())
-
-        divider = QFrame()
-        divider.setObjectName("divider")
-        layout.addWidget(divider)
-
-        layout.addWidget(self._build_table_area(), stretch=1)
-        layout.addWidget(self._build_bottom_bar())
+        lay.addWidget(self._mk_header())
+        lay.addWidget(self._mk_path_bar())
+        div = QFrame(); div.setObjectName("divider"); lay.addWidget(div)
+        lay.addWidget(self._mk_table_area(), stretch=1)
+        lay.addWidget(self._mk_bottom())
 
         self.setStyleSheet(STYLE)
 
-        # Если путь уже сохранён — сразу проверяем
         if self.config.get("install_dir"):
             self.path_edit.setText(self.config["install_dir"])
-            QTimer.singleShot(300, self._check_updates)
+            QTimer.singleShot(400, self._check_updates)
 
-    # ── Секции UI ──────────────────────────────────────────────────────────────
+    # ── Построение UI ─────────────────────────────────────────────────────────
 
-    def _build_header(self) -> QWidget:
+    def _mk_header(self):
         w = QWidget()
-        w.setFixedHeight(64)
-        w.setStyleSheet(f"background: #1a1a1a; border-bottom: 1px solid {BORDER};")
+        w.setFixedHeight(62)
+        w.setStyleSheet(f"background:#1a1a1a; border-bottom:1px solid {BORDER};")
         h = QHBoxLayout(w)
-        h.setContentsMargins(24, 0, 24, 0)
+        h.setContentsMargins(22, 0, 22, 0)
 
         badge = QLabel("4D")
         badge.setStyleSheet(
-            f"background: {ACCENT}; color: white; font-size: 14px; font-weight: 800;"
-            "padding: 4px 10px; border-radius: 5px; letter-spacing: 1px;"
+            f"background:{ACCENT}; color:white; font-size:14px; font-weight:800;"
+            "padding:4px 10px; border-radius:5px; letter-spacing:1px;"
         )
         h.addWidget(badge)
         h.addSpacing(12)
 
         title = QLabel("Plugin Installer")
-        title.setObjectName("title")
-        title.setStyleSheet(f"font-size: 18px; font-weight: 700; color: {TEXT};")
+        title.setStyleSheet(f"font-size:18px; font-weight:700; color:{TEXT};")
         h.addWidget(title)
-
         h.addStretch()
 
-        self.status_label = QLabel("Готов к работе")
-        self.status_label.setObjectName("dim")
-        h.addWidget(self.status_label)
-
+        self.status_lbl = QLabel("Готов к работе")
+        self.status_lbl.setStyleSheet(f"font-size:11px; color:{DIM};")
+        h.addWidget(self.status_lbl)
         return w
 
-    def _build_path_bar(self) -> QWidget:
+    def _mk_path_bar(self):
         w = QWidget()
-        w.setFixedHeight(62)
-        w.setStyleSheet(f"background: {DARK_BG};")
+        w.setFixedHeight(58)
+        w.setStyleSheet(f"background:{DARK_BG};")
         h = QHBoxLayout(w)
-        h.setContentsMargins(24, 10, 24, 10)
+        h.setContentsMargins(22, 8, 22, 8)
         h.setSpacing(10)
 
         lbl = QLabel("Папка плагинов C4D:")
-        lbl.setStyleSheet(f"color: {TEXT_DIM}; font-size: 11px; min-width: 140px;")
+        lbl.setStyleSheet(f"font-size:11px; color:{DIM}; min-width:140px;")
         h.addWidget(lbl)
 
         self.path_edit = QLineEdit()
         self.path_edit.setPlaceholderText(
-            r"Например: C:\Users\...\AppData\Roaming\Maxon\...\plugins"
+            r"Например: C:\Users\...\AppData\Roaming\Maxon\Cinema 4D\plugins"
         )
-        if self.config.get("install_dir"):
-            self.path_edit.setText(self.config["install_dir"])
         h.addWidget(self.path_edit, stretch=1)
 
-        browse_btn = QPushButton("Обзор…")
-        browse_btn.setObjectName("small")
-        browse_btn.clicked.connect(self._browse_dir)
-        h.addWidget(browse_btn)
-
+        browse = QPushButton("Обзор…")
+        browse.setFixedHeight(34)
+        browse.clicked.connect(self._browse_dir)
+        h.addWidget(browse)
         return w
 
-    def _build_table_area(self) -> QWidget:
+    def _mk_table_area(self):
         w = QWidget()
-        w.setStyleSheet(f"background: {DARK_BG};")
+        w.setStyleSheet(f"background:{DARK_BG};")
         v = QVBoxLayout(w)
-        v.setContentsMargins(24, 16, 24, 0)
+        v.setContentsMargins(22, 14, 22, 0)
         v.setSpacing(10)
 
-        # Заголовок + кнопка
+        # Заголовок секции + кнопки управления
         row = QHBoxLayout()
-        sec_label = QLabel("ПЛАГИНЫ")
-        sec_label.setStyleSheet(
-            f"color: {TEXT_DIM}; font-size: 10px; font-weight: 700; letter-spacing: 2px;"
-        )
-        row.addWidget(sec_label)
+        sec = QLabel("ПЛАГИНЫ")
+        sec.setStyleSheet(f"font-size:10px; font-weight:700; color:{DIM}; letter-spacing:2px;")
+        row.addWidget(sec)
         row.addStretch()
 
-        self.refresh_btn = QPushButton("↻  Проверить обновления")
-        self.refresh_btn.setObjectName("small")
+        self.select_all_btn = QPushButton("Выбрать все")
+        self.select_all_btn.setFixedHeight(30)
+        self.select_all_btn.clicked.connect(self._select_all)
+        row.addWidget(self.select_all_btn)
+
+        self.deselect_btn = QPushButton("Снять все")
+        self.deselect_btn.setFixedHeight(30)
+        self.deselect_btn.clicked.connect(self._deselect_all)
+        row.addWidget(self.deselect_btn)
+
+        sep = QFrame()
+        sep.setFrameShape(QFrame.Shape.VLine)
+        sep.setStyleSheet(f"background:{BORDER}; max-width:1px; margin:4px 4px;")
+        row.addWidget(sep)
+
+        self.refresh_btn = QPushButton("↻  Проверить")
+        self.refresh_btn.setFixedHeight(30)
         self.refresh_btn.clicked.connect(self._check_updates)
         row.addWidget(self.refresh_btn)
-
         v.addLayout(row)
 
-        # Таблица
-        self.table = QTableWidget(0, 4)
-        self.table.setHorizontalHeaderLabels(["Плагин", "Установлено", "На GitHub", "Статус"])
-        self.table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
-        self.table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Fixed)
-        self.table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.Fixed)
-        self.table.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeMode.Fixed)
-        self.table.setColumnWidth(1, 110)
-        self.table.setColumnWidth(2, 110)
-        self.table.setColumnWidth(3, 160)
+        # Таблица: чекбокс | Плагин | Установлено | На GitHub | Статус | Удалить
+        self.table = QTableWidget(0, 6)
+        self.table.setHorizontalHeaderLabels(["", "Плагин", "Установлено", "На GitHub", "Статус", ""])
+        hh = self.table.horizontalHeader()
+        hh.setSectionResizeMode(0, QHeaderView.ResizeMode.Fixed)
+        hh.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
+        hh.setSectionResizeMode(2, QHeaderView.ResizeMode.Fixed)
+        hh.setSectionResizeMode(3, QHeaderView.ResizeMode.Fixed)
+        hh.setSectionResizeMode(4, QHeaderView.ResizeMode.Fixed)
+        hh.setSectionResizeMode(5, QHeaderView.ResizeMode.Fixed)
+        self.table.setColumnWidth(0, 44)
+        self.table.setColumnWidth(2, 115)
+        self.table.setColumnWidth(3, 115)
+        self.table.setColumnWidth(4, 155)
+        self.table.setColumnWidth(5, 80)
         self.table.verticalHeader().setVisible(False)
-        self.table.setSelectionMode(QTableWidget.SelectionMode.NoSelection)
+        self.table.setSelectionMode(QAbstractItemView.SelectionMode.NoSelection)
         self.table.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self.table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         self.table.setShowGrid(False)
-        self.table.setAlternatingRowColors(False)
         v.addWidget(self.table)
-
         return w
 
-    def _build_bottom_bar(self) -> QWidget:
+    def _mk_bottom(self):
         w = QWidget()
-        w.setFixedHeight(70)
-        w.setStyleSheet(f"background: #181818; border-top: 1px solid {BORDER};")
+        w.setFixedHeight(68)
+        w.setStyleSheet(f"background:#181818; border-top:1px solid {BORDER};")
         h = QHBoxLayout(w)
-        h.setContentsMargins(24, 0, 24, 0)
-        h.setSpacing(16)
+        h.setContentsMargins(22, 0, 22, 0)
+        h.setSpacing(14)
+
+        left = QVBoxLayout()
+        left.setSpacing(5)
+        self.progress_lbl = QLabel("Введите путь и нажмите «Проверить»")
+        self.progress_lbl.setStyleSheet(f"font-size:11px; color:{DIM};")
+        left.addWidget(self.progress_lbl)
 
         self.progress_bar = QProgressBar()
         self.progress_bar.setFixedHeight(5)
         self.progress_bar.setRange(0, 0)
         self.progress_bar.setVisible(False)
-
-        self.progress_label = QLabel("")
-        self.progress_label.setStyleSheet(f"color: {TEXT_DIM}; font-size: 11px;")
-
-        left = QVBoxLayout()
-        left.setSpacing(4)
-        left.addWidget(self.progress_label)
         left.addWidget(self.progress_bar)
         h.addLayout(left, stretch=1)
 
-        self.install_btn = QPushButton("⬇  Установить / обновить")
+        self.install_btn = QPushButton("⬇  Установить выбранные")
         self.install_btn.setObjectName("primary")
-        self.install_btn.setFixedHeight(42)
+        self.install_btn.setFixedHeight(40)
         self.install_btn.setEnabled(False)
         self.install_btn.clicked.connect(self._start_install)
         h.addWidget(self.install_btn)
-
         return w
 
-    # ── Логика ─────────────────────────────────────────────────────────────────
+    # ── Логика ────────────────────────────────────────────────────────────────
 
     def _browse_dir(self):
         d = QFileDialog.getExistingDirectory(
-            self, "Выберите папку плагинов Cinema 4D",
+            self, "Папка плагинов Cinema 4D",
             self.path_edit.text() or "C:\\"
         )
         if d:
@@ -510,21 +473,31 @@ class MainWindow(QMainWindow):
             self.config["install_dir"] = d
             save_config(self.config)
 
-    def _set_status(self, msg: str):
-        self.status_label.setText(msg)
+    def _select_all(self):
+        for cb in self._row_checks:
+            cb.setChecked(True)
+        self._update_install_btn()
+
+    def _deselect_all(self):
+        for cb in self._row_checks:
+            cb.setChecked(False)
+        self._update_install_btn()
+
+    def _update_install_btn(self):
+        any_checked = any(cb.isChecked() for cb in self._row_checks)
+        self.install_btn.setEnabled(any_checked)
 
     def _check_updates(self):
-        # Сохраняем путь
-        install_dir = self.path_edit.text().strip()
-        if install_dir:
-            self.config["install_dir"] = install_dir
+        d = self.path_edit.text().strip()
+        if d:
+            self.config["install_dir"] = d
             save_config(self.config)
 
         self.refresh_btn.setEnabled(False)
         self.install_btn.setEnabled(False)
-        self._set_status("Загружаю список плагинов…")
         self.progress_bar.setVisible(True)
-        self.progress_label.setText("Подключаюсь к GitHub…")
+        self.progress_lbl.setText("Подключаюсь к GitHub…")
+        self.status_lbl.setText("Загружаю список…")
 
         def worker():
             try:
@@ -534,111 +507,146 @@ class MainWindow(QMainWindow):
                 with urllib.request.urlopen(req, timeout=10) as r:
                     raw = r.read().decode("utf-8")
                 plugins = parse_list(raw)
-                # передаём в главный поток
-                self._on_list_loaded(plugins, None)
+                self._pending = (plugins, None)
             except Exception as e:
-                self._on_list_loaded([], str(e))
+                self._pending = ([], str(e))
 
-        # Запускаем в отдельном потоке, результат через QTimer (простой способ)
-        self._pending_result = None
+        self._pending = None
         t = threading.Thread(target=worker, daemon=True)
         t.start()
 
         def poll():
-            if t.is_alive():
-                QTimer.singleShot(100, poll)
-            # _on_list_loaded уже вызван из worker через безопасный костыль ниже
-        # Безопасный вызов из потока — используем атрибут
-        QTimer.singleShot(100, poll)
-
-    def _on_list_loaded(self, plugins: list, error: str | None):
-        # Вызывается из потока — откладываем на main loop
-        self._pending_plugins = plugins
-        self._pending_error = error
-        QTimer.singleShot(0, self._apply_list)
-
-    def _apply_list(self):
-        self.progress_bar.setVisible(False)
-        self.refresh_btn.setEnabled(True)
-
-        if self._pending_error:
-            self._set_status(f"Ошибка: {self._pending_error}")
-            self.progress_label.setText(f"Не удалось загрузить список: {self._pending_error}")
-            return
-
-        self.remote_plugins = self._pending_plugins
-        self._populate_table()
+            if self._pending is None:
+                QTimer.singleShot(80, poll)
+            else:
+                plugins, err = self._pending
+                self.progress_bar.setVisible(False)
+                self.refresh_btn.setEnabled(True)
+                if err:
+                    self.status_lbl.setText("Ошибка")
+                    self.progress_lbl.setText(f"Не удалось загрузить список: {err}")
+                else:
+                    self.remote_plugins = plugins
+                    self._populate_table()
+        QTimer.singleShot(80, poll)
 
     def _populate_table(self):
-        installed = self.config.get("installed", {})
         self.table.setRowCount(0)
-        needs_update = 0
+        self._row_checks.clear()
+        installed = self.config.get("installed", {})
+        needs = 0
 
         for p in self.remote_plugins:
             name = p["name"]
             remote_ver = p["version"]
-            local_info = installed.get(name, {})
-            local_ver = local_info.get("version", "")
+            local_ver = installed.get(name, {}).get("version", "")
+            outdated = not local_ver or local_ver != remote_ver
 
             row = self.table.rowCount()
             self.table.insertRow(row)
+            self.table.setRowHeight(row, 46)
+
+            # Чекбокс
+            cb_widget = QWidget()
+            cb_widget.setStyleSheet(f"background:{PANEL_BG};")
+            cb_lay = QHBoxLayout(cb_widget)
+            cb_lay.setContentsMargins(0, 0, 0, 0)
+            cb_lay.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            cb = QCheckBox()
+            cb.setChecked(outdated)
+            cb.stateChanged.connect(self._update_install_btn)
+            cb_lay.addWidget(cb)
+            self._row_checks.append(cb)
+            self.table.setCellWidget(row, 0, cb_widget)
 
             # Имя
-            self.table.setItem(row, 0, QTableWidgetItem(name))
+            self.table.setItem(row, 1, QTableWidgetItem(name))
 
             # Локальная версия
-            loc_item = QTableWidgetItem(local_ver or "не установлен")
-            loc_item.setForeground(QColor(TEXT_DIM if not local_ver else TEXT))
-            self.table.setItem(row, 1, loc_item)
+            loc = QTableWidgetItem(local_ver or "не установлен")
+            loc.setForeground(QColor(DIM if not local_ver else TEXT))
+            self.table.setItem(row, 2, loc)
 
             # Remote версия
-            rem_item = QTableWidgetItem(remote_ver)
-            self.table.setItem(row, 2, rem_item)
+            self.table.setItem(row, 3, QTableWidgetItem(remote_ver))
 
             # Статус
-            outdated = not local_ver or local_ver != remote_ver
             if outdated:
-                needs_update += 1
-                status = "⬆ Нужно обновить" if local_ver else "✦ Не установлен"
-                color = YELLOW if local_ver else ACCENT
+                needs += 1
+                status_text = "⬆ Нужно обновить" if local_ver else "✦ Не установлен"
+                status_color = YELLOW if local_ver else ACCENT
             else:
-                status = "✓ Актуально"
-                color = GREEN
+                status_text = "✓ Актуально"
+                status_color = GREEN
+            st = QTableWidgetItem(status_text)
+            st.setForeground(QColor(status_color))
+            self.table.setItem(row, 4, st)
 
-            st_item = QTableWidgetItem(status)
-            st_item.setForeground(QColor(color))
-            self.table.setItem(row, 3, st_item)
+            # Кнопка удалить (только если установлен)
+            if local_ver:
+                del_btn = QPushButton("Удалить")
+                del_btn.setObjectName("danger")
+                del_btn.setFixedHeight(28)
+                captured_name = name
+                del_btn.clicked.connect(lambda _, n=captured_name: self._delete_plugin(n))
+                dw = QWidget()
+                dw.setStyleSheet(f"background:{PANEL_BG};")
+                dl = QHBoxLayout(dw)
+                dl.setContentsMargins(6, 0, 6, 0)
+                dl.addWidget(del_btn)
+                self.table.setCellWidget(row, 5, dw)
 
-            self.table.setRowHeight(row, 44)
-
-        if needs_update:
-            self.install_btn.setEnabled(True)
-            self._set_status(f"Найдено: {len(self.remote_plugins)} плагинов, требуют обновления: {needs_update}")
-            self.progress_label.setText(f"Готово к установке: {needs_update} плагин(ов)")
+        if needs:
+            self.status_lbl.setText(f"Требуют обновления: {needs}")
+            self.progress_lbl.setText(f"Отметьте нужные плагины и нажмите «Установить выбранные»")
         else:
-            self._set_status("Все плагины актуальны")
-            self.progress_label.setText("Всё актуально")
+            self.status_lbl.setText("Всё актуально")
+            self.progress_lbl.setText("Все плагины актуальны")
+
+        self._update_install_btn()
+
+    def _delete_plugin(self, name: str):
+        install_dir = self.path_edit.text().strip()
+        if not install_dir:
+            QMessageBox.warning(self, "Ошибка", "Не указана папка плагинов.")
+            return
+        reply = QMessageBox.question(
+            self, "Удалить плагин",
+            f"Удалить папку «{name}» из папки плагинов?\nДействие необратимо.",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+        )
+        if reply != QMessageBox.StandardButton.Yes:
+            return
+        try:
+            remove_plugin_folder(install_dir, name)
+            # Убираем из конфига
+            self.config["installed"].pop(name, None)
+            save_config(self.config)
+            self._populate_table()
+            self.progress_lbl.setText(f"«{name}» удалён")
+        except Exception as e:
+            QMessageBox.critical(self, "Ошибка удаления", str(e))
 
     def _start_install(self):
         install_dir = self.path_edit.text().strip()
         if not install_dir:
-            QMessageBox.warning(self, "Укажите папку",
-                                "Выберите папку плагинов Cinema 4D перед установкой.")
+            QMessageBox.warning(self, "Укажите папку", "Выберите папку плагинов Cinema 4D.")
+            return
+        os.makedirs(install_dir, exist_ok=True)
+
+        # Собираем только отмеченные
+        to_install = []
+        for i, cb in enumerate(self._row_checks):
+            if cb.isChecked() and i < len(self.remote_plugins):
+                to_install.append(self.remote_plugins[i])
+
+        if not to_install:
             return
 
-        if not os.path.exists(install_dir):
-            try:
-                os.makedirs(install_dir)
-            except Exception as e:
-                QMessageBox.critical(self, "Ошибка", f"Не удалось создать папку:\n{e}")
-                return
-
-        # Проверяем Git
         if not git_available():
             reply = QMessageBox.question(
                 self, "Git не найден",
-                "Git не установлен на этом компьютере.\n"
-                "Установить Git for Windows автоматически?",
+                "Git не установлен. Установить Git for Windows автоматически?",
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
             )
             if reply == QMessageBox.StandardButton.Yes:
@@ -647,82 +655,70 @@ class MainWindow(QMainWindow):
 
                 def on_git_done(ok, msg):
                     if ok:
-                        self.progress_label.setText("Git установлен. Запускаю установку плагинов…")
-                        QTimer.singleShot(500, self._run_install_worker)
+                        self.progress_lbl.setText("Git установлен. Запускаю установку…")
+                        QTimer.singleShot(300, lambda: self._run_worker(to_install, install_dir))
                     else:
-                        self.progress_label.setText(f"Ошибка установки Git: {msg}")
+                        self.progress_lbl.setText(f"Ошибка установки Git: {msg}")
                         self.install_btn.setEnabled(True)
 
                 install_git(
-                    lambda msg: QTimer.singleShot(0, lambda m=msg:
-                                                  self.progress_label.setText(m)),
+                    lambda msg: QTimer.singleShot(0, lambda m=msg: self.progress_lbl.setText(m)),
                     lambda ok, msg: QTimer.singleShot(0, lambda: on_git_done(ok, msg))
                 )
             return
 
-        self._run_install_worker()
+        self._run_worker(to_install, install_dir)
 
-    def _run_install_worker(self):
-        install_dir = self.path_edit.text().strip()
-        installed = self.config.get("installed", {})
-        to_install = [
-            p for p in self.remote_plugins
-            if installed.get(p["name"], {}).get("version", "") != p["version"]
-        ]
-
-        if not to_install:
-            return
-
+    def _run_worker(self, to_install, install_dir):
         self.install_btn.setEnabled(False)
         self.refresh_btn.setEnabled(False)
-        self.progress_bar.setVisible(True)
         self.progress_bar.setRange(0, 0)
+        self.progress_bar.setVisible(True)
 
         self.worker = InstallWorker(to_install, install_dir, self.config)
-        self.worker.progress.connect(
-            lambda msg, _: self.progress_label.setText(msg)
-        )
+        self.worker.progress.connect(self.progress_lbl.setText)
         self.worker.plugin_done.connect(self._on_plugin_done)
-        self.worker.finished.connect(self._on_install_finished)
+        self.worker.finished_all.connect(self._on_finished)
         self.worker.start()
 
     def _on_plugin_done(self, name: str, ok: bool, info: str):
-        installed = self.config.get("installed", {})
-        # Обновляем строку в таблице
         for row in range(self.table.rowCount()):
-            if self.table.item(row, 0).text() == name:
+            item = self.table.item(row, 1)
+            if item and item.text() == name:
                 if ok:
-                    self.table.item(row, 1).setText(info)
-                    self.table.item(row, 1).setForeground(QColor(TEXT))
-                    self.table.item(row, 3).setText("✓ Актуально")
-                    self.table.item(row, 3).setForeground(QColor(GREEN))
+                    self.table.item(row, 2).setText(info)
+                    self.table.item(row, 2).setForeground(QColor(TEXT))
+                    self.table.item(row, 4).setText("✓ Актуально")
+                    self.table.item(row, 4).setForeground(QColor(GREEN))
+                    # Снять чекбокс
+                    cw = self.table.cellWidget(row, 0)
+                    if cw:
+                        for ch in cw.findChildren(QCheckBox):
+                            ch.setChecked(False)
                 else:
-                    self.table.item(row, 3).setText("✗ Ошибка")
-                    self.table.item(row, 3).setForeground(QColor(RED))
-                    self.table.item(row, 3).setToolTip(info)
+                    self.table.item(row, 4).setText("✗ Ошибка")
+                    self.table.item(row, 4).setForeground(QColor(RED))
+                    self.table.item(row, 4).setToolTip(info)
                 break
 
-    def _on_install_finished(self):
+    def _on_finished(self):
         self.progress_bar.setRange(0, 1)
         self.progress_bar.setValue(1)
-        self.progress_label.setText("Установка завершена")
-        self._set_status("Готово")
-        self.install_btn.setEnabled(False)
+        self.progress_lbl.setText("Установка завершена")
+        self.status_lbl.setText("Готово")
         self.refresh_btn.setEnabled(True)
-        QMessageBox.information(self, "Готово", "Плагины успешно установлены!")
-
+        self._update_install_btn()
+        QMessageBox.information(self, "Готово", "Выбранные плагины установлены!")
 
 # ── Точка входа ───────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
     app.setStyle("Fusion")
-
     palette = QPalette()
     palette.setColor(QPalette.ColorRole.Window, QColor(DARK_BG))
     palette.setColor(QPalette.ColorRole.WindowText, QColor(TEXT))
     app.setPalette(palette)
-
     window = MainWindow()
     window.show()
     sys.exit(app.exec())
