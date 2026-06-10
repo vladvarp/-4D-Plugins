@@ -8,6 +8,7 @@ import tempfile
 import threading
 import urllib.request
 import winreg
+import base64
 from pathlib import Path
 from urllib.parse import unquote
 
@@ -17,7 +18,7 @@ from PyQt6.QtWidgets import (
     QTableWidgetItem, QHeaderView, QProgressBar, QFrame, QMessageBox,
     QAbstractItemView
 )
-from PyQt6.QtGui import QColor, QPalette, QCursor, QDesktopServices
+from PyQt6.QtGui import QColor, QPalette, QCursor, QDesktopServices, QIcon, QPixmap
 from PyQt6.QtCore import Qt, QThread, pyqtSignal, QTimer, QUrl
 
 # ── Конфигурация ──────────────────────────────────────────────────────────────
@@ -28,6 +29,108 @@ LIST_JSON_URL = (
 CONFIG_FILE = Path(os.getenv("APPDATA")) / "C4D_PluginInstaller" / "config.json"
 GIT_INSTALLER_URL = (
     "https://github.com/git-for-windows/git/releases/latest/download/Git-64-bit.exe"
+)
+
+# ── Иконка приложения (PNG 256×256, base64) ───────────────────────────────────
+
+ICON_B64 = (
+    "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"
 )
 
 # ── Парсинг list.json ─────────────────────────────────────────────────────────
@@ -754,6 +857,14 @@ class MainWindow(QMainWindow):
 if __name__ == "__main__":
     app = QApplication(sys.argv)
     app.setStyle("Fusion")
+
+    # Иконка из встроенного base64
+    import tempfile, os
+    _ico_tmp = os.path.join(tempfile.gettempdir(), "c4d_installer_icon.png")
+    with open(_ico_tmp, "wb") as _f:
+        _f.write(base64.b64decode(ICON_B64))
+    app.setWindowIcon(QIcon(_ico_tmp))
+
     palette = QPalette()
     palette.setColor(QPalette.ColorRole.Window, QColor(DARK_BG))
     palette.setColor(QPalette.ColorRole.WindowText, QColor(TEXT))
