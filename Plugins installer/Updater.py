@@ -43,6 +43,10 @@ def parse_list(raw: str) -> list[dict]:
         line = line.strip()
         if not line:
             continue
+        # Извлекаем текст из фигурных скобок {INFO} перед удалением
+        info_match = re.search(r"\{([^}]+)\}", line)
+        info_text = info_match.group(1).strip() if info_match else ""
+
         line = re.sub(r"\{[^}]+\}", "", line).strip()
         m = re.search(r"\s+(v[\d.]+)\s*$", line)
         if not m:
@@ -69,6 +73,7 @@ def parse_list(raw: str) -> list[dict]:
             "url": url,
             "repo_url": repo_url,
             "repo_path": repo_path,   # «VAr Tools», не «VAr%20Tools»
+            "info": info_text,         # текст из {}, например «Пакет VAr Tools»
         })
     return plugins
 
@@ -176,6 +181,18 @@ def sparse_clone_folder(repo_url: str, folder_path: str, dest: str, progress_cb)
     finally:
         shutil.rmtree(tmp_dir, ignore_errors=True)
 
+def read_plugin_ver(install_dir: str, name: str) -> str:
+    """Читает версию плагина из файла 'ver' (без расширения) внутри папки плагина."""
+    ver_file = Path(install_dir) / name / "ver"
+    if ver_file.exists():
+        return ver_file.read_text(encoding="utf-8").strip()
+    return ""
+
+def write_plugin_ver(install_dir: str, name: str, version: str):
+    """Записывает версию плагина в файл 'ver' (без расширения) внутри папки плагина."""
+    ver_file = Path(install_dir) / name / "ver"
+    ver_file.write_text(version, encoding="utf-8")
+
 def remove_plugin_folder(install_dir: str, name: str):
     target = Path(install_dir) / name
     if target.exists():
@@ -203,6 +220,8 @@ class InstallWorker(QThread):
                     p["repo_url"], p["repo_path"], self.install_dir,
                     lambda msg: self.progress.emit(msg)
                 )
+                # Записываем файл 'ver' в папку плагина
+                write_plugin_ver(self.install_dir, name, p["version"])
                 self.config["installed"][name] = {"version": p["version"]}
                 save_config(self.config)
                 self.plugin_done.emit(name, True, p["version"])
@@ -409,9 +428,9 @@ class MainWindow(QMainWindow):
         row.addWidget(self.refresh_btn)
         v.addLayout(row)
 
-        # Таблица: чекбокс | Плагин | Установлено | На GitHub | Статус | Удалить
-        self.table = QTableWidget(0, 6)
-        self.table.setHorizontalHeaderLabels(["", "Плагин", "Установлено", "На GitHub", "Статус", ""])
+        # Таблица: чекбокс | Плагин | Установлено | На GitHub | Статус | Действие | Удалить
+        self.table = QTableWidget(0, 7)
+        self.table.setHorizontalHeaderLabels(["", "Плагин", "Установлено", "На GitHub", "Статус", "", ""])
         hh = self.table.horizontalHeader()
         hh.setSectionResizeMode(0, QHeaderView.ResizeMode.Fixed)
         hh.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
@@ -419,11 +438,13 @@ class MainWindow(QMainWindow):
         hh.setSectionResizeMode(3, QHeaderView.ResizeMode.Fixed)
         hh.setSectionResizeMode(4, QHeaderView.ResizeMode.Fixed)
         hh.setSectionResizeMode(5, QHeaderView.ResizeMode.Fixed)
+        hh.setSectionResizeMode(6, QHeaderView.ResizeMode.Fixed)
         self.table.setColumnWidth(0, 44)
         self.table.setColumnWidth(2, 115)
         self.table.setColumnWidth(3, 115)
         self.table.setColumnWidth(4, 155)
-        self.table.setColumnWidth(5, 80)
+        self.table.setColumnWidth(5, 105)  # Установить / Обновить
+        self.table.setColumnWidth(6, 95)   # Удалить
         self.table.verticalHeader().setVisible(False)
         self.table.setSelectionMode(QAbstractItemView.SelectionMode.NoSelection)
         self.table.setFocusPolicy(Qt.FocusPolicy.NoFocus)
@@ -472,6 +493,9 @@ class MainWindow(QMainWindow):
             self.path_edit.setText(d)
             self.config["install_dir"] = d
             save_config(self.config)
+            # Перечитываем таблицу с новой папкой (версии из файлов 'ver')
+            if self.remote_plugins:
+                self._populate_table()
 
     def _select_all(self):
         for cb in self._row_checks:
@@ -533,13 +557,14 @@ class MainWindow(QMainWindow):
     def _populate_table(self):
         self.table.setRowCount(0)
         self._row_checks.clear()
-        installed = self.config.get("installed", {})
+        install_dir = self.path_edit.text().strip()
         needs = 0
 
         for p in self.remote_plugins:
             name = p["name"]
             remote_ver = p["version"]
-            local_ver = installed.get(name, {}).get("version", "")
+            # Версию читаем из файла 'ver' в папке плагина (актуально при смене папки)
+            local_ver = read_plugin_ver(install_dir, name) if install_dir else ""
             outdated = not local_ver or local_ver != remote_ver
 
             row = self.table.rowCount()
@@ -553,14 +578,31 @@ class MainWindow(QMainWindow):
             cb_lay.setContentsMargins(0, 0, 0, 0)
             cb_lay.setAlignment(Qt.AlignmentFlag.AlignCenter)
             cb = QCheckBox()
-            cb.setChecked(outdated)
+            cb.setChecked(False)  # галочки сняты по умолчанию
             cb.stateChanged.connect(self._update_install_btn)
             cb_lay.addWidget(cb)
             self._row_checks.append(cb)
             self.table.setCellWidget(row, 0, cb_widget)
 
-            # Имя
-            self.table.setItem(row, 1, QTableWidgetItem(name))
+            # Имя + info из {}
+            name_item = QTableWidgetItem(name)
+            if p.get("info"):
+                name_item.setToolTip(p["info"])
+                # Показываем info как подсказку прямо в ячейке через виджет
+                name_widget = QWidget()
+                name_widget.setStyleSheet(f"background:{PANEL_BG};")
+                nw_lay = QVBoxLayout(name_widget)
+                nw_lay.setContentsMargins(10, 2, 6, 2)
+                nw_lay.setSpacing(1)
+                lbl_name = QLabel(name)
+                lbl_name.setStyleSheet(f"color:{TEXT}; font-size:12px; background:transparent;")
+                lbl_info = QLabel(p["info"])
+                lbl_info.setStyleSheet(f"color:{DIM}; font-size:10px; background:transparent;")
+                nw_lay.addWidget(lbl_name)
+                nw_lay.addWidget(lbl_info)
+                self.table.setCellWidget(row, 1, name_widget)
+            else:
+                self.table.setItem(row, 1, name_item)
 
             # Локальная версия
             loc = QTableWidgetItem(local_ver or "не установлен")
@@ -582,6 +624,20 @@ class MainWindow(QMainWindow):
             st.setForeground(QColor(status_color))
             self.table.setItem(row, 4, st)
 
+            # Кнопка «Установить» или «Обновить» для одиночной установки
+            if outdated:
+                action_label = "Обновить" if local_ver else "Установить"
+                act_btn = QPushButton(action_label)
+                act_btn.setFixedHeight(28)
+                captured_plugin = dict(p)
+                act_btn.clicked.connect(lambda _, pl=captured_plugin: self._install_single(pl))
+                aw = QWidget()
+                aw.setStyleSheet(f"background:{PANEL_BG};")
+                al = QHBoxLayout(aw)
+                al.setContentsMargins(6, 0, 6, 0)
+                al.addWidget(act_btn)
+                self.table.setCellWidget(row, 5, aw)
+
             # Кнопка удалить (только если установлен)
             if local_ver:
                 del_btn = QPushButton("Удалить")
@@ -594,7 +650,7 @@ class MainWindow(QMainWindow):
                 dl = QHBoxLayout(dw)
                 dl.setContentsMargins(6, 0, 6, 0)
                 dl.addWidget(del_btn)
-                self.table.setCellWidget(row, 5, dw)
+                self.table.setCellWidget(row, 6, dw)
 
         if needs:
             self.status_lbl.setText(f"Требуют обновления: {needs}")
@@ -604,6 +660,21 @@ class MainWindow(QMainWindow):
             self.progress_lbl.setText("Все плагины актуальны")
 
         self._update_install_btn()
+
+    def _install_single(self, plugin: dict):
+        """Устанавливает/обновляет один плагин по кнопке в строке таблицы."""
+        install_dir = self.path_edit.text().strip()
+        if not install_dir:
+            QMessageBox.warning(self, "Укажите папку", "Выберите папку плагинов Cinema 4D.")
+            return
+        os.makedirs(install_dir, exist_ok=True)
+
+        if not git_available():
+            QMessageBox.warning(self, "Git не найден",
+                                "Git не установлен. Нажмите «Установить выбранные» для автоустановки Git.")
+            return
+
+        self._run_worker([plugin], install_dir)
 
     def _delete_plugin(self, name: str):
         install_dir = self.path_edit.text().strip()
@@ -683,23 +754,33 @@ class MainWindow(QMainWindow):
 
     def _on_plugin_done(self, name: str, ok: bool, info: str):
         for row in range(self.table.rowCount()):
+            # Имя может быть QTableWidgetItem или виджетом (когда есть info-текст)
             item = self.table.item(row, 1)
-            if item and item.text() == name:
-                if ok:
-                    self.table.item(row, 2).setText(info)
-                    self.table.item(row, 2).setForeground(QColor(TEXT))
-                    self.table.item(row, 4).setText("✓ Актуально")
-                    self.table.item(row, 4).setForeground(QColor(GREEN))
-                    # Снять чекбокс
-                    cw = self.table.cellWidget(row, 0)
-                    if cw:
-                        for ch in cw.findChildren(QCheckBox):
-                            ch.setChecked(False)
-                else:
-                    self.table.item(row, 4).setText("✗ Ошибка")
-                    self.table.item(row, 4).setForeground(QColor(RED))
-                    self.table.item(row, 4).setToolTip(info)
-                break
+            widget = self.table.cellWidget(row, 1)
+            row_name = ""
+            if item:
+                row_name = item.text()
+            elif widget:
+                labels = widget.findChildren(QLabel)
+                if labels:
+                    row_name = labels[0].text()
+            if row_name != name:
+                continue
+            if ok:
+                self.table.item(row, 2).setText(info)
+                self.table.item(row, 2).setForeground(QColor(TEXT))
+                self.table.item(row, 4).setText("✓ Актуально")
+                self.table.item(row, 4).setForeground(QColor(GREEN))
+                # Снять чекбокс
+                cw = self.table.cellWidget(row, 0)
+                if cw:
+                    for ch in cw.findChildren(QCheckBox):
+                        ch.setChecked(False)
+            else:
+                self.table.item(row, 4).setText("✗ Ошибка")
+                self.table.item(row, 4).setForeground(QColor(RED))
+                self.table.item(row, 4).setToolTip(info)
+            break
 
     def _on_finished(self):
         self.progress_bar.setRange(0, 1)
