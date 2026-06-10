@@ -15,10 +15,10 @@ from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QLabel, QPushButton, QLineEdit, QFileDialog, QTableWidget,
     QTableWidgetItem, QHeaderView, QProgressBar, QFrame, QMessageBox,
-    QCheckBox, QAbstractItemView
+    QAbstractItemView
 )
-from PyQt6.QtCore import Qt, QThread, pyqtSignal, QTimer
-from PyQt6.QtGui import QColor, QPalette, QCursor
+from PyQt6.QtGui import QColor, QPalette, QCursor, QDesktopServices
+from PyQt6.QtCore import Qt, QThread, pyqtSignal, QTimer, QUrl
 
 # ── Конфигурация ──────────────────────────────────────────────────────────────
 
@@ -266,6 +266,12 @@ QPushButton#danger {{
 }}
 QPushButton#danger:hover {{ background: #2a1212; }}
 QPushButton#danger:disabled {{ color: #554040; border-color: #2a1818; }}
+QPushButton#readme {{
+    background: transparent; color: {DIM};
+    border: 1px solid {BORDER}; border-radius: 6px;
+    padding: 5px 14px; font-size: 11px;
+}}
+QPushButton#readme:hover {{ color: {TEXT}; border-color: #555; background: #252525; }}
 QPushButton#install {{
     background: transparent; color: #5b9bd5;
     border: 1px solid #2a4a70; border-radius: 6px;
@@ -333,7 +339,6 @@ class MainWindow(QMainWindow):
         self.config = load_config()
         self.remote_plugins: list[dict] = []
         self.worker: InstallWorker | None = None
-        self._row_checks: list[QCheckBox] = []   # чекбоксы строк
 
         root = QWidget()
         root.setObjectName("root")
@@ -389,6 +394,15 @@ class MainWindow(QMainWindow):
         self.status_lbl = QLabel("Готов к работе")
         self.status_lbl.setStyleSheet(f"font-size:11px; color:{DIM};")
         h.addWidget(self.status_lbl)
+
+        h.addSpacing(12)
+        readme_btn = QPushButton("О плагинах")
+        readme_btn.setFixedHeight(30)
+        readme_btn.setObjectName("readme")
+        readme_btn.clicked.connect(lambda: QDesktopServices.openUrl(
+            QUrl("https://github.com/vladvarp/-4D-Plugins?tab=readme-ov-file#readme")
+        ))
+        h.addWidget(readme_btn)
         return w
 
     def _mk_path_bar(self):
@@ -431,44 +445,27 @@ class MainWindow(QMainWindow):
         row.addWidget(sec)
         row.addStretch()
 
-        self.select_all_btn = QPushButton("Выбрать все")
-        self.select_all_btn.setFixedHeight(30)
-        self.select_all_btn.clicked.connect(self._select_all)
-        row.addWidget(self.select_all_btn)
-
-        self.deselect_btn = QPushButton("Снять все")
-        self.deselect_btn.setFixedHeight(30)
-        self.deselect_btn.clicked.connect(self._deselect_all)
-        row.addWidget(self.deselect_btn)
-
-        sep = QFrame()
-        sep.setFrameShape(QFrame.Shape.VLine)
-        sep.setStyleSheet(f"background:{BORDER}; max-width:1px; margin:4px 4px;")
-        row.addWidget(sep)
-
         self.refresh_btn = QPushButton("↻  Проверить")
         self.refresh_btn.setFixedHeight(30)
         self.refresh_btn.clicked.connect(self._check_updates)
         row.addWidget(self.refresh_btn)
         v.addLayout(row)
 
-        # Таблица: чекбокс | Плагин | Установлено | На GitHub | Статус | Действие | Удалить
-        self.table = QTableWidget(0, 7)
-        self.table.setHorizontalHeaderLabels(["", "Плагин", "Установлено", "На GitHub", "Статус", "", ""])
+        # Таблица: Плагин | Установлено | На GitHub | Статус | Действие | Удалить
+        self.table = QTableWidget(0, 6)
+        self.table.setHorizontalHeaderLabels(["Плагин", "Установлено", "На GitHub", "Статус", "", ""])
         hh = self.table.horizontalHeader()
-        hh.setSectionResizeMode(0, QHeaderView.ResizeMode.Fixed)
-        hh.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
+        hh.setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
+        hh.setSectionResizeMode(1, QHeaderView.ResizeMode.Fixed)
         hh.setSectionResizeMode(2, QHeaderView.ResizeMode.Fixed)
         hh.setSectionResizeMode(3, QHeaderView.ResizeMode.Fixed)
         hh.setSectionResizeMode(4, QHeaderView.ResizeMode.Fixed)
         hh.setSectionResizeMode(5, QHeaderView.ResizeMode.Fixed)
-        hh.setSectionResizeMode(6, QHeaderView.ResizeMode.Fixed)
-        self.table.setColumnWidth(0, 44)
+        self.table.setColumnWidth(1, 115)
         self.table.setColumnWidth(2, 115)
-        self.table.setColumnWidth(3, 115)
-        self.table.setColumnWidth(4, 155)
-        self.table.setColumnWidth(5, 130)  # Установить / Обновить
-        self.table.setColumnWidth(6, 120)  # Удалить
+        self.table.setColumnWidth(3, 155)
+        self.table.setColumnWidth(4, 130)  # Установить / Обновить
+        self.table.setColumnWidth(5, 120)  # Удалить
         self.table.verticalHeader().setVisible(False)
         self.table.setSelectionMode(QAbstractItemView.SelectionMode.NoSelection)
         self.table.setFocusPolicy(Qt.FocusPolicy.NoFocus)
@@ -497,13 +494,6 @@ class MainWindow(QMainWindow):
         self.progress_bar.setVisible(False)
         left.addWidget(self.progress_bar)
         h.addLayout(left, stretch=1)
-
-        self.install_btn = QPushButton("⬇  Установить выбранные")
-        self.install_btn.setObjectName("primary")
-        self.install_btn.setFixedHeight(40)
-        self.install_btn.setEnabled(False)
-        self.install_btn.clicked.connect(self._start_install)
-        h.addWidget(self.install_btn)
         return w
 
     # ── Логика ────────────────────────────────────────────────────────────────
@@ -531,20 +521,6 @@ class MainWindow(QMainWindow):
             if self.remote_plugins:
                 self._populate_table()
 
-    def _select_all(self):
-        for cb in self._row_checks:
-            cb.setChecked(True)
-        self._update_install_btn()
-
-    def _deselect_all(self):
-        for cb in self._row_checks:
-            cb.setChecked(False)
-        self._update_install_btn()
-
-    def _update_install_btn(self):
-        any_checked = any(cb.isChecked() for cb in self._row_checks)
-        self.install_btn.setEnabled(any_checked)
-
     def _check_updates(self):
         d = self.path_edit.text().strip()
         if d:
@@ -552,7 +528,6 @@ class MainWindow(QMainWindow):
             save_config(self.config)
 
         self.refresh_btn.setEnabled(False)
-        self.install_btn.setEnabled(False)
         self.progress_bar.setVisible(True)
         self.progress_lbl.setText("Подключаюсь к GitHub…")
         self.status_lbl.setText("Загружаю список…")
@@ -590,7 +565,6 @@ class MainWindow(QMainWindow):
 
     def _populate_table(self):
         self.table.setRowCount(0)
-        self._row_checks.clear()
         install_dir = self.path_edit.text().strip()
         needs = 0
 
@@ -604,19 +578,6 @@ class MainWindow(QMainWindow):
             row = self.table.rowCount()
             self.table.insertRow(row)
             self.table.setRowHeight(row, 46)
-
-            # Чекбокс
-            cb_widget = QWidget()
-            cb_widget.setStyleSheet("background:transparent;")
-            cb_lay = QHBoxLayout(cb_widget)
-            cb_lay.setContentsMargins(0, 0, 0, 0)
-            cb_lay.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            cb = QCheckBox()
-            cb.setChecked(False)  # галочки сняты по умолчанию
-            cb.stateChanged.connect(self._update_install_btn)
-            cb_lay.addWidget(cb)
-            self._row_checks.append(cb)
-            self.table.setCellWidget(row, 0, cb_widget)
 
             # Имя + info из {}
             name_item = QTableWidgetItem(name)
@@ -634,17 +595,17 @@ class MainWindow(QMainWindow):
                 lbl_info.setStyleSheet(f"color:{DIM}; font-size:10px; background:transparent;")
                 nw_lay.addWidget(lbl_name)
                 nw_lay.addWidget(lbl_info)
-                self.table.setCellWidget(row, 1, name_widget)
+                self.table.setCellWidget(row, 0, name_widget)
             else:
-                self.table.setItem(row, 1, name_item)
+                self.table.setItem(row, 0, name_item)
 
             # Локальная версия
             loc = QTableWidgetItem(local_ver or "не установлен")
             loc.setForeground(QColor(DIM if not local_ver else TEXT))
-            self.table.setItem(row, 2, loc)
+            self.table.setItem(row, 1, loc)
 
             # Remote версия
-            self.table.setItem(row, 3, QTableWidgetItem(remote_ver))
+            self.table.setItem(row, 2, QTableWidgetItem(remote_ver))
 
             # Статус
             if outdated:
@@ -656,7 +617,7 @@ class MainWindow(QMainWindow):
                 status_color = GREEN
             st = QTableWidgetItem(status_text)
             st.setForeground(QColor(status_color))
-            self.table.setItem(row, 4, st)
+            self.table.setItem(row, 3, st)
 
             # Кнопка «Установить» или «Обновить» для одиночной установки
             if outdated:
@@ -671,7 +632,7 @@ class MainWindow(QMainWindow):
                 al = QHBoxLayout(aw)
                 al.setContentsMargins(6, 0, 6, 0)
                 al.addWidget(act_btn)
-                self.table.setCellWidget(row, 5, aw)
+                self.table.setCellWidget(row, 4, aw)
 
             # Кнопка удалить (только если установлен)
             if local_ver:
@@ -685,16 +646,14 @@ class MainWindow(QMainWindow):
                 dl = QHBoxLayout(dw)
                 dl.setContentsMargins(6, 0, 6, 0)
                 dl.addWidget(del_btn)
-                self.table.setCellWidget(row, 6, dw)
+                self.table.setCellWidget(row, 5, dw)
 
         if needs:
             self.status_lbl.setText(f"Требуют обновления: {needs}")
-            self.progress_lbl.setText(f"Отметьте нужные плагины и нажмите «Установить выбранные»")
+            self.progress_lbl.setText("Нажмите «Установить» или «Обновить» напротив нужного плагина")
         else:
             self.status_lbl.setText("Всё актуально")
             self.progress_lbl.setText("Все плагины актуальны")
-
-        self._update_install_btn()
 
     def _install_single(self, plugin: dict):
         """Устанавливает/обновляет один плагин по кнопке в строке таблицы."""
@@ -733,50 +692,7 @@ class MainWindow(QMainWindow):
         except Exception as e:
             QMessageBox.critical(self, "Ошибка удаления", str(e))
 
-    def _start_install(self):
-        install_dir = self.path_edit.text().strip()
-        if not install_dir:
-            QMessageBox.warning(self, "Укажите папку", "Выберите папку плагинов Cinema 4D.")
-            return
-        os.makedirs(install_dir, exist_ok=True)
-
-        # Собираем только отмеченные
-        to_install = []
-        for i, cb in enumerate(self._row_checks):
-            if cb.isChecked() and i < len(self.remote_plugins):
-                to_install.append(self.remote_plugins[i])
-
-        if not to_install:
-            return
-
-        if not git_available():
-            reply = QMessageBox.question(
-                self, "Git не найден",
-                "Git не установлен. Установить Git for Windows автоматически?",
-                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
-            )
-            if reply == QMessageBox.StandardButton.Yes:
-                self.install_btn.setEnabled(False)
-                self.progress_bar.setVisible(True)
-
-                def on_git_done(ok, msg):
-                    if ok:
-                        self.progress_lbl.setText("Git установлен. Запускаю установку…")
-                        QTimer.singleShot(300, lambda: self._run_worker(to_install, install_dir))
-                    else:
-                        self.progress_lbl.setText(f"Ошибка установки Git: {msg}")
-                        self.install_btn.setEnabled(True)
-
-                install_git(
-                    lambda msg: QTimer.singleShot(0, lambda m=msg: self.progress_lbl.setText(m)),
-                    lambda ok, msg: QTimer.singleShot(0, lambda: on_git_done(ok, msg))
-                )
-            return
-
-        self._run_worker(to_install, install_dir)
-
     def _run_worker(self, to_install, install_dir):
-        self.install_btn.setEnabled(False)
         self.refresh_btn.setEnabled(False)
         self.progress_bar.setRange(0, 0)
         self.progress_bar.setVisible(True)
@@ -790,8 +706,8 @@ class MainWindow(QMainWindow):
     def _on_plugin_done(self, name: str, ok: bool, info: str):
         for row in range(self.table.rowCount()):
             # Имя может быть QTableWidgetItem или виджетом (когда есть info-текст)
-            item = self.table.item(row, 1)
-            widget = self.table.cellWidget(row, 1)
+            item = self.table.item(row, 0)
+            widget = self.table.cellWidget(row, 0)
             row_name = ""
             if item:
                 row_name = item.text()
@@ -802,17 +718,12 @@ class MainWindow(QMainWindow):
             if row_name != name:
                 continue
             if ok:
-                self.table.item(row, 2).setText(info)
-                self.table.item(row, 2).setForeground(QColor(TEXT))
-                self.table.item(row, 4).setText("✓ Актуально")
-                self.table.item(row, 4).setForeground(QColor(GREEN))
-                # Снять чекбокс
-                cw = self.table.cellWidget(row, 0)
-                if cw:
-                    for ch in cw.findChildren(QCheckBox):
-                        ch.setChecked(False)
+                self.table.item(row, 1).setText(info)
+                self.table.item(row, 1).setForeground(QColor(TEXT))
+                self.table.item(row, 3).setText("✓ Актуально")
+                self.table.item(row, 3).setForeground(QColor(GREEN))
                 # Убрать кнопку «Установить»/«Обновить» — плагин теперь актуален
-                self.table.removeCellWidget(row, 5)
+                self.table.removeCellWidget(row, 4)
                 # Поставить кнопку «Удалить» (если её ещё нет)
                 captured_name = name
                 del_btn = QPushButton("Удалить")
@@ -824,11 +735,11 @@ class MainWindow(QMainWindow):
                 dl = QHBoxLayout(dw)
                 dl.setContentsMargins(6, 0, 6, 0)
                 dl.addWidget(del_btn)
-                self.table.setCellWidget(row, 6, dw)
+                self.table.setCellWidget(row, 5, dw)
             else:
-                self.table.item(row, 4).setText("✗ Ошибка")
-                self.table.item(row, 4).setForeground(QColor(RED))
-                self.table.item(row, 4).setToolTip(info)
+                self.table.item(row, 3).setText("✗ Ошибка")
+                self.table.item(row, 3).setForeground(QColor(RED))
+                self.table.item(row, 3).setToolTip(info)
             break
 
     def _on_finished(self):
@@ -837,8 +748,6 @@ class MainWindow(QMainWindow):
         self.progress_lbl.setText("Установка завершена")
         self.status_lbl.setText("Готово")
         self.refresh_btn.setEnabled(True)
-        self._update_install_btn()
-        QMessageBox.information(self, "Готово", "Выбранные плагины установлены!")
 
 # ── Точка входа ───────────────────────────────────────────────────────────────
 
