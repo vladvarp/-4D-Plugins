@@ -11,7 +11,32 @@ MolecularHexLattice — Cinema 4D ObjectData Plugin v1.0
   • «Strip» — плавное смещение узлов по синусоиде без разрыва трубок
   • Материальные теги: M — шары, T — трубки, F — фаски
   • Фонг-сглаживание 45° на всех объектах
-  • Уникальная иконка в base64
+  • Уникальная иконка (генерируется программно)
+
+UserData SubID MAP (строго фиксировано):
+  SubID=1  : g_lat (группа «Каркас»)
+  SubID=2  : ML_SIZE_X
+  SubID=3  : ML_SIZE_Y
+  SubID=4  : ML_SIZE_Z
+  SubID=5  : ML_DENSITY
+  SubID=6  : ML_BOND_DENS
+  SubID=7  : ML_SEED
+  SubID=8  : ML_JITTER
+  SubID=9  : g_strip (группа «Strip»)
+  SubID=10 : ML_STRIP_AMP
+  SubID=11 : ML_STRIP_FREQ
+  SubID=12 : ML_STRIP_PHASE
+  SubID=13 : ML_STRIP_AXIS
+  SubID=14 : g_sph (группа «Шары»)
+  SubID=15 : ML_SPHERE_RADIUS
+  SubID=16 : ML_SPHERE_SUBDIV
+  SubID=17 : g_tub (группа «Трубки»)
+  SubID=18 : ML_TUBE_RADIUS
+  SubID=19 : ML_TUBE_SEGS_R
+  SubID=20 : ML_TUBE_SEGS_H
+  SubID=21 : g_bev (группа «Фаска»)
+  SubID=22 : ML_BEVEL_SIZE
+  SubID=23 : ML_BEVEL_SUBDIV
 """
 
 import c4d
@@ -20,177 +45,145 @@ import random
 import os
 import base64
 import tempfile
+import struct
+import zlib
 
 # ══════════════════════════════════════════════════════════════════════════════
 #  Plugin ID & Name
 # ══════════════════════════════════════════════════════════════════════════════
 
 ID_MOLHEXLATTICE  = 1068899
-NAME_MOLHEXLATTICE = "MolecularHexLattice v1.0"
+NAME_MOLHEXLATTICE = "MolecularHexLattice v1.1"
 
 # ══════════════════════════════════════════════════════════════════════════════
-#  UserData SubID — строго зафиксированные номера
+#  UserData SubID — СТРОГО совпадают с порядком вызовов AddUserData
 # ══════════════════════════════════════════════════════════════════════════════
 
-UD_GROUP_LATTICE  = 1   # Группа «Каркас»
-
-# Каркас
+# Группы (занимают SubID наравне с полями)
+UD_G_LAT    = 1    # группа «Каркас»
 ML_SIZE_X   = 2
 ML_SIZE_Y   = 3
 ML_SIZE_Z   = 4
-ML_DENSITY  = 5   # плотность узлов (расстояние между ними)
-ML_BOND_DENS= 6   # плотность связей (макс. дистанция для создания трубки)
-ML_SEED     = 7   # Seed для случайного размещения
-ML_JITTER   = 8   # Дрожание (случайное смещение позиций)
+ML_DENSITY  = 5
+ML_BOND_DENS = 6
+ML_SEED     = 7
+ML_JITTER   = 8
 
-# Strip
-ML_STRIP_AMP   = 9    # Амплитуда полоски
-ML_STRIP_FREQ  = 10   # Частота синусоиды
-ML_STRIP_PHASE = 11   # Фаза (анимируемый параметр смещения)
-ML_STRIP_AXIS  = 12   # Ось синусоиды (X/Y/Z)
+UD_G_STRIP  = 9    # группа «Strip»
+ML_STRIP_AMP   = 10
+ML_STRIP_FREQ  = 11
+ML_STRIP_PHASE = 12
+ML_STRIP_AXIS  = 13
 
-# Шары
-ML_SPHERE_RADIUS = 13
-ML_SPHERE_SUBDIV = 14
+UD_G_SPH    = 14   # группа «Шары»
+ML_SPHERE_RADIUS = 15
+ML_SPHERE_SUBDIV = 16
 
-# Трубки
-ML_TUBE_RADIUS   = 15
-ML_TUBE_SEGS_R   = 16
-ML_TUBE_SEGS_H   = 17
+UD_G_TUB    = 17   # группа «Трубки»
+ML_TUBE_RADIUS  = 18
+ML_TUBE_SEGS_R  = 19
+ML_TUBE_SEGS_H  = 20
 
-# Фаска
-ML_BEVEL_SIZE    = 18
-ML_BEVEL_SUBDIV  = 19
+UD_G_BEV    = 21   # группа «Фаска»
+ML_BEVEL_SIZE   = 22
+ML_BEVEL_SUBDIV = 23
+
+# Первый «настоящий» параметр данных (используется для проверки инициализации)
+ML_FIRST_PARAM = ML_SIZE_X  # SubID=2
+
 
 # ══════════════════════════════════════════════════════════════════════════════
-#  Иконка (32×32, молекула из гексагональных шаров)
+#  Иконка — генерируется программно как PNG 32×32
 # ══════════════════════════════════════════════════════════════════════════════
 
-_ICON_ML = (
-    "iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAC8ElEQVR4nL2X"
-    "TUhUURTHf+/NeKOjo6OOOuqoo4466qijjjrqqKOOOuqoo4466qijjjrq"
-    "qKOOOuqoo4466qijFhERERERERERERERERERERERERERERERERERERERERER"
-    "ERERERERERERERERERERERERQ6urq6urq6urq6urq6urq6urq6urq6urq6urq6"
-    "urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6ur"
-    "q6urq6uo7d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3"
-    "d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3"
-    "d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d"
-    "3d3d3d3d3d3d3d3AAAAAAAA"
-)
-
-# Генерируем настоящую иконку программно — 32×32 PNG молекулы
 def _generate_icon_png():
-    """Генерирует PNG-иконку 32×32 в виде молекулярной сетки."""
-    # Используем встроенный модуль для создания простого PNG
-    import struct
-    import zlib
+    """
+    Рисует PNG 32×32 с молекулярной решёткой:
+    тёмный фон + 7 узлов-шаров + соединяющие линии.
+    """
+    W, H = 32, 32
+    pixels = bytearray(W * H * 4)
 
-    width, height = 32, 32
+    # Фон: тёмно-синий
+    for i in range(W * H):
+        pixels[i*4:i*4+4] = [18, 20, 40, 255]
 
-    def put_pixel(pixels, x, y, r, g, b, a=255):
-        if 0 <= x < width and 0 <= y < height:
-            idx = (y * width + x) * 4
+    def put(x, y, r, g, b, a=255):
+        if 0 <= x < W and 0 <= y < H:
+            idx = (y * W + x) * 4
             pixels[idx]   = r
             pixels[idx+1] = g
             pixels[idx+2] = b
             pixels[idx+3] = a
 
-    def draw_circle(pixels, cx, cy, radius, r, g, b, fill=True):
-        for dy in range(-radius, radius+1):
-            for dx in range(-radius, radius+1):
-                dist = math.sqrt(dx*dx + dy*dy)
-                if fill:
-                    if dist <= radius:
-                        put_pixel(pixels, int(cx+dx), int(cy+dy), r, g, b)
-                else:
-                    if radius-1 <= dist <= radius:
-                        put_pixel(pixels, int(cx+dx), int(cy+dy), r, g, b)
+    def circle(cx, cy, rad, r, g, b):
+        for dy in range(-rad-1, rad+2):
+            for dx in range(-rad-1, rad+2):
+                d = math.sqrt(dx*dx + dy*dy)
+                if d <= rad:
+                    # Небольшое «освещение» сверху-слева
+                    light = max(0.0, min(1.0, 1.0 - d / (rad + 0.5)))
+                    hi = 1.0 + 0.4 * max(0.0, ((-dx - dy) / (rad + 1)))
+                    rr = min(255, int(r * light * hi))
+                    gg = min(255, int(g * light * hi))
+                    bb = min(255, int(b * light * hi))
+                    put(int(cx+dx), int(cy+dy), rr, gg, bb)
 
-    def draw_line(pixels, x0, y0, x1, y1, r, g, b, thick=1):
-        dx = x1 - x0
-        dy = y1 - y0
-        length = math.sqrt(dx*dx + dy*dy)
-        if length < 0.001:
-            return
-        steps = int(length * 2) + 1
-        for i in range(steps):
-            t = i / steps
-            px = int(x0 + dx * t)
-            py = int(y0 + dy * t)
-            for tx in range(-thick+1, thick):
-                for ty in range(-thick+1, thick):
-                    put_pixel(pixels, px+tx, py+ty, r, g, b)
+    def line(x0, y0, x1, y1, r, g, b):
+        dx, dy = x1 - x0, y1 - y0
+        steps = max(abs(dx), abs(dy)) * 2 + 1
+        for i in range(int(steps) + 1):
+            t = i / steps if steps > 0 else 0.0
+            px = int(round(x0 + dx * t))
+            py = int(round(y0 + dy * t))
+            put(px, py, r, g, b)
+            put(px+1, py, r, g, b)
 
-    # Прозрачный фон
-    pixels = bytearray([0] * (width * height * 4))
-
-    # Тёмный фон
-    for i in range(width * height):
-        pixels[i*4]   = 18
-        pixels[i*4+1] = 20
-        pixels[i*4+2] = 35
-        pixels[i*4+3] = 255
-
-    # Молекулярные узлы (позиции)
+    # Узлы молекулы
     nodes = [
-        (8, 8), (24, 8),
+        (7, 7),   (25, 7),
         (16, 16),
-        (4, 22), (28, 22),
-        (10, 28), (22, 28),
+        (4, 24),  (28, 24),
+        (10, 29), (22, 29),
     ]
+    # Связи
+    bonds = [(0,1),(0,2),(1,2),(0,3),(1,4),(2,5),(2,6),(3,5),(4,6),(5,6)]
 
-    # Связи между узлами
-    bonds = [
-        (0,1), (0,2), (1,2),
-        (0,3), (1,4),
-        (2,5), (2,6),
-        (3,5), (4,6),
-        (5,6),
-    ]
-
-    # Рисуем трубки (связи) — сначала, чтобы шары перекрывали их
-    for a_idx, b_idx in bonds:
-        ax, ay = nodes[a_idx]
-        bx, by = nodes[b_idx]
-        draw_line(pixels, ax, ay, bx, by, 80, 160, 220, thick=1)
+    # Рисуем трубки
+    for a, b in bonds:
+        ax, ay = nodes[a]
+        bx, by = nodes[b]
+        line(ax, ay, bx, by, 60, 140, 210)
 
     # Рисуем шары поверх трубок
-    for i, (nx, ny) in enumerate(nodes):
-        # Градиентный шар — внешний обод
-        draw_circle(pixels, nx, ny, 4, 30, 100, 200)
-        # Светлый верх (имитация объёма)
-        draw_circle(pixels, nx-1, ny-1, 2, 120, 200, 255)
-        # Гексагональная решётка на шаре (маленькая)
-        put_pixel(pixels, nx, ny, 200, 240, 255)
+    for nx_, ny_ in nodes:
+        circle(nx_, ny_, 3, 40, 120, 220)
+        # Блик
+        put(nx_-1, ny_-1, 180, 230, 255)
 
     # PNG encode
-    def make_png(pixels, w, h):
-        raw_rows = []
-        for y in range(h):
-            row = bytearray([0])  # filter type None
-            for x in range(w):
-                idx = (y * w + x) * 4
-                row += pixels[idx:idx+4]
-            raw_rows.append(bytes(row))
-        raw_data = b''.join(raw_rows)
-        compressed = zlib.compress(raw_data, 9)
+    def chunk(tag, data):
+        l = struct.pack('>I', len(data))
+        c = struct.pack('>I', zlib.crc32(tag + data) & 0xFFFFFFFF)
+        return l + tag + data + c
 
-        def chunk(name, data):
-            length = struct.pack('>I', len(data))
-            crc    = struct.pack('>I', zlib.crc32(name + data) & 0xFFFFFFFF)
-            return length + name + data + crc
+    raw_rows = bytearray()
+    for y in range(H):
+        raw_rows.append(0)  # filter None
+        for x in range(W):
+            idx = (y * W + x) * 4
+            raw_rows += pixels[idx:idx+4]
+    compressed = zlib.compress(bytes(raw_rows), 9)
 
-        ihdr_data = struct.pack('>IIBBBBB', w, h, 8, 6, 0, 0, 0)
-        png = (b'\x89PNG\r\n\x1a\n'
-               + chunk(b'IHDR', ihdr_data)
-               + chunk(b'IDAT', compressed)
-               + chunk(b'IEND', b''))
-        return png
-
-    return make_png(pixels, width, height)
+    ihdr = struct.pack('>IIBBBBB', W, H, 8, 6, 0, 0, 0)
+    png = (b'\x89PNG\r\n\x1a\n'
+           + chunk(b'IHDR', ihdr)
+           + chunk(b'IDAT', compressed)
+           + chunk(b'IEND', b''))
+    return png
 
 
-def _make_icon_ml():
+def _make_icon():
     png_data = _generate_icon_png()
     try:
         bmp = c4d.bitmaps.BaseBitmap()
@@ -240,22 +233,19 @@ def _ud_exists(op, uid):
     return did is not None
 
 
-def _add_group(op, name, parent_subid=0):
+def _add_group(op, name):
+    """Добавляет корневую группу UserData. Возвращает SubID группы."""
     bc = c4d.GetCustomDatatypeDefault(c4d.DTYPE_GROUP)
     bc[c4d.DESC_NAME]       = name
     bc[c4d.DESC_SHORT_NAME] = name
     bc[c4d.DESC_TITLEBAR]   = 1
     bc[c4d.DESC_DEFAULT]    = 1
-    if parent_subid:
-        bc[c4d.DESC_PARENTGROUP] = c4d.DescID(
-            c4d.DescLevel(c4d.ID_USERDATA, c4d.DTYPE_SUBCONTAINER, 0),
-            c4d.DescLevel(parent_subid, c4d.DTYPE_GROUP, 0)
-        )
     did = op.AddUserData(bc)
     return did[1].id
 
 
 def _add_in_group(op, grp_subid, bc):
+    """Добавляет элемент UserData внутрь группы с данным SubID."""
     bc[c4d.DESC_PARENTGROUP] = c4d.DescID(
         c4d.DescLevel(c4d.ID_USERDATA, c4d.DTYPE_SUBCONTAINER, 0),
         c4d.DescLevel(grp_subid, c4d.DTYPE_GROUP, 0)
@@ -303,11 +293,18 @@ def _cycle_bc(name, default, items):
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-#  Математика: общие утилиты
+#  Математика
 # ══════════════════════════════════════════════════════════════════════════════
 
-def _v3(x, y, z):
-    return c4d.Vector(x, y, z)
+def _normalize_tuple(v):
+    d = math.sqrt(v[0]**2 + v[1]**2 + v[2]**2)
+    if d < 1e-12:
+        return (v[0], v[1], v[2])
+    return (v[0]/d, v[1]/d, v[2]/d)
+
+
+def _midpoint_sphere(a, b):
+    return _normalize_tuple(((a[0]+b[0])/2, (a[1]+b[1])/2, (a[2]+b[2])/2))
 
 
 def _v3_normalize(v):
@@ -341,22 +338,12 @@ def _v3_lerp(a, b, t):
     )
 
 
-def _normalize_tuple(v):
-    d = math.sqrt(v[0]**2 + v[1]**2 + v[2]**2)
-    if d < 1e-12:
-        return v
-    return (v[0]/d, v[1]/d, v[2]/d)
-
-
-def _midpoint_sphere(a, b):
-    return _normalize_tuple(((a[0]+b[0])/2, (a[1]+b[1])/2, (a[2]+b[2])/2))
-
-
 # ══════════════════════════════════════════════════════════════════════════════
-#  Dual Icosphere (гексагональная сфера) — ядро из HexSphere
+#  Dual Icosphere
 # ══════════════════════════════════════════════════════════════════════════════
 
 def _icosphere_tris(subdivisions):
+    """Икосаэдр с midpoint-подразделением. Возвращает (verts, faces)."""
     PHI = (1.0 + math.sqrt(5.0)) / 2.0
     raw = [
         ( 0,  1,  PHI), ( 0, -1,  PHI), ( 0,  1, -PHI), ( 0, -1, -PHI),
@@ -374,12 +361,12 @@ def _icosphere_tris(subdivisions):
         new_faces  = []
         edge_cache = {}
 
-        def get_mid(a, b, _verts=verts, _ec=edge_cache):
+        def get_mid(a, b):
             key = (min(a, b), max(a, b))
-            if key not in _ec:
-                _ec[key] = len(_verts)
-                _verts.append(list(_midpoint_sphere(_verts[a], _verts[b])))
-            return _ec[key]
+            if key not in edge_cache:
+                edge_cache[key] = len(verts)
+                verts.append(list(_midpoint_sphere(verts[a], verts[b])))
+            return edge_cache[key]
 
         for f in faces:
             a, b, c = f[0], f[1], f[2]
@@ -388,31 +375,39 @@ def _icosphere_tris(subdivisions):
             ca = get_mid(c, a)
             new_faces += [[a,ab,ca],[ab,b,bc],[ca,bc,c],[ab,bc,ca]]
         faces = new_faces
-
     return verts, faces
 
 
-def _dual_mesh(verts, faces):
-    """Строит dual mesh: центры треугольников → вершины гексагонов."""
-    n_verts = len(verts)
+def _dual_mesh(ico_verts, ico_faces):
+    """
+    Dual mesh треугольной сетки.
+    Центры треугольников становятся вершинами dual_polys (гексагонов/пятиугольников).
+    """
+    n_verts = len(ico_verts)
     dual_verts = []
-    for f in faces:
-        cx = (verts[f[0]][0] + verts[f[1]][0] + verts[f[2]][0]) / 3.0
-        cy = (verts[f[0]][1] + verts[f[1]][1] + verts[f[2]][1]) / 3.0
-        cz = (verts[f[0]][2] + verts[f[1]][2] + verts[f[2]][2]) / 3.0
+    for f in ico_faces:
+        cx = (ico_verts[f[0]][0] + ico_verts[f[1]][0] + ico_verts[f[2]][0]) / 3.0
+        cy = (ico_verts[f[0]][1] + ico_verts[f[1]][1] + ico_verts[f[2]][1]) / 3.0
+        cz = (ico_verts[f[0]][2] + ico_verts[f[1]][2] + ico_verts[f[2]][2]) / 3.0
         dual_verts.append(list(_normalize_tuple((cx, cy, cz))))
 
     vert_to_faces = [[] for _ in range(n_verts)]
-    for fi, f in enumerate(faces):
+    for fi, f in enumerate(ico_faces):
         for vi in f:
             vert_to_faces[vi].append(fi)
 
-    dual_polys = []
+    dual_polys     = []
+    face_normals   = []   # unit-вектор «наружу» для каждого полигона
+
     for vi in range(n_verts):
         adj = vert_to_faces[vi]
         if len(adj) < 3:
             continue
-        nx, ny, nz = verts[vi]
+
+        # Нормаль полигона = направление ico-вершины (она на сфере)
+        nx, ny, nz = ico_verts[vi]
+
+        # Касательная система для сортировки по углу
         if abs(nx) < 0.9:
             tx, ty, tz = 1.0, 0.0, 0.0
         else:
@@ -425,7 +420,7 @@ def _dual_mesh(verts, faces):
         by = nz*tx - nx*tz
         bz = nx*ty - ny*tx
 
-        def angle(fi, _nx=nx,_ny=ny,_nz=nz,_tx=tx,_ty=ty,_tz=tz,_bx=bx,_by=by,_bz=bz):
+        def _angle(fi, _nx=nx,_ny=ny,_nz=nz,_tx=tx,_ty=ty,_tz=tz,_bx=bx,_by=by,_bz=bz):
             dvx = dual_verts[fi][0] - _nx
             dvy = dual_verts[fi][1] - _ny
             dvz = dual_verts[fi][2] - _nz
@@ -433,8 +428,9 @@ def _dual_mesh(verts, faces):
             v = dvx*_bx + dvy*_by + dvz*_bz
             return math.atan2(v, u)
 
-        ordered = sorted(adj, key=angle)
-        # Проверяем ориентацию нормали
+        ordered = sorted(adj, key=_angle)
+
+        # Проверяем ориентацию нормали (должна смотреть наружу)
         p0 = c4d.Vector(*dual_verts[ordered[0]])
         p1 = c4d.Vector(*dual_verts[ordered[1]])
         p2 = c4d.Vector(*dual_verts[ordered[2]])
@@ -445,56 +441,34 @@ def _dual_mesh(verts, faces):
         centroid /= float(len(ordered))
         if normal.Dot(centroid) < 0.0:
             ordered = list(reversed(ordered))
-        dual_polys.append(ordered)
 
-    return dual_verts, dual_polys
+        dual_polys.append(ordered)
+        face_normals.append((nx, ny, nz))
+
+    return dual_verts, dual_polys, face_normals
 
 
 def _build_hex_sphere_data(radius, subdivisions):
     """
-    Возвращает (sphere_pts, dual_polys, face_centers_unit, ico_verts_unit):
-      sphere_pts       — c4d.Vector на поверхности сферы (уже масштабированы)
-      dual_polys       — индексные списки гексагонов/пятиугольников
-      face_normals     — единичные нормали каждого dual_poly (направление «наружу»)
-      ico_verts_unit   — unit-вектора исходных вершин икосаэдра (для оси трубки)
+    Возвращает (sphere_pts, dual_polys, face_normals_unit, dual_verts_unit).
+    sphere_pts       — c4d.Vector на сфере (масштабированы на radius)
+    dual_polys       — индексные списки (гексагоны/пятиугольники)
+    face_normals     — unit-нормали каждой грани (направление наружу)
+    dual_verts_unit  — нормализованные координаты вершин dual mesh
     """
-    subdivisions = max(1, min(5, int(subdivisions)))
+    subdivisions = max(1, min(4, int(subdivisions)))
     ico_verts, ico_faces = _icosphere_tris(subdivisions)
-    dual_verts, dual_polys = _dual_mesh(ico_verts, ico_faces)
-    sphere_pts = [c4d.Vector(v[0]*radius, v[1]*radius, v[2]*radius) for v in dual_verts]
-    # Нормаль каждого полигона = среднее направление его вершин (они на сфере)
-    face_normals = []
-    for poly in dual_polys:
-        nx = ny = nz = 0.0
-        for idx in poly:
-            nx += dual_verts[idx][0]
-            ny += dual_verts[idx][1]
-            nz += dual_verts[idx][2]
-        l = math.sqrt(nx**2 + ny**2 + nz**2)
-        face_normals.append((nx/l, ny/l, nz/l) if l > 1e-12 else (0,1,0))
-    return sphere_pts, dual_polys, face_normals, ico_verts
+    dual_verts, dual_polys, face_normals = _dual_mesh(ico_verts, ico_faces)
+    sphere_pts = [c4d.Vector(v[0]*radius, v[1]*radius, v[2]*radius)
+                  for v in dual_verts]
+    return sphere_pts, dual_polys, face_normals, dual_verts
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-#  Генератор гексагональной сферы С отверстием
+#  Phong-тег
 # ══════════════════════════════════════════════════════════════════════════════
-
-def _fan_polys(indices, pts):
-    """N-гон → список c4d.CPolygon (веер от первой вершины)."""
-    hub = indices[0]
-    result = []
-    n = len(indices)
-    if n == 3:
-        return [c4d.CPolygon(indices[0], indices[1], indices[2], indices[2])]
-    if n == 4:
-        return [c4d.CPolygon(indices[0], indices[1], indices[2], indices[3])]
-    for k in range(1, n - 1):
-        result.append(c4d.CPolygon(hub, indices[k], indices[k+1], indices[k+1]))
-    return result
-
 
 def _add_phong_tag(obj, angle_deg=45.0):
-    """Добавляет Phong-тег к объекту."""
     tag = obj.MakeTag(c4d.Tphong)
     if tag:
         tag[c4d.PHONGTAG_PHONG_ANGLELIMIT] = True
@@ -503,8 +477,11 @@ def _add_phong_tag(obj, angle_deg=45.0):
     return tag
 
 
-def _make_poly_object_raw(pts, cpolys, name):
-    """Создаёт c4d.PolygonObject из готовых списков точек и CPolygon."""
+# ══════════════════════════════════════════════════════════════════════════════
+#  Утилита создания PolygonObject
+# ══════════════════════════════════════════════════════════════════════════════
+
+def _make_poly_object(pts, cpolys, name):
     obj = c4d.PolygonObject(len(pts), len(cpolys))
     obj.SetName(name)
     for i, p in enumerate(pts):
@@ -515,50 +492,62 @@ def _make_poly_object_raw(pts, cpolys, name):
     return obj
 
 
-def _build_hex_sphere_with_holes(radius, subdivisions, connection_face_indices):
-    """
-    Строит dual icosphere с удалёнными гексагонами на позициях connection_face_indices.
-    Возвращает (PolygonObject, hole_centers, hole_normals, hole_radii).
-      hole_centers — c4d.Vector центра каждого отверстия (на поверхности сферы)
-      hole_normals — направление «наружу» для каждого отверстия
-      hole_radii   — усреднённый радиус отверстия (для стыковки трубки)
-    """
-    sphere_pts_raw, dual_polys, face_normals, _ = _build_hex_sphere_data(radius, subdivisions)
+# ══════════════════════════════════════════════════════════════════════════════
+#  Гексагональная сфера с отверстиями (гексагоны на местах трубок удалены)
+# ══════════════════════════════════════════════════════════════════════════════
 
-    pts = list(sphere_pts_raw)
-    cpolys = []
+def _fan_triangulate(indices, pts):
+    """N-гон → список c4d.CPolygon (веер от hub=indices[0])."""
+    n = len(indices)
+    if n == 3:
+        return [c4d.CPolygon(indices[0], indices[1], indices[2], indices[2])]
+    if n == 4:
+        return [c4d.CPolygon(indices[0], indices[1], indices[2], indices[3])]
+    hub = indices[0]
+    return [c4d.CPolygon(hub, indices[k], indices[k+1], indices[k+1])
+            for k in range(1, n - 1)]
+
+
+def _build_sphere_with_holes(radius, subdivisions, hole_face_indices):
+    """
+    Строит dual icosphere с удалёнными полигонами на позициях hole_face_indices.
+
+    Возвращает:
+      (PolygonObject, hole_centers, hole_normals)
+      hole_centers — c4d.Vector центров отверстий (в локальном пространстве)
+      hole_normals — unit c4d.Vector нормалей отверстий
+    """
+    sphere_pts, dual_polys, face_normals, dual_verts_unit = \
+        _build_hex_sphere_data(radius, subdivisions)
+
+    pts    = list(sphere_pts)
+    cpols  = []
     hidden = []
 
-    hole_centers = []
-    hole_normals = []
-    hole_radii   = []
+    hole_centers  = []
+    hole_normals  = []
 
-    conn_set = set(connection_face_indices)
+    hole_set = set(hole_face_indices)
 
     for fi, poly_idx_list in enumerate(dual_polys):
-        if fi in conn_set:
-            # Запоминаем данные отверстия
+        if fi in hole_set:
+            # Вычисляем центр и нормаль отверстия
             cx = cy = cz = 0.0
             for idx in poly_idx_list:
                 cx += pts[idx].x
                 cy += pts[idx].y
                 cz += pts[idx].z
-            n_pts = len(poly_idx_list)
-            cx /= n_pts; cy /= n_pts; cz /= n_pts
+            n_p = len(poly_idx_list)
+            cx /= n_p; cy /= n_p; cz /= n_p
             hole_centers.append(c4d.Vector(cx, cy, cz))
             hole_normals.append(c4d.Vector(*face_normals[fi]))
-            # Среднее расстояние от центра до края — радиус отверстия
-            r_avg = 0.0
-            for idx in poly_idx_list:
-                p = pts[idx]
-                r_avg += math.sqrt((p.x-cx)**2 + (p.y-cy)**2 + (p.z-cz)**2)
-            hole_radii.append(r_avg / n_pts)
-            # Этот полигон пропускаем (не добавляем)
-            continue
+            continue   # пропускаем полигон — это и есть отверстие
 
-        start = len(cpolys)
-        new_cps = _fan_polys(poly_idx_list, pts)
-        cpolys.extend(new_cps)
+        start = len(cpols)
+        new_cps = _fan_triangulate(poly_idx_list, pts)
+        cpols.extend(new_cps)
+
+        # Помечаем внутренние рёбра веера как «скрытые» (N-gon в C4D)
         n = len(poly_idx_list)
         if n > 4:
             for t in range(n - 2):
@@ -568,55 +557,60 @@ def _build_hex_sphere_with_holes(radius, subdivisions, connection_face_indices):
                 if t < n - 3:
                     hidden.append(4 * pi + 2)
 
-    obj = _make_poly_object_raw(pts, cpolys, "MHL_Sphere")
+    obj = _make_poly_object(pts, cpols, "MHL_Sphere")
+
     if hidden:
         eh = obj.GetEdgeH()
         for eid in hidden:
             eh.Select(eid)
+
     _add_phong_tag(obj, 45.0)
-    return obj, hole_centers, hole_normals, hole_radii
+    return obj, hole_centers, hole_normals
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-#  Генератор трубки между двумя точками (с фаской)
+#  Матрица поворота: ось Y → direction
 # ══════════════════════════════════════════════════════════════════════════════
 
-def _make_rotation_matrix_from_z_to_dir(direction):
-    """Матрица поворота, которая направляет ось Z вдоль direction."""
-    d = _v3_normalize(direction)
-    # Стандартная ось Z
-    z = c4d.Vector(0, 1, 0)  # Cinema 4D: Y — ось цилиндра
-    # Если direction почти параллелен Y
-    if abs(_v3_dot(d, c4d.Vector(0, 1, 0))) > 0.9999:
-        # Деградированный случай — поворот на 180° вокруг X
-        if d.y > 0:
-            return c4d.Matrix(
-                c4d.Vector(0,0,0),
-                c4d.Vector(1,0,0),
-                c4d.Vector(0,1,0),
-                c4d.Vector(0,0,1)
-            )
-        else:
-            return c4d.Matrix(
-                c4d.Vector(0,0,0),
-                c4d.Vector(1,0,0),
-                c4d.Vector(0,-1,0),
-                c4d.Vector(0,0,-1)
-            )
-    right = _v3_normalize(_v3_cross(c4d.Vector(0, 1, 0), d))
-    up    = _v3_normalize(_v3_cross(d, right))
-    return c4d.Matrix(c4d.Vector(0,0,0), right, d, up)
+def _matrix_y_to_dir(direction):
+    """
+    Строит c4d.Matrix, выравнивающую ось Y объекта вдоль direction.
+    Используется для позиционирования трубок и фасок.
+    """
+    up = _v3_normalize(direction)
+
+    # Выбираем вспомогательный вектор, не параллельный up
+    helper = c4d.Vector(0, 0, 1)
+    if abs(_v3_dot(up, helper)) > 0.99:
+        helper = c4d.Vector(1, 0, 0)
+
+    right  = _v3_normalize(_v3_cross(helper, up))
+    fwd    = _v3_normalize(_v3_cross(up, right))
+
+    # c4d.Matrix(off, v1, v2, v3): v1=X, v2=Y, v3=Z
+    mg = c4d.Matrix()
+    mg.v1 = right
+    mg.v2 = up
+    mg.v3 = fwd
+    mg.off = c4d.Vector(0, 0, 0)
+    return mg
 
 
-def _build_tube(pt_a, pt_b, tube_radius, segs_r, segs_h,
-                bevel_size, bevel_subdiv):
+# ══════════════════════════════════════════════════════════════════════════════
+#  Генератор трубки (основной цилиндр + фаски на концах)
+# ══════════════════════════════════════════════════════════════════════════════
+
+def _build_tube_between(pt_a, pt_b, tube_radius, segs_r, segs_h,
+                         bevel_size, bevel_subdiv):
     """
     Строит трубку от pt_a до pt_b.
-    Возвращает (tube_obj, bevel_objs).
-    tube_obj   — основной цилиндр (PolygonObject)
-    bevel_objs — список фасочных кольцевых объектов (по 2 штуки: у каждого конца)
+    Трубка позиционируется и ориентируется в мировом пространстве.
+
+    Возвращает (tube_obj, bevel_list):
+      tube_obj   — PolygonObject основного цилиндра
+      bevel_list — список PolygonObject фасок (0, 1 или 2 штуки)
     """
-    diff = pt_b - pt_a
+    diff   = pt_b - pt_a
     length = _v3_len(diff)
     if length < 1e-6:
         return None, []
@@ -624,105 +618,98 @@ def _build_tube(pt_a, pt_b, tube_radius, segs_r, segs_h,
     direction = _v3_normalize(diff)
     midpoint  = _v3_lerp(pt_a, pt_b, 0.5)
 
-    segs_r = max(3, int(segs_r))
-    segs_h = max(1, int(segs_h))
-    bevel_subdiv = max(0, int(bevel_subdiv))
+    segs_r       = max(3,   int(segs_r))
+    segs_h       = max(1,   int(segs_h))
+    bevel_subdiv = max(0,   int(bevel_subdiv))
     bevel_size   = max(0.0, float(bevel_size))
 
+    # Фаска не может превышать половину длины трубки
+    actual_bevel = min(bevel_size, length * 0.45)
+    inner_half   = length * 0.5 - actual_bevel
+
     # ── Основной цилиндр ────────────────────────────────────────────────────
-    pts      = []
-    cpolys   = []
+    tube_pts   = []
+    tube_cpols = []
 
-    half_len = length / 2.0
-    # Если есть фаска — укорачиваем трубку на bevel_size с каждого конца
-    actual_bevel = min(bevel_size, half_len * 0.45)
-    inner_half   = half_len - actual_bevel
-
-    # Ряды вершин: segs_h+1 рядов вдоль оси
     for row in range(segs_h + 1):
         t = row / segs_h
-        y = -inner_half + t * inner_half * 2.0
+        y = -inner_half + t * (inner_half * 2.0)
         for col in range(segs_r):
-            angle = col / segs_r * 2.0 * math.pi
-            x = tube_radius * math.cos(angle)
-            z = tube_radius * math.sin(angle)
-            pts.append(c4d.Vector(x, y, z))
+            a = col / segs_r * 2.0 * math.pi
+            tube_pts.append(c4d.Vector(
+                tube_radius * math.cos(a),
+                y,
+                tube_radius * math.sin(a)
+            ))
 
     for row in range(segs_h):
         for col in range(segs_r):
             bl = row * segs_r + col
-            br = row * segs_r + (col+1) % segs_r
-            tl = (row+1) * segs_r + col
-            tr = (row+1) * segs_r + (col+1) % segs_r
-            cpolys.append(c4d.CPolygon(bl, tl, tr, br))
+            br = row * segs_r + (col + 1) % segs_r
+            tl = (row + 1) * segs_r + col
+            tr = (row + 1) * segs_r + (col + 1) % segs_r
+            tube_cpols.append(c4d.CPolygon(bl, tl, tr, br))
 
-    # Крышки трубки (кольцо без дна — трубка открытая у шаров)
-    # Ничего не добавляем — шары закрывают отверстия
-
-    tube_obj = _make_poly_object_raw(pts, cpolys, "MHL_Tube")
+    tube_obj = _make_poly_object(tube_pts, tube_cpols, "MHL_Tube")
     _add_phong_tag(tube_obj, 45.0)
 
-    # Позиционируем и ориентируем
-    mg = _make_rotation_matrix_from_z_to_dir(direction)
+    mg = _matrix_y_to_dir(direction)
     mg.off = midpoint
     tube_obj.SetMg(mg)
 
     # ── Фаски ───────────────────────────────────────────────────────────────
-    bevel_objs = []
-    if actual_bevel > 1e-4 and bevel_subdiv >= 0:
-        for end_sign in (-1.0, 1.0):  # -1 = нижний конец, +1 = верхний
+    bevel_list = []
+
+    if actual_bevel > 1e-4:
+        n_bev = max(1, bevel_subdiv + 1)
+
+        for end_sign in (-1.0, 1.0):
             bev_pts   = []
-            bev_polys = []
+            bev_cpols = []
 
-            # Фаска — тор-секция: переход от inner_half до half_len по радиусу
-            # Число кольцевых рядов фаски
-            n_bev = max(1, bevel_subdiv + 1)
-
+            # Профиль фаски: четверть окружности от tube_radius до tube_radius+actual_bevel
+            # по Y: от ±inner_half до ±(inner_half+actual_bevel) = ±half_length
             for ring in range(n_bev + 1):
-                t = ring / n_bev  # 0..1
-                # Радиус и Y меняются по четверти окружности (скруглённая фаска)
-                ang = t * math.pi * 0.5
-                ring_radius = tube_radius + actual_bevel * math.sin(ang)
-                ring_y      = end_sign * (inner_half + actual_bevel * (1.0 - math.cos(ang)))
+                t     = ring / n_bev
+                angle = t * math.pi * 0.5   # 0..90°
+                r_ring = tube_radius + actual_bevel * math.sin(angle)
+                y_ring = end_sign * (inner_half + actual_bevel * (1.0 - math.cos(angle)))
                 for col in range(segs_r):
                     a = col / segs_r * 2.0 * math.pi
-                    x = ring_radius * math.cos(a)
-                    z = ring_radius * math.sin(a)
-                    bev_pts.append(c4d.Vector(x, ring_y, z))
+                    bev_pts.append(c4d.Vector(
+                        r_ring * math.cos(a),
+                        y_ring,
+                        r_ring * math.sin(a)
+                    ))
 
             for ring in range(n_bev):
                 for col in range(segs_r):
                     bl = ring * segs_r + col
-                    br = ring * segs_r + (col+1) % segs_r
-                    tl = (ring+1) * segs_r + col
-                    tr = (ring+1) * segs_r + (col+1) % segs_r
+                    br = ring * segs_r + (col + 1) % segs_r
+                    tl = (ring + 1) * segs_r + col
+                    tr = (ring + 1) * segs_r + (col + 1) % segs_r
+                    # Нижний конец: нормаль смотрит вниз → переставляем порядок
                     if end_sign < 0:
-                        # Нижний конец — порядок CCW
-                        bev_polys.append(c4d.CPolygon(bl, br, tr, tl))
+                        bev_cpols.append(c4d.CPolygon(bl, br, tr, tl))
                     else:
-                        # Верхний конец
-                        bev_polys.append(c4d.CPolygon(bl, tl, tr, br))
+                        bev_cpols.append(c4d.CPolygon(bl, tl, tr, br))
 
-            bev_obj = _make_poly_object_raw(bev_pts, bev_polys, "MHL_Bevel")
+            bev_obj = _make_poly_object(bev_pts, bev_cpols, "MHL_Bevel")
             _add_phong_tag(bev_obj, 45.0)
             bev_obj.SetMg(mg)
-            bevel_objs.append(bev_obj)
+            bevel_list.append(bev_obj)
 
-    return tube_obj, bevel_objs
+    return tube_obj, bevel_list
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-#  Генератор каркаса
+#  Генератор позиций и связей
 # ══════════════════════════════════════════════════════════════════════════════
 
-def _generate_node_positions(size_x, size_y, size_z, density, seed, jitter):
-    """
-    Генерирует позиции узлов на регулярной решётке с добавлением случайного
-    джиттера. density — расстояние между узлами.
-    """
-    rng = random.Random(seed)
+def _generate_positions(size_x, size_y, size_z, density, seed, jitter):
+    """Генерирует позиции узлов на решётке + случайный джиттер."""
+    rng     = random.Random(int(seed))
     density = max(1.0, float(density))
-
     nx = max(1, int(math.ceil(size_x / density)))
     ny = max(1, int(math.ceil(size_y / density)))
     nz = max(1, int(math.ceil(size_z / density)))
@@ -739,59 +726,53 @@ def _generate_node_positions(size_x, size_y, size_z, density, seed, jitter):
                     y += rng.uniform(-jitter, jitter)
                     z += rng.uniform(-jitter, jitter)
                 positions.append(c4d.Vector(x, y, z))
-
     return positions
 
 
 def _apply_strip(positions, amplitude, frequency, phase, axis):
     """
-    Плавно смещает позиции вдоль перпендикулярной оси по синусоиде.
-    axis: 0=X (смещение по Y+Z), 1=Y (смещение по X+Z), 2=Z (смещение по X+Y)
-    Параметр phase анимируется — смещение «плывёт» не разрывая связей,
-    потому что трубки пересчитываются по новым позициям.
+    Плавно смещает позиции синусоидой вдоль перпендикулярного направления.
+    Трубки не рвутся, так как пересчитываются при каждом изменении phase.
     """
     if amplitude < 1e-6:
         return positions
     result = []
     for p in positions:
-        if axis == 0:
+        if axis == 0:        # синусоида вдоль X, смещение по Y
             val = math.sin(p.x * frequency + phase)
-            result.append(c4d.Vector(p.x, p.y + amplitude * val, p.z + amplitude * val * 0.5))
-        elif axis == 1:
+            result.append(c4d.Vector(p.x, p.y + amplitude * val, p.z))
+        elif axis == 1:      # синусоида вдоль Y, смещение по X
             val = math.sin(p.y * frequency + phase)
-            result.append(c4d.Vector(p.x + amplitude * val, p.y, p.z + amplitude * val * 0.5))
-        else:
+            result.append(c4d.Vector(p.x + amplitude * val, p.y, p.z))
+        else:                # синусоида вдоль Z, смещение по Y
             val = math.sin(p.z * frequency + phase)
-            result.append(c4d.Vector(p.x + amplitude * val, p.y + amplitude * val * 0.5, p.z))
+            result.append(c4d.Vector(p.x, p.y + amplitude * val, p.z))
     return result
 
 
-def _find_bonds(positions, bond_max_dist):
-    """
-    Находит пары узлов для создания связей.
-    Только пары, расстояние между которыми < bond_max_dist.
-    """
-    bonds = []
+def _find_bonds(positions, max_dist):
+    """Находит все пары узлов на расстоянии ≤ max_dist."""
+    bonds  = []
+    max_sq = max_dist * max_dist
     n = len(positions)
-    bond_sq = bond_max_dist * bond_max_dist
     for i in range(n):
-        for j in range(i+1, n):
-            d = positions[i] - positions[j]
-            dsq = d.x**2 + d.y**2 + d.z**2
-            if dsq < bond_sq:
+        for j in range(i + 1, n):
+            d  = positions[i] - positions[j]
+            sq = d.x**2 + d.y**2 + d.z**2
+            if sq <= max_sq:
                 bonds.append((i, j))
     return bonds
 
 
-def _find_closest_face(node_pos, face_normals_unit, direction):
+def _find_best_face(face_normals, direction):
     """
-    Находит индекс грани dual_sphere, нормаль которой ближе всего к direction.
-    direction — единичный вектор от центра шара к соседнему узлу.
+    Возвращает индекс грани dual_sphere, нормаль которой ближе всего
+    к direction (unit vector). Используется для выбора места подключения трубки.
     """
     best_idx = 0
     best_dot = -2.0
     dx, dy, dz = direction.x, direction.y, direction.z
-    for fi, (nx, ny, nz) in enumerate(face_normals_unit):
+    for fi, (nx, ny, nz) in enumerate(face_normals):
         dot = nx*dx + ny*dy + nz*dz
         if dot > best_dot:
             best_dot = dot
@@ -800,188 +781,162 @@ def _find_closest_face(node_pos, face_normals_unit, direction):
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-#  Материальные теги (ограничение выделения)
+#  Материальные теги
 # ══════════════════════════════════════════════════════════════════════════════
 
-def _find_material(doc, restriction):
-    """Ищет в документе материал по ограничению выделения (имя материала)."""
+def _get_or_create_material(doc, name, color):
+    """Возвращает материал с данным именем или создаёт новый."""
     mat = doc.GetFirstMaterial()
     while mat:
-        if mat.GetName() == restriction:
+        if mat.GetName() == name:
             return mat
         mat = mat.GetNext()
-    return None
+    # Создаём
+    mat = c4d.BaseMaterial(c4d.Mmaterial)
+    mat.SetName(name)
+    mat[c4d.MATERIAL_COLOR_COLOR] = color
+    doc.InsertMaterial(mat)
+    doc.AddUndo(c4d.UNDOTYPE_NEW, mat)
+    return mat
 
 
-def _apply_material_tag(obj, doc, restriction):
-    """
-    Назначает материал с ограничением выделения obj.
-    restriction — 'M', 'T' или 'F'.
-    Ищет материал с именем restriction. Если не найден — создаёт новый.
-    """
-    mat = _find_material(doc, restriction)
-    if mat is None:
-        mat = c4d.BaseMaterial(c4d.Mmaterial)
-        mat.SetName(restriction)
-        # Базовый цвет по типу
-        if restriction == "M":
-            mat[c4d.MATERIAL_COLOR_COLOR] = c4d.Vector(0.2, 0.5, 1.0)
-        elif restriction == "T":
-            mat[c4d.MATERIAL_COLOR_COLOR] = c4d.Vector(0.8, 0.8, 0.9)
-        elif restriction == "F":
-            mat[c4d.MATERIAL_COLOR_COLOR] = c4d.Vector(1.0, 0.7, 0.2)
-        doc.InsertMaterial(mat)
-
+def _apply_mat_tag(obj, doc, restriction, color):
+    """Назначает текстурный тег с ограничением выделения."""
+    if doc is None:
+        return
+    mat = _get_or_create_material(doc, restriction, color)
     tag = obj.MakeTag(c4d.Ttexture)
     if tag:
         tag[c4d.TEXTURETAG_MATERIAL]    = mat
         tag[c4d.TEXTURETAG_RESTRICTION] = restriction
-    return tag
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-#  Главный генератор: собираем всё вместе
+#  Главный генератор
 # ══════════════════════════════════════════════════════════════════════════════
 
-def _build_molecular_lattice(op, doc):
-    """
-    Строит всю молекулярную систему.
-    Возвращает BaseObject (нулевой объект-контейнер) со всеми дочерними объектами.
-    """
-    # ── Читаем параметры ────────────────────────────────────────────────────
-    size_x      = max(1.0,   float(_ud_get(op, ML_SIZE_X,      500.0)))
-    size_y      = max(1.0,   float(_ud_get(op, ML_SIZE_Y,      500.0)))
-    size_z      = max(1.0,   float(_ud_get(op, ML_SIZE_Z,      500.0)))
-    density     = max(10.0,  float(_ud_get(op, ML_DENSITY,     200.0)))
-    bond_dens   = max(1.0,   float(_ud_get(op, ML_BOND_DENS,   250.0)))
-    seed        = int(_ud_get(op, ML_SEED,        42))
-    jitter      = max(0.0,   float(_ud_get(op, ML_JITTER,      20.0)))
+def _build_lattice(op, doc):
+    """Строит всю молекулярную систему и возвращает нулевой объект-контейнер."""
+
+    # ── Параметры ────────────────────────────────────────────────────────────
+    size_x      = max(1.0,  float(_ud_get(op, ML_SIZE_X,       500.0)))
+    size_y      = max(1.0,  float(_ud_get(op, ML_SIZE_Y,       500.0)))
+    size_z      = max(1.0,  float(_ud_get(op, ML_SIZE_Z,       500.0)))
+    density     = max(10.0, float(_ud_get(op, ML_DENSITY,      200.0)))
+    bond_dens   = max(1.0,  float(_ud_get(op, ML_BOND_DENS,    250.0)))
+    seed        = int(_ud_get(op, ML_SEED,    42))
+    jitter      = max(0.0,  float(_ud_get(op, ML_JITTER,       20.0)))
 
     strip_amp   = max(0.0,   float(_ud_get(op, ML_STRIP_AMP,   0.0)))
-    strip_freq  = max(0.001, float(_ud_get(op, ML_STRIP_FREQ,  0.01)))
+    strip_freq  = max(0.0001,float(_ud_get(op, ML_STRIP_FREQ,  0.01)))
     strip_phase = float(_ud_get(op, ML_STRIP_PHASE, 0.0))
-    strip_axis  = int(_ud_get(op, ML_STRIP_AXIS,  1))
+    strip_axis  = int(_ud_get(op, ML_STRIP_AXIS,   1))
 
-    sphere_r    = max(1.0,   float(_ud_get(op, ML_SPHERE_RADIUS, 40.0)))
-    sphere_sub  = max(1,     min(4, int(_ud_get(op, ML_SPHERE_SUBDIV, 2))))
+    sphere_r    = max(1.0,  float(_ud_get(op, ML_SPHERE_RADIUS, 40.0)))
+    sphere_sub  = max(1,    min(4, int(_ud_get(op, ML_SPHERE_SUBDIV, 2))))
 
-    tube_r      = max(0.5,   float(_ud_get(op, ML_TUBE_RADIUS,  8.0)))
-    tube_sr     = max(3,     int(_ud_get(op, ML_TUBE_SEGS_R,   8)))
-    tube_sh     = max(1,     int(_ud_get(op, ML_TUBE_SEGS_H,   2)))
+    tube_r      = max(0.5,  float(_ud_get(op, ML_TUBE_RADIUS,   8.0)))
+    tube_sr     = max(3,    int(_ud_get(op, ML_TUBE_SEGS_R,    8)))
+    tube_sh     = max(1,    int(_ud_get(op, ML_TUBE_SEGS_H,    2)))
 
-    bevel_size  = max(0.0,   float(_ud_get(op, ML_BEVEL_SIZE,  5.0)))
-    bevel_sub   = max(0,     int(_ud_get(op, ML_BEVEL_SUBDIV,  2)))
+    bevel_size  = max(0.0,  float(_ud_get(op, ML_BEVEL_SIZE,    5.0)))
+    bevel_sub   = max(0,    int(_ud_get(op, ML_BEVEL_SUBDIV,    2)))
 
-    # ── Генерируем позиции узлов ────────────────────────────────────────────
-    positions_raw = _generate_node_positions(size_x, size_y, size_z, density, seed, jitter)
+    # ── Позиции узлов ────────────────────────────────────────────────────────
+    positions_raw = _generate_positions(size_x, size_y, size_z, density, seed, jitter)
 
-    # Ограничиваем количество узлов (безопасность производительности)
-    max_nodes = 200
-    if len(positions_raw) > max_nodes:
-        positions_raw = positions_raw[:max_nodes]
+    # Жёсткое ограничение (производительность)
+    MAX_NODES = 150
+    if len(positions_raw) > MAX_NODES:
+        positions_raw = positions_raw[:MAX_NODES]
 
-    # Применяем Strip
     positions = _apply_strip(positions_raw, strip_amp, strip_freq, strip_phase, strip_axis)
 
     if not positions:
         null = c4d.BaseObject(c4d.Onull)
-        null.SetName("MolecularHexLattice")
+        null.SetName("MolecularHexLattice [пусто]")
         return null
 
-    # ── Находим связи ────────────────────────────────────────────────────────
+    # ── Связи ────────────────────────────────────────────────────────────────
     bonds = _find_bonds(positions, bond_dens)
 
-    # Ограничиваем количество связей
-    max_bonds = 600
-    if len(bonds) > max_bonds:
-        bonds = bonds[:max_bonds]
+    MAX_BONDS = 500
+    if len(bonds) > MAX_BONDS:
+        bonds = bonds[:MAX_BONDS]
 
-    # ── Вычисляем какие грани шара используются для связей ──────────────────
-    # Получаем нормали граней dual icosphere
-    _, _, face_normals_unit, _ = _build_hex_sphere_data(1.0, sphere_sub)
-    n_faces = len(face_normals_unit)
+    # ── Данные dual icosphere для определения лучшей грани ───────────────────
+    _, _, face_normals, _ = _build_hex_sphere_data(1.0, sphere_sub)
+    n_faces = len(face_normals)
 
-    # Для каждого узла — список граней, куда подключаются трубки
-    node_connection_faces = [[] for _ in range(len(positions))]
+    # Для каждого узла: список индексов граней, куда подключены трубки
+    node_holes = [[] for _ in range(len(positions))]
 
-    for bond_idx, (i, j) in enumerate(bonds):
-        pi = positions[i]
-        pj = positions[j]
-        # Направление от i к j
-        diff_ij = pj - pi
-        diff_ji = pi - pj
-        dir_ij = _v3_normalize(diff_ij)
-        dir_ji = _v3_normalize(diff_ji)
+    for i, j in bonds:
+        dir_ij = _v3_normalize(positions[j] - positions[i])
+        dir_ji = _v3_normalize(positions[i] - positions[j])
 
-        fi_ij = _find_closest_face(pi, face_normals_unit, dir_ij)
-        fi_ji = _find_closest_face(pj, face_normals_unit, dir_ji)
+        fi_ij = _find_best_face(face_normals, dir_ij)
+        fi_ji = _find_best_face(face_normals, dir_ji)
 
-        # Избегаем дублирования грани на одном шаре
-        if fi_ij not in node_connection_faces[i]:
-            node_connection_faces[i].append(fi_ij)
-        if fi_ji not in node_connection_faces[j]:
-            node_connection_faces[j].append(fi_ji)
+        if fi_ij not in node_holes[i]:
+            node_holes[i].append(fi_ij)
+        if fi_ji not in node_holes[j]:
+            node_holes[j].append(fi_ji)
 
-    # ── Создаём контейнер ────────────────────────────────────────────────────
+    # ── Строим иерархию ──────────────────────────────────────────────────────
     root = c4d.BaseObject(c4d.Onull)
     root.SetName("MolecularHexLattice")
 
-    # Группы для организации
-    grp_spheres = c4d.BaseObject(c4d.Onull)
-    grp_spheres.SetName("Spheres")
-    grp_spheres.InsertUnder(root)
+    g_spheres = c4d.BaseObject(c4d.Onull)
+    g_spheres.SetName("Spheres")
+    g_spheres.InsertUnder(root)
 
-    grp_tubes = c4d.BaseObject(c4d.Onull)
-    grp_tubes.SetName("Tubes")
-    grp_tubes.InsertUnder(root)
+    g_tubes = c4d.BaseObject(c4d.Onull)
+    g_tubes.SetName("Tubes")
+    g_tubes.InsertUnder(root)
 
-    grp_bevels = c4d.BaseObject(c4d.Onull)
-    grp_bevels.SetName("Bevels")
-    grp_bevels.InsertUnder(root)
+    g_bevels = c4d.BaseObject(c4d.Onull)
+    g_bevels.SetName("Bevels")
+    g_bevels.InsertUnder(root)
 
-    # ── Строим шары ──────────────────────────────────────────────────────────
-    sphere_objects = []
+    # Цвета материалов
+    col_m = c4d.Vector(0.20, 0.50, 1.00)   # синий  — шары
+    col_t = c4d.Vector(0.75, 0.80, 0.90)   # серый  — трубки
+    col_f = c4d.Vector(1.00, 0.65, 0.15)   # золото — фаски
+
+    # ── Шары ─────────────────────────────────────────────────────────────────
     for node_idx, pos in enumerate(positions):
-        conn_faces = node_connection_faces[node_idx]
-        # Клэмп: не более чем граней существует
-        conn_faces = [f for f in conn_faces if f < n_faces]
+        hole_faces = [f for f in node_holes[node_idx] if f < n_faces]
 
-        sphere_obj, hole_centers, hole_normals, hole_radii = \
-            _build_hex_sphere_with_holes(sphere_r, sphere_sub, conn_faces)
+        sphere_obj, hole_centers, hole_normals = \
+            _build_sphere_with_holes(sphere_r, sphere_sub, hole_faces)
 
         sphere_obj.SetAbsPos(pos)
         sphere_obj.SetName("Sphere_%03d" % node_idx)
-        sphere_objects.append(sphere_obj)
+        _apply_mat_tag(sphere_obj, doc, "M", col_m)
+        sphere_obj.InsertUnder(g_spheres)
 
-        # Материальный тег "M"
-        if doc:
-            _apply_material_tag(sphere_obj, doc, "M")
-
-        sphere_obj.InsertUnder(grp_spheres)
-
-    # ── Строим трубки ────────────────────────────────────────────────────────
+    # ── Трубки и фаски ────────────────────────────────────────────────────────
     for bond_idx, (i, j) in enumerate(bonds):
         pi = positions[i]
         pj = positions[j]
-
-        # Точки стыковки трубки у поверхности шаров
-        diff = pj - pi
+        diff   = pj - pi
         length = _v3_len(diff)
         if length < 1e-6:
             continue
 
         dir_n = _v3_normalize(diff)
 
-        # Трубка начинается/заканчивается у поверхности шаров
+        # Точки старта/конца трубки у поверхности шаров
         pt_a = pi + dir_n * sphere_r
         pt_b = pj - dir_n * sphere_r
 
-        # Убеждаемся что длина трубки положительная
         tube_len = _v3_len(pt_b - pt_a)
-        if tube_len < tube_r * 0.5:
+        if tube_len < tube_r * 0.1:
+            # Узлы слишком близко — трубка не вмещается
             continue
 
-        tube_obj, bevel_objs = _build_tube(
+        tube_obj, bevel_list = _build_tube_between(
             pt_a, pt_b,
             tube_r, tube_sr, tube_sh,
             bevel_size, bevel_sub
@@ -989,81 +944,82 @@ def _build_molecular_lattice(op, doc):
 
         if tube_obj is not None:
             tube_obj.SetName("Tube_%03d" % bond_idx)
-            if doc:
-                _apply_material_tag(tube_obj, doc, "T")
-            tube_obj.InsertUnder(grp_tubes)
+            _apply_mat_tag(tube_obj, doc, "T", col_t)
+            tube_obj.InsertUnder(g_tubes)
 
-            for bv_idx, bev_obj in enumerate(bevel_objs):
-                bev_obj.SetName("Bevel_%03d_%d" % (bond_idx, bv_idx))
-                if doc:
-                    _apply_material_tag(bev_obj, doc, "F")
-                bev_obj.InsertUnder(grp_bevels)
+        for bv_idx, bev_obj in enumerate(bevel_list):
+            bev_obj.SetName("Bevel_%03d_%d" % (bond_idx, bv_idx))
+            _apply_mat_tag(bev_obj, doc, "F", col_f)
+            bev_obj.InsertUnder(g_bevels)
 
     return root
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-#  UserData: создание и инициализация
+#  UserData: создание интерфейса
 # ══════════════════════════════════════════════════════════════════════════════
 
-def _create_all_userdata(op):
-    """Создаёт все UserData-поля плагина."""
+def _create_userdata(op):
+    """
+    Создаёт все группы и поля UserData В СТРОГО ФИКСИРОВАННОМ ПОРЯДКЕ.
+    SubID назначается автоматически C4D: каждый вызов AddUserData
+    даёт следующий свободный SubID (начиная с 1).
+    """
+    # SubID=1 → g_lat
+    g_lat = _add_group(op, "Каркас (Lattice)")
+    # SubID=2..8 → поля
+    _add_in_group(op, g_lat, _float_bc("Размер X",           500.0,  10.0, 100000.0))
+    _add_in_group(op, g_lat, _float_bc("Размер Y",           500.0,  10.0, 100000.0))
+    _add_in_group(op, g_lat, _float_bc("Размер Z",           500.0,  10.0, 100000.0))
+    _add_in_group(op, g_lat, _float_bc("Плотность (шаг сетки)", 200.0, 10.0, 10000.0))
+    _add_in_group(op, g_lat, _float_bc("Макс. длина связи",  250.0,  10.0, 10000.0))
+    _add_in_group(op, g_lat, _int_bc  ("Seed",                42,     0,    99999))
+    _add_in_group(op, g_lat, _float_bc("Джиттер (шум позиций)", 20.0, 0.0, 5000.0))
 
-    # ── Группа: Каркас ───────────────────────────────────────────────────────
-    g_lat = _add_group(op, "Каркас")
-
-    _add_in_group(op, g_lat, _float_bc("Размер X",      500.0,  10.0, 100000.0))
-    _add_in_group(op, g_lat, _float_bc("Размер Y",      500.0,  10.0, 100000.0))
-    _add_in_group(op, g_lat, _float_bc("Размер Z",      500.0,  10.0, 100000.0))
-    _add_in_group(op, g_lat, _float_bc("Плотность узлов", 200.0, 10.0, 10000.0))
-    _add_in_group(op, g_lat, _float_bc("Макс. длина связи", 250.0, 10.0, 10000.0))
-    _add_in_group(op, g_lat, _int_bc("Seed", 42, 0, 99999))
-    _add_in_group(op, g_lat, _float_bc("Джиттер", 20.0, 0.0, 5000.0))
-
-    # ── Группа: Strip ────────────────────────────────────────────────────────
-    g_strip = _add_group(op, "Strip (смещение)")
-
-    _add_in_group(op, g_strip, _float_bc("Амплитуда", 0.0, 0.0, 10000.0))
-    _add_in_group(op, g_strip, _float_bc("Частота",   0.01, 0.0001, 10.0,
+    # SubID=9 → g_strip
+    g_strip = _add_group(op, "Strip — волновое смещение")
+    # SubID=10..13 → поля
+    _add_in_group(op, g_strip, _float_bc("Амплитуда",          0.0,    0.0,    10000.0))
+    _add_in_group(op, g_strip, _float_bc("Частота",            0.01,   0.0001, 10.0,
                                           unit=c4d.DESC_UNIT_FLOAT, step=0.001))
-    _add_in_group(op, g_strip, _float_bc("Фаза (анимировать)", 0.0, -1000.0, 1000.0,
+    _add_in_group(op, g_strip, _float_bc("Фаза (анимировать)", 0.0,  -1000.0, 1000.0,
                                           unit=c4d.DESC_UNIT_FLOAT, step=0.01))
-    _add_in_group(op, g_strip, _cycle_bc("Ось синусоиды", 1, ["X", "Y", "Z"]))
+    _add_in_group(op, g_strip, _cycle_bc("Ось волны",          1,
+                                          ["X (смещение Y)", "Y (смещение X)", "Z (смещение Y)"]))
 
-    # ── Группа: Шары ─────────────────────────────────────────────────────────
-    g_sph = _add_group(op, "Шары (M)")
+    # SubID=14 → g_sph
+    g_sph = _add_group(op, "Шары  [M]")
+    # SubID=15..16
+    _add_in_group(op, g_sph, _float_bc("Радиус шара",   40.0, 1.0, 100000.0))
+    _add_in_group(op, g_sph, _int_bc  ("Подразделение",  2,    1,   4))
 
-    _add_in_group(op, g_sph, _float_bc("Радиус шара", 40.0, 1.0, 100000.0))
-    _add_in_group(op, g_sph, _int_bc("Подразделение", 2, 1, 4))
+    # SubID=17 → g_tub
+    g_tub = _add_group(op, "Трубки  [T]")
+    # SubID=18..20
+    _add_in_group(op, g_tub, _float_bc("Радиус трубки",          8.0,  0.5,  100000.0))
+    _add_in_group(op, g_tub, _int_bc  ("Сегменты окружности",    8,    3,    64))
+    _add_in_group(op, g_tub, _int_bc  ("Сегменты длины",         2,    1,    64))
 
-    # ── Группа: Трубки ────────────────────────────────────────────────────────
-    g_tub = _add_group(op, "Трубки (T)")
-
-    _add_in_group(op, g_tub, _float_bc("Радиус трубки", 8.0, 0.5, 100000.0))
-    _add_in_group(op, g_tub, _int_bc("Сегменты окружности", 8, 3, 64))
-    _add_in_group(op, g_tub, _int_bc("Сегменты длины",      2, 1, 64))
-
-    # ── Группа: Фаска ─────────────────────────────────────────────────────────
-    g_bev = _add_group(op, "Фаска (F)")
-
-    _add_in_group(op, g_bev, _float_bc("Размер фаски", 5.0, 0.0, 100000.0))
-    _add_in_group(op, g_bev, _int_bc("Подразделение фаски", 2, 0, 8))
+    # SubID=21 → g_bev
+    g_bev = _add_group(op, "Фаска  [F]")
+    # SubID=22..23
+    _add_in_group(op, g_bev, _float_bc("Размер фаски",           5.0,  0.0,  100000.0))
+    _add_in_group(op, g_bev, _int_bc  ("Подразделение фаски",    2,    0,    8))
 
 
-def _set_all_defaults(op):
-    """Устанавливает значения по умолчанию."""
-    _ud_set(op, ML_SIZE_X,      500.0)
-    _ud_set(op, ML_SIZE_Y,      500.0)
-    _ud_set(op, ML_SIZE_Z,      500.0)
-    _ud_set(op, ML_DENSITY,     200.0)
-    _ud_set(op, ML_BOND_DENS,   250.0)
-    _ud_set(op, ML_SEED,        42)
-    _ud_set(op, ML_JITTER,      20.0)
+def _set_defaults(op):
+    _ud_set(op, ML_SIZE_X,       500.0)
+    _ud_set(op, ML_SIZE_Y,       500.0)
+    _ud_set(op, ML_SIZE_Z,       500.0)
+    _ud_set(op, ML_DENSITY,      200.0)
+    _ud_set(op, ML_BOND_DENS,    250.0)
+    _ud_set(op, ML_SEED,         42)
+    _ud_set(op, ML_JITTER,       20.0)
 
-    _ud_set(op, ML_STRIP_AMP,   0.0)
-    _ud_set(op, ML_STRIP_FREQ,  0.01)
-    _ud_set(op, ML_STRIP_PHASE, 0.0)
-    _ud_set(op, ML_STRIP_AXIS,  1)
+    _ud_set(op, ML_STRIP_AMP,    0.0)
+    _ud_set(op, ML_STRIP_FREQ,   0.01)
+    _ud_set(op, ML_STRIP_PHASE,  0.0)
+    _ud_set(op, ML_STRIP_AXIS,   1)
 
     _ud_set(op, ML_SPHERE_RADIUS, 40.0)
     _ud_set(op, ML_SPHERE_SUBDIV, 2)
@@ -1083,15 +1039,13 @@ def _set_all_defaults(op):
 class MolecularHexLatticeObject(c4d.plugins.ObjectData):
     """Генератор молекулярной гексагональной решётки."""
 
-    OBJECT_NAME  = "MolecularHexLattice"
-    _first_ud_id = ML_SIZE_X
-
-    # ── Служебные ────────────────────────────────────────────────────────────
+    OBJECT_NAME = "MolecularHexLattice"
 
     def _ensure_ud(self, op):
-        if not _ud_exists(op, self._first_ud_id):
-            _create_all_userdata(op)
-            _set_all_defaults(op)
+        """Инициализирует UserData один раз (проверяет по первому параметру)."""
+        if not _ud_exists(op, ML_FIRST_PARAM):
+            _create_userdata(op)
+            _set_defaults(op)
 
     # ── ObjectData interface ──────────────────────────────────────────────────
 
@@ -1104,8 +1058,7 @@ class MolecularHexLatticeObject(c4d.plugins.ObjectData):
     def GetVirtualObjects(self, op, hh):
         self._ensure_ud(op)
         doc = op.GetDocument()
-        result = _build_molecular_lattice(op, doc)
-        return result
+        return _build_lattice(op, doc)
 
     def GetDDescription(self, op, description, flags):
         if not description.LoadDescription(op.GetType()):
@@ -1121,19 +1074,16 @@ class MolecularHexLatticeObject(c4d.plugins.ObjectData):
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-#  Регистрация плагина
+#  Точка входа — регистрация плагина
 # ══════════════════════════════════════════════════════════════════════════════
 
-ICO_ML = None
-
 if __name__ == "__main__":
-    ICO_ML = _make_icon_ml()
-
+    icon = _make_icon()
     c4d.plugins.RegisterObjectPlugin(
         id          = ID_MOLHEXLATTICE,
         str         = NAME_MOLHEXLATTICE,
         g           = MolecularHexLatticeObject,
         description = "",
-        icon        = ICO_ML,
+        icon        = icon,
         info        = c4d.OBJECT_GENERATOR,
     )
