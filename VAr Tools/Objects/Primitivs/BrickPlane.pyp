@@ -15,7 +15,7 @@ import random
 
 ID_BRICKPLANE = 1068875
 
-NAME_BRICKPLANE = "BrickPlane v1.1"
+NAME_BRICKPLANE = "BrickPlane v1.2"
 
 # ─── UserData SubID (общая схема: SubID=1 — группа, поля с 2) ────────────────
 
@@ -79,7 +79,7 @@ def _add_in_group(op, grp_subid, bc):
     return op.AddUserData(bc)
 
 
-def _make_float_bc(name, default, minval, maxval, unit=c4d.DESC_UNIT_METER):
+def _make_float_bc(name, default, minval, maxval, unit=c4d.DESC_UNIT_METER, step=1.0):
     bc = c4d.GetCustomDatatypeDefault(c4d.DTYPE_REAL)
     bc[c4d.DESC_NAME]       = name
     bc[c4d.DESC_SHORT_NAME] = name
@@ -87,7 +87,7 @@ def _make_float_bc(name, default, minval, maxval, unit=c4d.DESC_UNIT_METER):
     bc[c4d.DESC_MIN]        = minval
     bc[c4d.DESC_MAX]        = maxval
     bc[c4d.DESC_UNIT]       = unit
-    bc[c4d.DESC_STEP]       = 1.0
+    bc[c4d.DESC_STEP]       = step
     bc[c4d.DESC_ANIMATE]    = c4d.DESC_ANIMATE_ON
     return bc
 
@@ -256,8 +256,8 @@ def _build_running_bond(width, height, segs_w, segs_h, mortar_frac=0.0):
                 # Полный кирпич = quad (bl, br, tr, tl)
                 # Но нам нужны средние точки для стыковки с нечётным рядом
                 # Нижняя половина кирпича
-                polys.append(c4d.CPolygon(bl, bm, tm, tl))
-                polys.append(c4d.CPolygon(bm, br, tr, tm))
+                polys.append(c4d.CPolygon(bl, tl, tm, bm))
+                polys.append(c4d.CPolygon(bm, tm, tr, br))
         else:
             # Нечётный ряд: смещение на полкирпича
             # Первый полукирпич у левого края
@@ -265,7 +265,7 @@ def _build_running_bond(width, height, segs_w, segs_h, mortar_frac=0.0):
             br = row * nx + 1
             tl = (row + 1) * nx + 0
             tr = (row + 1) * nx + 1
-            polys.append(c4d.CPolygon(bl, br, tr, tl))
+            polys.append(c4d.CPolygon(bl, tl, tr, br))
 
             # Полные кирпичи в середине
             for brick in range(segs_w - 1):
@@ -276,8 +276,8 @@ def _build_running_bond(width, height, segs_w, segs_h, mortar_frac=0.0):
                 tr = (row + 1) * nx + col_start + 2
                 bm = row * nx + col_start + 1
                 tm = (row + 1) * nx + col_start + 1
-                polys.append(c4d.CPolygon(bl, bm, tm, tl))
-                polys.append(c4d.CPolygon(bm, br, tr, tm))
+                polys.append(c4d.CPolygon(bl, tl, tm, bm))
+                polys.append(c4d.CPolygon(bm, tm, tr, br))
 
             # Последний полукирпич у правого края
             col_start = (segs_w - 1) * 2 + 1
@@ -285,7 +285,7 @@ def _build_running_bond(width, height, segs_w, segs_h, mortar_frac=0.0):
             br = row * nx + col_start + 1
             tl = (row + 1) * nx + col_start
             tr = (row + 1) * nx + col_start + 1
-            polys.append(c4d.CPolygon(bl, br, tr, tl))
+            polys.append(c4d.CPolygon(bl, tl, tr, br))
 
     # Если шов задан — применяем inset к каждому полигону
     if m > 1e-6:
@@ -319,7 +319,7 @@ def _build_stack_bond(width, height, segs_w, segs_h, mortar_frac=0.0):
             verts.append(c4d.Vector(x1 - hm_x, 0.0, z0 + hm_y))  # br
             verts.append(c4d.Vector(x1 - hm_x, 0.0, z1 - hm_y))  # tr
             verts.append(c4d.Vector(x0 + hm_x, 0.0, z1 - hm_y))  # tl
-            polys.append(c4d.CPolygon(base, base+1, base+2, base+3))
+            polys.append(c4d.CPolygon(base, base+3, base+2, base+1))
     return verts, polys
 
 
@@ -357,7 +357,7 @@ def _build_third_bond(width, height, segs_w, segs_h, mortar_frac=0.0):
             verts.append(c4d.Vector(cx0 + hm_x, 0.0, z1 - hm_y))
             if (cx1 - hm_x) - (cx0 + hm_x) < 1e-6 or (z1 - hm_y) - (z0 + hm_y) < 1e-6:
                 continue
-            polys.append(c4d.CPolygon(base, base+1, base+2, base+3))
+            polys.append(c4d.CPolygon(base, base+3, base+2, base+1))
     return verts, polys
 
 
@@ -405,7 +405,7 @@ def _build_herringbone(width, height, segs_w, segs_h, mortar_frac=0.0):
             verts.append(c4d.Vector(x0 + hm_x, 0.0, z1 - hm_y))
             if (x1 - hm_x) - (x0 + hm_x) < 1e-6 or (z1 - hm_y) - (z0 + hm_y) < 1e-6:
                 continue
-            polys.append(c4d.CPolygon(base, base+1, base+2, base+3))
+            polys.append(c4d.CPolygon(base, base+3, base+2, base+1))
 
     return verts, polys
 
@@ -461,7 +461,8 @@ def _build_hexagonal(width, height, segs_w, segs_h, mortar_frac=0.0):
                 a = base + i
                 b = base + (i + 1) % 6
                 # Используем CPolygon с вырожденным 4-м индексом (треугольник)
-                polys.append(c4d.CPolygon(center_idx, a, b, b))
+                # Обход CW сверху: center → b → a
+                polys.append(c4d.CPolygon(center_idx, b, a, a))
 
     return verts, polys
 
@@ -496,7 +497,7 @@ def _build_basket_weave(width, height, segs_w, segs_h, mortar_frac=0.0):
         verts.append(c4d.Vector(x1 - dx, 0.0, z0 + dz))
         verts.append(c4d.Vector(x1 - dx, 0.0, z1 - dz))
         verts.append(c4d.Vector(x0 + dx, 0.0, z1 - dz))
-        polys.append(c4d.CPolygon(base, base+1, base+2, base+3))
+        polys.append(c4d.CPolygon(base, base+3, base+2, base+1))
 
     for row in range(segs_h):
         z0 = row * cell_h - height / 2.0
@@ -539,11 +540,11 @@ def _inset_polys(verts, polys, hm_x, hm_y):
         n = len(pts) if not is_tri else 3
         cx = sum(p.x for p in pts[:n]) / n
         cz = sum(p.z for p in pts[:n]) / n
-        # Inset: сдвигаем каждую вершину к центру
+        # Inset: сдвигаем каждую вершину к центру (уменьшаем кирпич)
         new_pts = []
         for p in pts[:n]:
-            dx = hm_x if p.x >= cx else -hm_x
-            dz = hm_y if p.z >= cz else -hm_y
+            dx = -hm_x if p.x >= cx else hm_x
+            dz = -hm_y if p.z >= cz else hm_y
             new_pts.append(c4d.Vector(p.x + dx, p.y, p.z + dz))
 
         base = len(new_verts)
@@ -674,7 +675,7 @@ class BrickPlaneObject(_MeshPrimitiveBase):
             "Смещение (Y)", 0.0, 0.0, 10000.0, c4d.DESC_UNIT_METER))
         # Ширина шва (0..0.4, безразмерная — DESC_UNIT_FLOAT доступен во всех версиях)
         _add_in_group(op, grp_subid, _make_float_bc(
-            "Шов (0-0.4)", 0.0, 0.0, 0.4, c4d.DESC_UNIT_FLOAT))
+            "Шов (0-0.4)", 0.0, 0.0, 0.4, c4d.DESC_UNIT_FLOAT, step=0.005))
 
     def _set_defaults(self, op):
         _ud_set_default(op, BP_WIDTH,   400.0)
