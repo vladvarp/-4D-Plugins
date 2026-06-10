@@ -254,7 +254,7 @@ QPushButton:hover {{ background: #282828; border-color: #444; }}
 QPushButton:pressed {{ background: #111; }}
 QPushButton:disabled {{ color: #555; border-color: #252525; }}
 QPushButton#primary {{
-    background: {ACCENT}; color: white; border: none;
+    background: {ACCENT}; color: white; border: 2px solid #ff8050;
     font-weight: 600; font-size: 13px; padding: 9px 22px;
 }}
 QPushButton#primary:hover {{ background: #f07040; }}
@@ -266,6 +266,18 @@ QPushButton#danger {{
 }}
 QPushButton#danger:hover {{ background: #2a1212; }}
 QPushButton#danger:disabled {{ color: #554040; border-color: #2a1818; }}
+QPushButton#install {{
+    background: transparent; color: #5b9bd5;
+    border: 1px solid #2a4a70; border-radius: 6px;
+    padding: 5px 12px; font-size: 11px;
+}}
+QPushButton#install:hover {{ background: #152030; }}
+QPushButton#update {{
+    background: transparent; color: {GREEN};
+    border: 1px solid #1e4a2e; border-radius: 6px;
+    padding: 5px 12px; font-size: 11px;
+}}
+QPushButton#update:hover {{ background: #122018; }}
 QLineEdit {{
     background: {PANEL_BG}; color: {TEXT};
     border: 1px solid {BORDER}; border-radius: 6px;
@@ -338,11 +350,21 @@ class MainWindow(QMainWindow):
 
         self.setStyleSheet(STYLE)
 
+        # При клике в любом месте окна фокус уходит с поля ввода
+        root.setFocusPolicy(Qt.FocusPolicy.ClickFocus)
+
         if self.config.get("install_dir"):
             self.path_edit.setText(self.config["install_dir"])
             QTimer.singleShot(400, self._check_updates)
 
     # ── Построение UI ─────────────────────────────────────────────────────────
+
+    def mousePressEvent(self, event):
+        """Снимает фокус с поля ввода при клике в любом месте окна."""
+        focused = QApplication.focusWidget()
+        if focused and focused is self.path_edit:
+            self.path_edit.clearFocus()
+        super().mousePressEvent(event)
 
     def _mk_header(self):
         w = QWidget()
@@ -385,6 +407,8 @@ class MainWindow(QMainWindow):
         self.path_edit.setPlaceholderText(
             r"Например: C:\Users\...\AppData\Roaming\Maxon\Cinema 4D\plugins"
         )
+        # При ручном вводе — обновляем таблицу когда фокус уходит с поля
+        self.path_edit.editingFinished.connect(self._on_path_edited)
         h.addWidget(self.path_edit, stretch=1)
 
         browse = QPushButton("Обзор…")
@@ -443,8 +467,8 @@ class MainWindow(QMainWindow):
         self.table.setColumnWidth(2, 115)
         self.table.setColumnWidth(3, 115)
         self.table.setColumnWidth(4, 155)
-        self.table.setColumnWidth(5, 105)  # Установить / Обновить
-        self.table.setColumnWidth(6, 95)   # Удалить
+        self.table.setColumnWidth(5, 130)  # Установить / Обновить
+        self.table.setColumnWidth(6, 120)  # Удалить
         self.table.verticalHeader().setVisible(False)
         self.table.setSelectionMode(QAbstractItemView.SelectionMode.NoSelection)
         self.table.setFocusPolicy(Qt.FocusPolicy.NoFocus)
@@ -483,6 +507,16 @@ class MainWindow(QMainWindow):
         return w
 
     # ── Логика ────────────────────────────────────────────────────────────────
+
+    def _on_path_edited(self):
+        """Вызывается когда пользователь вручную ввёл путь и убрал фокус с поля."""
+        d = self.path_edit.text().strip()
+        if d:
+            self.config["install_dir"] = d
+            save_config(self.config)
+            # Перечитываем таблицу с новой папкой (версии из файлов 'ver')
+            if self.remote_plugins:
+                self._populate_table()
 
     def _browse_dir(self):
         d = QFileDialog.getExistingDirectory(
@@ -573,7 +607,7 @@ class MainWindow(QMainWindow):
 
             # Чекбокс
             cb_widget = QWidget()
-            cb_widget.setStyleSheet(f"background:{PANEL_BG};")
+            cb_widget.setStyleSheet("background:transparent;")
             cb_lay = QHBoxLayout(cb_widget)
             cb_lay.setContentsMargins(0, 0, 0, 0)
             cb_lay.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -590,7 +624,7 @@ class MainWindow(QMainWindow):
                 name_item.setToolTip(p["info"])
                 # Показываем info как подсказку прямо в ячейке через виджет
                 name_widget = QWidget()
-                name_widget.setStyleSheet(f"background:{PANEL_BG};")
+                name_widget.setStyleSheet("background:transparent;")
                 nw_lay = QVBoxLayout(name_widget)
                 nw_lay.setContentsMargins(10, 2, 6, 2)
                 nw_lay.setSpacing(1)
@@ -628,11 +662,12 @@ class MainWindow(QMainWindow):
             if outdated:
                 action_label = "Обновить" if local_ver else "Установить"
                 act_btn = QPushButton(action_label)
+                act_btn.setObjectName("update" if local_ver else "install")
                 act_btn.setFixedHeight(28)
                 captured_plugin = dict(p)
                 act_btn.clicked.connect(lambda _, pl=captured_plugin: self._install_single(pl))
                 aw = QWidget()
-                aw.setStyleSheet(f"background:{PANEL_BG};")
+                aw.setStyleSheet("background:transparent;")
                 al = QHBoxLayout(aw)
                 al.setContentsMargins(6, 0, 6, 0)
                 al.addWidget(act_btn)
@@ -646,7 +681,7 @@ class MainWindow(QMainWindow):
                 captured_name = name
                 del_btn.clicked.connect(lambda _, n=captured_name: self._delete_plugin(n))
                 dw = QWidget()
-                dw.setStyleSheet(f"background:{PANEL_BG};")
+                dw.setStyleSheet("background:transparent;")
                 dl = QHBoxLayout(dw)
                 dl.setContentsMargins(6, 0, 6, 0)
                 dl.addWidget(del_btn)
@@ -776,6 +811,20 @@ class MainWindow(QMainWindow):
                 if cw:
                     for ch in cw.findChildren(QCheckBox):
                         ch.setChecked(False)
+                # Убрать кнопку «Установить»/«Обновить» — плагин теперь актуален
+                self.table.removeCellWidget(row, 5)
+                # Поставить кнопку «Удалить» (если её ещё нет)
+                captured_name = name
+                del_btn = QPushButton("Удалить")
+                del_btn.setObjectName("danger")
+                del_btn.setFixedHeight(28)
+                del_btn.clicked.connect(lambda _, n=captured_name: self._delete_plugin(n))
+                dw = QWidget()
+                dw.setStyleSheet("background:transparent;")
+                dl = QHBoxLayout(dw)
+                dl.setContentsMargins(6, 0, 6, 0)
+                dl.addWidget(del_btn)
+                self.table.setCellWidget(row, 6, dw)
             else:
                 self.table.item(row, 4).setText("✗ Ошибка")
                 self.table.item(row, 4).setForeground(QColor(RED))
