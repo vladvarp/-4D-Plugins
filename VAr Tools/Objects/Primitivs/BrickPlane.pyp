@@ -1,7 +1,8 @@
 # -*- coding: utf-8 -*-
 """
 BrickPlane — Cinema 4D ObjectData Plugin
-Плоскость с кирпичной сеткой (running bond).
+Плоскость с кирпичной сеткой (паттерны: running bond, stack bond, 1/3 bond,
+ёлочка, гексагональные, корзинка). Поддерживает швы и displacement по Y.
 """
 
 import c4d
