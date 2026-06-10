@@ -40,6 +40,7 @@ MENU_ITEMS = [
             1068873,    # DiamondCylinder
             1068874,    # TriTorus
             1068875,    # BrickPlane
+            1068899,    # MolecularHexLattice 
         ]},
 
         1068852,    # HierarchyFilter
