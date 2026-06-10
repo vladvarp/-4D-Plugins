@@ -27,7 +27,9 @@ DC_SEGS_R  = 4
 DC_SEGS_H  = 5
 DC_CAPS    = 6
 DC_SURFACE = 7   # Тип поверхности (enum)
-DC_TWIST   = 8   # Скрутка по оси Y (градусы)
+DC_TWIST        = 8   # Скрутка по оси Y (градусы)
+DC_STAR_ENABLED = 9   # Галочка "Смещение (звезда)"
+DC_STAR_OFFSET  = 10  # Величина радиального смещения чётных точек
 
 # Значения для DC_SURFACE
 SURF_ZIGZAG  = 0   # Зигзаг (ромбы) — исходный режим
@@ -141,11 +143,13 @@ def _ud_set_default(op, uid, value):
 
 # ─── Генераторы мешей ─────────────────────────────────────────────────────────
 
-def build_diamond_cylinder(radius, height, segs_r, segs_h, add_caps, twist=0.0):
+def build_diamond_cylinder(radius, height, segs_r, segs_h, add_caps, twist=0.0, star_offset=0.0):
     """
     Цилиндр с ромбической сеткой.
     Нечётные ряды вершин смещены на полшага по углу — ячейки становятся ромбами.
     twist — угол скрутки по оси Y в радианах (0 = без скрутки).
+    star_offset — величина радиального смещения чётных точек окружности наружу
+                  (вид сверху: круг превращается в звезду/шестерёнку).
     Возвращает (points, polys).
     """
     verts = []
@@ -160,8 +164,10 @@ def build_diamond_cylinder(radius, height, segs_r, segs_h, add_caps, twist=0.0):
         twist_angle = twist * t
         for col in range(segs_r):
             angle = col / segs_r * 2.0 * math.pi + offset_angle + twist_angle
-            x = radius * math.cos(angle)
-            z = radius * math.sin(angle)
+            # Чётные точки (col % 2 == 0) смещаем наружу на star_offset — эффект звезды
+            r = radius + (star_offset if col % 2 == 0 else 0.0)
+            x = r * math.cos(angle)
+            z = r * math.sin(angle)
             verts.append(c4d.Vector(x, y, z))
 
     polys = []
@@ -205,11 +211,12 @@ def build_diamond_cylinder(radius, height, segs_r, segs_h, add_caps, twist=0.0):
     return verts, polys
 
 
-def build_spiral_cylinder(radius, height, segs_r, segs_h, add_caps, twist=0.0):
+def build_spiral_cylinder(radius, height, segs_r, segs_h, add_caps, twist=0.0, star_offset=0.0):
     """
     Цилиндр со спиральной сеткой.
     Каждый ряд вершин повёрнут на фиксированный шаг — рёбра уходят по спирали.
     twist — угол скрутки по оси Y в радианах (0 = без скрутки).
+    star_offset — величина радиального смещения чётных точек окружности наружу.
     Возвращает (points, polys).
     """
     verts = []
@@ -225,8 +232,10 @@ def build_spiral_cylinder(radius, height, segs_r, segs_h, add_caps, twist=0.0):
         twist_angle = twist * t
         for col in range(segs_r):
             angle = col / segs_r * 2.0 * math.pi + base_angle + twist_angle
-            x = radius * math.cos(angle)
-            z = radius * math.sin(angle)
+            # Чётные точки (col % 2 == 0) смещаем наружу на star_offset — эффект звезды
+            r = radius + (star_offset if col % 2 == 0 else 0.0)
+            x = r * math.cos(angle)
+            z = r * math.sin(angle)
             verts.append(c4d.Vector(x, y, z))
 
     polys = []
@@ -258,13 +267,14 @@ def build_spiral_cylinder(radius, height, segs_r, segs_h, add_caps, twist=0.0):
     return verts, polys
 
 
-def build_hex_cylinder(radius, height, segs_r, segs_h, add_caps, twist=0.0):
+def build_hex_cylinder(radius, height, segs_r, segs_h, add_caps, twist=0.0, star_offset=0.0):
     """
     Цилиндр с гексагональной (шестиугольной) сеткой.
     Чётные ряды смещаются на полшага — образуются правильные шестиугольники.
     Каждая ячейка разбивается на два треугольника/четырёхугольника так, чтобы
     получалась классическая «кирпичная» укладка гексагонов.
     twist — угол скрутки по оси Y в радианах (0 = без скрутки).
+    star_offset — величина радиального смещения чётных точек окружности наружу.
     Возвращает (points, polys).
     """
     # Гексагональная сетка на цилиндре: нечётные ряды сдвинуты на полшага,
@@ -281,8 +291,10 @@ def build_hex_cylinder(radius, height, segs_r, segs_h, add_caps, twist=0.0):
         twist_angle = twist * t
         for col in range(segs_r):
             angle = col / segs_r * 2.0 * math.pi + offset_angle + twist_angle
-            x = radius * math.cos(angle)
-            z = radius * math.sin(angle)
+            # Чётные точки (col % 2 == 0) смещаем наружу на star_offset — эффект звезды
+            r = radius + (star_offset if col % 2 == 0 else 0.0)
+            x = r * math.cos(angle)
+            z = r * math.sin(angle)
             verts.append(c4d.Vector(x, y, z))
 
     polys = []
@@ -323,11 +335,12 @@ def build_hex_cylinder(radius, height, segs_r, segs_h, add_caps, twist=0.0):
     return verts, polys
 
 
-def build_straight_cylinder(radius, height, segs_r, segs_h, add_caps, twist=0.0):
+def build_straight_cylinder(radius, height, segs_r, segs_h, add_caps, twist=0.0, star_offset=0.0):
     """
     Цилиндр с прямой сеткой (без смещения рядов).
     Классические прямоугольники / ровные колонки.
     twist — угол скрутки по оси Y в радианах (0 = без скрутки).
+    star_offset — величина радиального смещения чётных точек окружности наружу.
     Возвращает (points, polys).
     """
     verts = []
@@ -339,8 +352,10 @@ def build_straight_cylinder(radius, height, segs_r, segs_h, add_caps, twist=0.0)
         twist_angle = twist * t
         for col in range(segs_r):
             angle = col / segs_r * 2.0 * math.pi + twist_angle
-            x = radius * math.cos(angle)
-            z = radius * math.sin(angle)
+            # Чётные точки (col % 2 == 0) смещаем наружу на star_offset — эффект звезды
+            r = radius + (star_offset if col % 2 == 0 else 0.0)
+            x = r * math.cos(angle)
+            z = r * math.sin(angle)
             verts.append(c4d.Vector(x, y, z))
 
     polys = []
@@ -482,6 +497,10 @@ class DiamondCylinderObject(_MeshPrimitiveBase):
             ["Зигзаг (ромбы)", "Спираль", "Гармошка", "Прямая сетка"]))
         _add_in_group(op, grp_subid, _make_float_bc(
             "Скрутка (°)", 0.0, math.radians(-3600.0), math.radians(3600.0), unit=c4d.DESC_UNIT_DEGREE, step=math.radians(0.1)))
+        _add_in_group(op, grp_subid, _make_bool_bc(
+            "Смещение (звезда)", False))
+        _add_in_group(op, grp_subid, _make_float_bc(
+            "Величина смещения", 20.0, 0.0, 100000.0, unit=c4d.DESC_UNIT_METER, step=1.0))
 
     def _set_defaults(self, op):
         _ud_set_default(op, DC_RADIUS, 100.0)
@@ -491,24 +510,35 @@ class DiamondCylinderObject(_MeshPrimitiveBase):
         _ud_set_default(op, DC_CAPS,    True)
         _ud_set_default(op, DC_SURFACE, SURF_ZIGZAG)
         _ud_set_default(op, DC_TWIST,   0.0)
+        _ud_set_default(op, DC_STAR_ENABLED, False)
+        _ud_set_default(op, DC_STAR_OFFSET,  20.0)
 
     def _build_mesh(self, op):
-        radius = _ud_get(op, DC_RADIUS, 100.0)
-        height = _ud_get(op, DC_HEIGHT, 200.0)
-        segs_r = max(3,  int(_ud_get(op, DC_SEGS_R, 12)))
-        segs_h = max(1,  int(_ud_get(op, DC_SEGS_H, 6)))
-        caps   = bool(_ud_get(op, DC_CAPS, True))
-        surf   = int(_ud_get(op, DC_SURFACE, SURF_ZIGZAG))
-        twist  = _ud_get(op, DC_TWIST, 0.0)  # скрутка по Y, хранится в радианах (C4D конвертирует из °)
+        radius       = _ud_get(op, DC_RADIUS, 100.0)
+        height       = _ud_get(op, DC_HEIGHT, 200.0)
+        segs_r       = max(3,  int(_ud_get(op, DC_SEGS_R, 12)))
+        segs_h       = max(1,  int(_ud_get(op, DC_SEGS_H, 6)))
+        caps         = bool(_ud_get(op, DC_CAPS, True))
+        surf         = int(_ud_get(op, DC_SURFACE, SURF_ZIGZAG))
+        twist        = _ud_get(op, DC_TWIST, 0.0)  # скрутка по Y, хранится в радианах (C4D конвертирует из °)
+        star_enabled = bool(_ud_get(op, DC_STAR_ENABLED, False))
+        star_offset  = float(_ud_get(op, DC_STAR_OFFSET, 20.0))
+
+        # Если смещение включено — segs_r должен быть чётным (звезда требует пар точек)
+        if star_enabled and segs_r % 2 != 0:
+            segs_r += 1
+
+        # Если смещение выключено — передаём 0.0 чтобы не влияло на форму
+        effective_star_offset = star_offset if star_enabled else 0.0
 
         if surf == SURF_SPIRAL:
-            return build_spiral_cylinder(radius, height, segs_r, segs_h, caps, twist)
+            return build_spiral_cylinder(radius, height, segs_r, segs_h, caps, twist, effective_star_offset)
         elif surf == SURF_HEX:
-            return build_hex_cylinder(radius, height, segs_r, segs_h, caps, twist)
+            return build_hex_cylinder(radius, height, segs_r, segs_h, caps, twist, effective_star_offset)
         elif surf == SURF_DIAMOND:
-            return build_straight_cylinder(radius, height, segs_r, segs_h, caps, twist)
+            return build_straight_cylinder(radius, height, segs_r, segs_h, caps, twist, effective_star_offset)
         else:  # SURF_ZIGZAG (default)
-            return build_diamond_cylinder(radius, height, segs_r, segs_h, caps, twist)
+            return build_diamond_cylinder(radius, height, segs_r, segs_h, caps, twist, effective_star_offset)
 
 
 _ICON_DC = (
