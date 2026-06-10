@@ -55,7 +55,7 @@ import zlib
 # ══════════════════════════════════════════════════════════════════════════════
 
 ID_MOLHEXLATTICE  = 1068899
-NAME_MOLHEXLATTICE = "MolecularHexLattice v1.5"
+NAME_MOLHEXLATTICE = "MolecularHexLattice v1.6"
 
 # ══════════════════════════════════════════════════════════════════════════════
 #  UserData SubID — СТРОГО совпадают с порядком вызовов AddUserData
@@ -95,6 +95,33 @@ ML_SPHERE_PHONG = 24   # угол фонг-сглаживания шаров (г
 # Первый «настоящий» параметр данных (используется для проверки инициализации)
 ML_FIRST_PARAM = ML_SIZE_X  # SubID=2
 
+# ══════════════════════════════════════════════════════════════════════════════
+#  Дефолтные значения параметров
+# ══════════════════════════════════════════════════════════════════════════════
+
+DEFAULT_SIZE_X        = 500.0
+DEFAULT_SIZE_Y        = 500.0
+DEFAULT_SIZE_Z        = 500.0
+DEFAULT_DENSITY       = 200.0
+DEFAULT_BOND_DENS     = 250.0
+DEFAULT_SEED          = 0
+DEFAULT_JITTER        = 0
+
+DEFAULT_STRIP_AMP     = 0.0
+DEFAULT_STRIP_FREQ    = 0.01
+DEFAULT_STRIP_PHASE   = 0.0
+DEFAULT_STRIP_AXIS    = 1
+
+DEFAULT_SPHERE_RADIUS = 35.0
+DEFAULT_SPHERE_SUBDIV = 1
+DEFAULT_SPHERE_PHONG  = math.radians(0.0)   # в радианах (единица хранения C4D)
+
+DEFAULT_TUBE_RADIUS   = 6.0
+DEFAULT_TUBE_SEGS_R   = 9
+DEFAULT_TUBE_SEGS_H   = 2
+
+DEFAULT_BEVEL_SIZE    = 3.0
+DEFAULT_BEVEL_SUBDIV  = 0
 
 # ══════════════════════════════════════════════════════════════════════════════
 #  Иконка — генерируется программно как PNG 32×32
@@ -854,30 +881,30 @@ def _build_lattice(op):
     """Строит всю молекулярную систему и возвращает нулевой объект-контейнер."""
 
     # ── Параметры ────────────────────────────────────────────────────────────
-    size_x      = max(1.0,  float(_ud_get(op, ML_SIZE_X,       500.0)))
-    size_y      = max(1.0,  float(_ud_get(op, ML_SIZE_Y,       500.0)))
-    size_z      = max(1.0,  float(_ud_get(op, ML_SIZE_Z,       500.0)))
-    density     = max(10.0, float(_ud_get(op, ML_DENSITY,      200.0)))
-    bond_dens   = max(1.0,  float(_ud_get(op, ML_BOND_DENS,    250.0)))
-    seed        = int(_ud_get(op, ML_SEED,    42))
-    jitter      = max(0.0,  float(_ud_get(op, ML_JITTER,       20.0)))
+    size_x      = max(1.0,  float(_ud_get(op, ML_SIZE_X,       DEFAULT_SIZE_X)))
+    size_y      = max(1.0,  float(_ud_get(op, ML_SIZE_Y,       DEFAULT_SIZE_Y)))
+    size_z      = max(1.0,  float(_ud_get(op, ML_SIZE_Z,       DEFAULT_SIZE_Z)))
+    density     = max(10.0, float(_ud_get(op, ML_DENSITY,      DEFAULT_DENSITY)))
+    bond_dens   = max(1.0,  float(_ud_get(op, ML_BOND_DENS,    DEFAULT_BOND_DENS)))
+    seed        = int(_ud_get(op, ML_SEED,    DEFAULT_SEED))
+    jitter      = max(0.0,  float(_ud_get(op, ML_JITTER,       DEFAULT_JITTER)))
 
-    strip_amp   = max(0.0,   float(_ud_get(op, ML_STRIP_AMP,   0.0)))
-    strip_freq  = max(0.0001,float(_ud_get(op, ML_STRIP_FREQ,  0.01)))
-    strip_phase = float(_ud_get(op, ML_STRIP_PHASE, 0.0))
-    strip_axis  = int(_ud_get(op, ML_STRIP_AXIS,   1))
+    strip_amp   = max(0.0,   float(_ud_get(op, ML_STRIP_AMP,   DEFAULT_STRIP_AMP)))
+    strip_freq  = max(0.0001,float(_ud_get(op, ML_STRIP_FREQ,  DEFAULT_STRIP_FREQ)))
+    strip_phase = float(_ud_get(op, ML_STRIP_PHASE, DEFAULT_STRIP_PHASE))
+    strip_axis  = int(_ud_get(op, ML_STRIP_AXIS,   DEFAULT_STRIP_AXIS))
 
-    sphere_r    = max(1.0,  float(_ud_get(op, ML_SPHERE_RADIUS, 40.0)))
-    sphere_sub  = max(1,    min(4, int(_ud_get(op, ML_SPHERE_SUBDIV, 2))))
+    sphere_r    = max(1.0,  float(_ud_get(op, ML_SPHERE_RADIUS, DEFAULT_SPHERE_RADIUS)))
+    sphere_sub  = max(1,    min(4, int(_ud_get(op, ML_SPHERE_SUBDIV, DEFAULT_SPHERE_SUBDIV))))
 
-    tube_r      = max(0.5,  float(_ud_get(op, ML_TUBE_RADIUS,   8.0)))
-    tube_sr     = max(3,    int(_ud_get(op, ML_TUBE_SEGS_R,    8)))
-    tube_sh     = max(1,    int(_ud_get(op, ML_TUBE_SEGS_H,    2)))
+    tube_r      = max(0.5,  float(_ud_get(op, ML_TUBE_RADIUS,   DEFAULT_TUBE_RADIUS)))
+    tube_sr     = max(3,    int(_ud_get(op, ML_TUBE_SEGS_R,    DEFAULT_TUBE_SEGS_R)))
+    tube_sh     = max(1,    int(_ud_get(op, ML_TUBE_SEGS_H,    DEFAULT_TUBE_SEGS_H)))
 
-    bevel_size  = max(0.0,  float(_ud_get(op, ML_BEVEL_SIZE,    5.0)))
-    bevel_sub   = max(0,    int(_ud_get(op, ML_BEVEL_SUBDIV,    2)))
+    bevel_size  = max(0.0,  float(_ud_get(op, ML_BEVEL_SIZE,    DEFAULT_BEVEL_SIZE)))
+    bevel_sub   = max(0,    int(_ud_get(op, ML_BEVEL_SUBDIV,    DEFAULT_BEVEL_SUBDIV)))
 
-    sphere_phong = math.degrees(max(0.0, min(math.radians(180.0), float(_ud_get(op, ML_SPHERE_PHONG, math.radians(45.0))))))
+    sphere_phong = math.degrees(max(0.0, min(math.radians(180.0), float(_ud_get(op, ML_SPHERE_PHONG, DEFAULT_SPHERE_PHONG)))))
 
     # ── Позиции узлов ────────────────────────────────────────────────────────
     positions_raw = _generate_positions(size_x, size_y, size_z, density, seed, jitter)
@@ -1000,73 +1027,73 @@ def _create_userdata(op):
     # SubID=1 → g_lat
     g_lat = _add_group(op, "Каркас (Lattice)")
     # SubID=2..8 → поля
-    _add_in_group(op, g_lat, _float_bc("Размер X",           500.0,  10.0, 100000.0))
-    _add_in_group(op, g_lat, _float_bc("Размер Y",           500.0,  10.0, 100000.0))
-    _add_in_group(op, g_lat, _float_bc("Размер Z",           500.0,  10.0, 100000.0))
-    _add_in_group(op, g_lat, _float_bc("Плотность (шаг сетки)", 200.0, 10.0, 10000.0))
-    _add_in_group(op, g_lat, _float_bc("Макс. длина связи",  250.0,  10.0, 10000.0))
-    _add_in_group(op, g_lat, _int_bc  ("Seed",                42,     0,    99999))
-    _add_in_group(op, g_lat, _float_bc("Джиттер (шум позиций)", 20.0, 0.0, 5000.0))
+    _add_in_group(op, g_lat, _float_bc("Размер X",           DEFAULT_SIZE_X,    10.0, 100000.0))
+    _add_in_group(op, g_lat, _float_bc("Размер Y",           DEFAULT_SIZE_Y,    10.0, 100000.0))
+    _add_in_group(op, g_lat, _float_bc("Размер Z",           DEFAULT_SIZE_Z,    10.0, 100000.0))
+    _add_in_group(op, g_lat, _float_bc("Плотность (шаг сетки)", DEFAULT_DENSITY, 10.0, 10000.0))
+    _add_in_group(op, g_lat, _float_bc("Макс. длина связи",  DEFAULT_BOND_DENS, 10.0, 10000.0))
+    _add_in_group(op, g_lat, _int_bc  ("Seed",               DEFAULT_SEED,      0,    99999))
+    _add_in_group(op, g_lat, _float_bc("Джиттер (шум позиций)", DEFAULT_JITTER, 0.0, 5000.0))
 
     # SubID=9 → g_strip
     g_strip = _add_group(op, "Strip — волновое смещение")
     # SubID=10..13 → поля
-    _add_in_group(op, g_strip, _float_bc("Амплитуда",          0.0,    0.0,    10000.0))
-    _add_in_group(op, g_strip, _float_bc("Частота",            0.01,   0.0001, 10.0,
+    _add_in_group(op, g_strip, _float_bc("Амплитуда",          DEFAULT_STRIP_AMP,   0.0,    10000.0))
+    _add_in_group(op, g_strip, _float_bc("Частота",            DEFAULT_STRIP_FREQ,  0.0001, 10.0,
                                           unit=c4d.DESC_UNIT_FLOAT, step=0.001))
-    _add_in_group(op, g_strip, _float_bc("Фаза (анимировать)", 0.0,  -1000.0, 1000.0,
+    _add_in_group(op, g_strip, _float_bc("Фаза (анимировать)", DEFAULT_STRIP_PHASE, -1000.0, 1000.0,
                                           unit=c4d.DESC_UNIT_FLOAT, step=0.01))
-    _add_in_group(op, g_strip, _cycle_bc("Ось волны",          1,
+    _add_in_group(op, g_strip, _cycle_bc("Ось волны",          DEFAULT_STRIP_AXIS,
                                           ["X (смещение Y)", "Y (смещение X)", "Z (смещение Y)"]))
 
     # SubID=14 → g_sph
     g_sph = _add_group(op, "Шары  [M]")
     # SubID=15..16, 24
-    _add_in_group(op, g_sph, _float_bc("Радиус шара",   40.0, 1.0, 100000.0))
-    _add_in_group(op, g_sph, _int_bc  ("Подразделение",  2,    1,   4))
+    _add_in_group(op, g_sph, _float_bc("Радиус шара",   DEFAULT_SPHERE_RADIUS, 1.0, 100000.0))
+    _add_in_group(op, g_sph, _int_bc  ("Подразделение", DEFAULT_SPHERE_SUBDIV, 1,   4))
 
     # SubID=17 → g_tub
     g_tub = _add_group(op, "Трубки  [T]")
     # SubID=18..20
-    _add_in_group(op, g_tub, _float_bc("Радиус трубки",          8.0,  0.5,  100000.0))
-    _add_in_group(op, g_tub, _int_bc  ("Сегменты окружности",    8,    3,    64))
-    _add_in_group(op, g_tub, _int_bc  ("Сегменты длины",         2,    1,    64))
+    _add_in_group(op, g_tub, _float_bc("Радиус трубки",          DEFAULT_TUBE_RADIUS,  0.5,  100000.0))
+    _add_in_group(op, g_tub, _int_bc  ("Сегменты окружности",    DEFAULT_TUBE_SEGS_R,  3,    64))
+    _add_in_group(op, g_tub, _int_bc  ("Сегменты длины",         DEFAULT_TUBE_SEGS_H,  1,    64))
 
     # SubID=21 → g_bev
     g_bev = _add_group(op, "Фаска  [F]")
     # SubID=22..23
-    _add_in_group(op, g_bev, _float_bc("Размер фаски",           5.0,  0.0,  100000.0))
-    _add_in_group(op, g_bev, _int_bc  ("Подразделение фаски",    2,    0,    8))
+    _add_in_group(op, g_bev, _float_bc("Размер фаски",           DEFAULT_BEVEL_SIZE,   0.0,  100000.0))
+    _add_in_group(op, g_bev, _int_bc  ("Подразделение фаски",    DEFAULT_BEVEL_SUBDIV, 0,    8))
 
     # SubID=24 → угол фонг-сглаживания шаров
-    _add_in_group(op, g_sph, _float_bc("Фонг шаров (°)",        math.radians(45.0),  0.0,  math.radians(180.0),
+    _add_in_group(op, g_sph, _float_bc("Фонг шаров (°)",        DEFAULT_SPHERE_PHONG,  0.0,  math.radians(180.0),
                                         unit=c4d.DESC_UNIT_DEGREE, step=math.radians(1.0)))
 
 
 def _set_defaults(op):
-    _ud_set(op, ML_SIZE_X,       500.0)
-    _ud_set(op, ML_SIZE_Y,       500.0)
-    _ud_set(op, ML_SIZE_Z,       500.0)
-    _ud_set(op, ML_DENSITY,      200.0)
-    _ud_set(op, ML_BOND_DENS,    250.0)
-    _ud_set(op, ML_SEED,         42)
-    _ud_set(op, ML_JITTER,       20.0)
+    _ud_set(op, ML_SIZE_X,       DEFAULT_SIZE_X)
+    _ud_set(op, ML_SIZE_Y,       DEFAULT_SIZE_Y)
+    _ud_set(op, ML_SIZE_Z,       DEFAULT_SIZE_Z)
+    _ud_set(op, ML_DENSITY,      DEFAULT_DENSITY)
+    _ud_set(op, ML_BOND_DENS,    DEFAULT_BOND_DENS)
+    _ud_set(op, ML_SEED,         DEFAULT_SEED)
+    _ud_set(op, ML_JITTER,       DEFAULT_JITTER)
 
-    _ud_set(op, ML_STRIP_AMP,    0.0)
-    _ud_set(op, ML_STRIP_FREQ,   0.01)
-    _ud_set(op, ML_STRIP_PHASE,  0.0)
-    _ud_set(op, ML_STRIP_AXIS,   1)
+    _ud_set(op, ML_STRIP_AMP,    DEFAULT_STRIP_AMP)
+    _ud_set(op, ML_STRIP_FREQ,   DEFAULT_STRIP_FREQ)
+    _ud_set(op, ML_STRIP_PHASE,  DEFAULT_STRIP_PHASE)
+    _ud_set(op, ML_STRIP_AXIS,   DEFAULT_STRIP_AXIS)
 
-    _ud_set(op, ML_SPHERE_RADIUS, 40.0)
-    _ud_set(op, ML_SPHERE_SUBDIV, 2)
-    _ud_set(op, ML_SPHERE_PHONG,  math.radians(45.0))
+    _ud_set(op, ML_SPHERE_RADIUS, DEFAULT_SPHERE_RADIUS)
+    _ud_set(op, ML_SPHERE_SUBDIV, DEFAULT_SPHERE_SUBDIV)
+    _ud_set(op, ML_SPHERE_PHONG,  DEFAULT_SPHERE_PHONG)
 
-    _ud_set(op, ML_TUBE_RADIUS,  8.0)
-    _ud_set(op, ML_TUBE_SEGS_R,  8)
-    _ud_set(op, ML_TUBE_SEGS_H,  2)
+    _ud_set(op, ML_TUBE_RADIUS,  DEFAULT_TUBE_RADIUS)
+    _ud_set(op, ML_TUBE_SEGS_R,  DEFAULT_TUBE_SEGS_R)
+    _ud_set(op, ML_TUBE_SEGS_H,  DEFAULT_TUBE_SEGS_H)
 
-    _ud_set(op, ML_BEVEL_SIZE,   5.0)
-    _ud_set(op, ML_BEVEL_SUBDIV, 2)
+    _ud_set(op, ML_BEVEL_SIZE,   DEFAULT_BEVEL_SIZE)
+    _ud_set(op, ML_BEVEL_SUBDIV, DEFAULT_BEVEL_SUBDIV)
 
 
 # ══════════════════════════════════════════════════════════════════════════════
