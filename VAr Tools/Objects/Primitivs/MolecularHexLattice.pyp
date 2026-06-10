@@ -50,12 +50,13 @@ import tempfile
 import struct
 import zlib
 
+
 # ══════════════════════════════════════════════════════════════════════════════
 #  Plugin ID & Name
 # ══════════════════════════════════════════════════════════════════════════════
 
 ID_MOLHEXLATTICE  = 1068899
-NAME_MOLHEXLATTICE = "MolecularHexLattice v1.7"
+NAME_MOLHEXLATTICE = "MolecularHexLattice v1.8"
 
 # ══════════════════════════════════════════════════════════════════════════════
 #  UserData SubID — СТРОГО совпадают с порядком вызовов AddUserData
@@ -122,116 +123,6 @@ DEFAULT_TUBE_SEGS_H   = 2
 
 DEFAULT_BEVEL_SIZE    = 3.0
 DEFAULT_BEVEL_SUBDIV  = 0
-
-# ══════════════════════════════════════════════════════════════════════════════
-#  Иконка — генерируется программно как PNG 32×32
-# ══════════════════════════════════════════════════════════════════════════════
-
-def _generate_icon_png():
-    """
-    Рисует PNG 32×32 с молекулярной решёткой:
-    тёмный фон + 7 узлов-шаров + соединяющие линии.
-    """
-    W, H = 32, 32
-    pixels = bytearray(W * H * 4)
-
-    # Фон: тёмно-синий
-    for i in range(W * H):
-        pixels[i*4:i*4+4] = [18, 20, 40, 255]
-
-    def put(x, y, r, g, b, a=255):
-        if 0 <= x < W and 0 <= y < H:
-            idx = (y * W + x) * 4
-            pixels[idx]   = r
-            pixels[idx+1] = g
-            pixels[idx+2] = b
-            pixels[idx+3] = a
-
-    def circle(cx, cy, rad, r, g, b):
-        for dy in range(-rad-1, rad+2):
-            for dx in range(-rad-1, rad+2):
-                d = math.sqrt(dx*dx + dy*dy)
-                if d <= rad:
-                    # Небольшое «освещение» сверху-слева
-                    light = max(0.0, min(1.0, 1.0 - d / (rad + 0.5)))
-                    hi = 1.0 + 0.4 * max(0.0, ((-dx - dy) / (rad + 1)))
-                    rr = min(255, int(r * light * hi))
-                    gg = min(255, int(g * light * hi))
-                    bb = min(255, int(b * light * hi))
-                    put(int(cx+dx), int(cy+dy), rr, gg, bb)
-
-    def line(x0, y0, x1, y1, r, g, b):
-        dx, dy = x1 - x0, y1 - y0
-        steps = max(abs(dx), abs(dy)) * 2 + 1
-        for i in range(int(steps) + 1):
-            t = i / steps if steps > 0 else 0.0
-            px = int(round(x0 + dx * t))
-            py = int(round(y0 + dy * t))
-            put(px, py, r, g, b)
-            put(px+1, py, r, g, b)
-
-    # Узлы молекулы
-    nodes = [
-        (7, 7),   (25, 7),
-        (16, 16),
-        (4, 24),  (28, 24),
-        (10, 29), (22, 29),
-    ]
-    # Связи
-    bonds = [(0,1),(0,2),(1,2),(0,3),(1,4),(2,5),(2,6),(3,5),(4,6),(5,6)]
-
-    # Рисуем трубки
-    for a, b in bonds:
-        ax, ay = nodes[a]
-        bx, by = nodes[b]
-        line(ax, ay, bx, by, 60, 140, 210)
-
-    # Рисуем шары поверх трубок
-    for nx_, ny_ in nodes:
-        circle(nx_, ny_, 3, 40, 120, 220)
-        # Блик
-        put(nx_-1, ny_-1, 180, 230, 255)
-
-    # PNG encode
-    def chunk(tag, data):
-        l = struct.pack('>I', len(data))
-        c = struct.pack('>I', zlib.crc32(tag + data) & 0xFFFFFFFF)
-        return l + tag + data + c
-
-    raw_rows = bytearray()
-    for y in range(H):
-        raw_rows.append(0)  # filter None
-        for x in range(W):
-            idx = (y * W + x) * 4
-            raw_rows += pixels[idx:idx+4]
-    compressed = zlib.compress(bytes(raw_rows), 9)
-
-    ihdr = struct.pack('>IIBBBBB', W, H, 8, 6, 0, 0, 0)
-    png = (b'\x89PNG\r\n\x1a\n'
-           + chunk(b'IHDR', ihdr)
-           + chunk(b'IDAT', compressed)
-           + chunk(b'IEND', b''))
-    return png
-
-
-def _make_icon():
-    png_data = _generate_icon_png()
-    try:
-        bmp = c4d.bitmaps.BaseBitmap()
-    except AttributeError:
-        bmp = c4d.BaseBitmap()
-    tmp = tempfile.NamedTemporaryFile(suffix=".png", delete=False)
-    try:
-        tmp.write(png_data)
-        tmp.close()
-        bmp.InitWith(tmp.name)
-    finally:
-        try:
-            os.unlink(tmp.name)
-        except Exception:
-            pass
-    return bmp
-
 
 # ══════════════════════════════════════════════════════════════════════════════
 #  Вспомогательные функции UserData
@@ -1135,18 +1026,166 @@ class MolecularHexLatticeObject(c4d.plugins.ObjectData):
     def Draw(self, op, drawpass, bd, bh):
         return c4d.DRAWRESULT_OK
 
+# ══════════════════════════════════════════════════════════════════════════════
+#  Иконка (32×32, молекула из гексагональных шаров)
+# ══════════════════════════════════════════════════════════════════════════════
+
+_ICON_ML = (
+    "iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAC8ElEQVR4nL2X"
+    "TUhUURTHf+/NeKOjo6OOOuqoo4466qijjjrqqKOOOuqoo4466qijjjrq"
+    "qKOOOuqoo4466qijFhERERERERERERERERERERERERERERERERERERERERER"
+    "ERERERERERERERERERERERERQ6urq6urq6urq6urq6urq6urq6urq6urq6urq6"
+    "urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6ur"
+    "q6urq6uo7d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3"
+    "d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3"
+    "d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d"
+    "3d3d3d3d3d3d3d3AAAAAAAA"
+)
+
+# Генерируем настоящую иконку программно — 32×32 PNG молекулы
+def _generate_icon_png():
+    """Генерирует PNG-иконку 32×32 в виде молекулярной сетки."""
+    # Используем встроенный модуль для создания простого PNG
+    import struct
+    import zlib
+
+    width, height = 32, 32
+
+    def put_pixel(pixels, x, y, r, g, b, a=255):
+        if 0 <= x < width and 0 <= y < height:
+            idx = (y * width + x) * 4
+            pixels[idx]   = r
+            pixels[idx+1] = g
+            pixels[idx+2] = b
+            pixels[idx+3] = a
+
+    def draw_circle(pixels, cx, cy, radius, r, g, b, fill=True):
+        for dy in range(-radius, radius+1):
+            for dx in range(-radius, radius+1):
+                dist = math.sqrt(dx*dx + dy*dy)
+                if fill:
+                    if dist <= radius:
+                        put_pixel(pixels, int(cx+dx), int(cy+dy), r, g, b)
+                else:
+                    if radius-1 <= dist <= radius:
+                        put_pixel(pixels, int(cx+dx), int(cy+dy), r, g, b)
+
+    def draw_line(pixels, x0, y0, x1, y1, r, g, b, thick=1):
+        dx = x1 - x0
+        dy = y1 - y0
+        length = math.sqrt(dx*dx + dy*dy)
+        if length < 0.001:
+            return
+        steps = int(length * 2) + 1
+        for i in range(steps):
+            t = i / steps
+            px = int(x0 + dx * t)
+            py = int(y0 + dy * t)
+            for tx in range(-thick+1, thick):
+                for ty in range(-thick+1, thick):
+                    put_pixel(pixels, px+tx, py+ty, r, g, b)
+
+    # Прозрачный фон
+    pixels = bytearray([0] * (width * height * 4))
+
+    # Тёмный фон
+    for i in range(width * height):
+        pixels[i*4]   = 18
+        pixels[i*4+1] = 20
+        pixels[i*4+2] = 35
+        pixels[i*4+3] = 255
+
+    # Молекулярные узлы (позиции)
+    nodes = [
+        (8, 8), (24, 8),
+        (16, 16),
+        (4, 22), (28, 22),
+        (10, 28), (22, 28),
+    ]
+
+    # Связи между узлами
+    bonds = [
+        (0,1), (0,2), (1,2),
+        (0,3), (1,4),
+        (2,5), (2,6),
+        (3,5), (4,6),
+        (5,6),
+    ]
+
+    # Рисуем трубки (связи) — сначала, чтобы шары перекрывали их
+    for a_idx, b_idx in bonds:
+        ax, ay = nodes[a_idx]
+        bx, by = nodes[b_idx]
+        draw_line(pixels, ax, ay, bx, by, 80, 160, 220, thick=1)
+
+    # Рисуем шары поверх трубок
+    for i, (nx, ny) in enumerate(nodes):
+        # Градиентный шар — внешний обод
+        draw_circle(pixels, nx, ny, 4, 30, 100, 200)
+        # Светлый верх (имитация объёма)
+        draw_circle(pixels, nx-1, ny-1, 2, 120, 200, 255)
+        # Гексагональная решётка на шаре (маленькая)
+        put_pixel(pixels, nx, ny, 200, 240, 255)
+
+    # PNG encode
+    def make_png(pixels, w, h):
+        raw_rows = []
+        for y in range(h):
+            row = bytearray([0])  # filter type None
+            for x in range(w):
+                idx = (y * w + x) * 4
+                row += pixels[idx:idx+4]
+            raw_rows.append(bytes(row))
+        raw_data = b''.join(raw_rows)
+        compressed = zlib.compress(raw_data, 9)
+
+        def chunk(name, data):
+            length = struct.pack('>I', len(data))
+            crc    = struct.pack('>I', zlib.crc32(name + data) & 0xFFFFFFFF)
+            return length + name + data + crc
+
+        ihdr_data = struct.pack('>IIBBBBB', w, h, 8, 6, 0, 0, 0)
+        png = (b'\x89PNG\r\n\x1a\n'
+               + chunk(b'IHDR', ihdr_data)
+               + chunk(b'IDAT', compressed)
+               + chunk(b'IEND', b''))
+        return png
+
+    return make_png(pixels, width, height)
+
+
+def _make_icon_ml():
+    png_data = _generate_icon_png()
+    try:
+        bmp = c4d.bitmaps.BaseBitmap()
+    except AttributeError:
+        bmp = c4d.BaseBitmap()
+    tmp = tempfile.NamedTemporaryFile(suffix=".png", delete=False)
+    try:
+        tmp.write(png_data)
+        tmp.close()
+        bmp.InitWith(tmp.name)
+    finally:
+        try:
+            os.unlink(tmp.name)
+        except Exception:
+            pass
+    return bmp
 
 # ══════════════════════════════════════════════════════════════════════════════
 #  Точка входа — регистрация плагина
 # ══════════════════════════════════════════════════════════════════════════════
 
+
+
 if __name__ == "__main__":
-    icon = _make_icon()
+    ICO_ML = _make_icon_ml()
+
     c4d.plugins.RegisterObjectPlugin(
         id          = ID_MOLHEXLATTICE,
         str         = NAME_MOLHEXLATTICE,
         g           = MolecularHexLatticeObject,
         description = "",
-        icon        = icon,
+        icon        = ICO_ML,
         info        = c4d.OBJECT_GENERATOR,
     )
