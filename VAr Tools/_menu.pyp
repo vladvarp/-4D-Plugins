@@ -62,7 +62,9 @@ def _build_container(items):
     """Рекурсивно строит BaseContainer из списка items."""
     container = c4d.BaseContainer()
     for item in items:
-        if isinstance(item, int):
+        if item is None:
+            container.InsData(c4d.MENURESOURCE_SEPERATOR, True)
+        elif isinstance(item, int):
             container.InsData(c4d.MENURESOURCE_COMMAND, "PLUGIN_CMD_{}".format(item))
         elif isinstance(item, dict):
             sub = _build_container(item["items"])
