@@ -14,16 +14,30 @@ import tempfile
 
 ID_TRICUBE = 1068871
 
-NAME_TRICUBE = "TriCube v1.1"
+NAME_TRICUBE = "TriCube v1.2"
 
 # ─── UserData SubID (общая схема: SubID=1 — группа, поля с 2) ────────────────
 
 UD_GROUP = 1   # Группа "Параметры"
 
-# TriCube
-TC_SIZE    = 2
-TC_SUBDIVS = 3
-TC_NOTRI   = 4   # Галочка "Квады" (выключить триангуляцию)
+# TriCube — размеры по осям
+TC_SIZE_X  = 2
+TC_SIZE_Y  = 3
+TC_SIZE_Z  = 4
+# TriCube — подразделения по осям
+TC_SUB_X   = 5
+TC_SUB_Y   = 6
+TC_SUB_Z   = 7
+# TriCube — тип поверхности и смещение
+TC_SURFACE    = 8   # 0=Треугольники, 1=Квады, 2=Ёлочка, 3=Смещённые ряды
+TC_STAR_EN    = 9   # Галочка "Смещение (звезда)"
+TC_STAR_OFFSET = 10  # Величина смещения по нормали грани
+
+# Значения для TC_SURFACE
+SURF_TRI    = 0   # Треугольная сетка (диагональ единообразная)
+SURF_QUAD   = 1   # Квадратная сетка
+SURF_HBONE  = 2   # Ёлочка (чередование диагоналей)
+SURF_SHIFT  = 3   # Смещённые ряды (кирпичная раскладка)
 
 
 # ─── Вспомогательные функции UserData ────────────────────────────────────────
@@ -99,6 +113,23 @@ def _make_bool_bc(name, default):
     return bc
 
 
+def _make_cycle_bc(name, default, items):
+    """Создаёт поле-выпадающий список (CUSTOMGUI_CYCLE / DTYPE_LONG).
+    items — список строк в нужном порядке (индекс = значение).
+    """
+    bc = c4d.GetCustomDatatypeDefault(c4d.DTYPE_LONG)
+    bc[c4d.DESC_NAME]       = name
+    bc[c4d.DESC_SHORT_NAME] = name
+    bc[c4d.DESC_DEFAULT]    = default
+    bc[c4d.DESC_ANIMATE]    = c4d.DESC_ANIMATE_ON
+    bc[c4d.DESC_CUSTOMGUI]  = c4d.CUSTOMGUI_CYCLE
+    cycle_bc = c4d.BaseContainer()
+    for i, label in enumerate(items):
+        cycle_bc[i] = label
+    bc[c4d.DESC_CYCLE] = cycle_bc
+    return bc
+
+
 def _ud_already_created(op, first_field_uid):
     """Проверяет, созданы ли уже UserData по наличию поля с данным SubID."""
     did, _ = _ud_descid(op, first_field_uid)
@@ -114,61 +145,85 @@ def _ud_set_default(op, uid, value):
 
 # ─── Генераторы мешей ─────────────────────────────────────────────────────────
 
-def build_tricube(size, subdivs, triangulate=True):
+def build_tricube(size_x, size_y, size_z, sub_x, sub_y, sub_z, surface=SURF_TRI, star_offset=0.0):
     """
-    Куб с треугольной сеткой.
-    Каждая из 6 граней делится на subdivs×subdivs ячеек,
-    каждая ячейка — 2 треугольника (CPolygon с равными c и d = вырожденный квад).
-    При triangulate=False ячейки остаются квадами.
+    Куб с настраиваемой сеткой.
+    size_x/y/z   — размеры по осям.
+    sub_x/y/z    — подразделения по каждой оси (применяются к соответствующим граням).
+    surface      — тип сетки: SURF_TRI / SURF_QUAD / SURF_HBONE / SURF_SHIFT.
+    star_offset  — смещение чередующихся вершин вдоль нормали грани (эффект рельефа).
     Возвращает (points, polys) для c4d.PolygonObject.
     """
-    half = size / 2.0
+    hx = size_x / 2.0
+    hy = size_y / 2.0
+    hz = size_z / 2.0
 
-    # 6 граней куба: (ось_u, ось_v, нормаль_знак * нормаль_ось)
-    # Каждая грань задаётся тремя осями: u, v, w (нормаль)
-    # Ориентация такова, что нормаль смотрит наружу
-    face_axes = [
-        # (u_axis,      v_axis,      w_sign, w_axis)  — w = нормаль * w_sign
-        (( 1, 0, 0), ( 0, 1, 0), +1, (0, 0, 1)),  # передняя  +Z
-        ((-1, 0, 0), ( 0, 1, 0), -1, (0, 0, 1)),  # задняя    -Z
-        (( 0, 0,-1), ( 0, 1, 0), +1, (1, 0, 0)),  # правая    +X
-        (( 0, 0, 1), ( 0, 1, 0), -1, (1, 0, 0)),  # левая     -X
-        (( 1, 0, 0), ( 0, 0,-1), +1, (0, 1, 0)),  # верхняя   +Y
-        (( 1, 0, 0), ( 0, 0, 1), -1, (0, 1, 0)),  # нижняя    -Y
+    # 6 граней куба: (u_axis, v_axis, w_sign, w_axis, half_u, half_v, half_w, subdivs_u, subdivs_v)
+    # half_u/v/w — половины размеров по соответствующим осям
+    # subdivs_u/v — подразделения вдоль u и v на данной грани
+    face_defs = [
+        # (u_axis,      v_axis,      w_sign, w_axis,       hu,  hv,  hw,  su,    sv   )
+        (( 1, 0, 0), ( 0, 1, 0), +1, (0, 0, 1),   hx,  hy,  hz,  sub_x, sub_y),  # передняя  +Z
+        ((-1, 0, 0), ( 0, 1, 0), -1, (0, 0, 1),   hx,  hy,  hz,  sub_x, sub_y),  # задняя    -Z
+        (( 0, 0,-1), ( 0, 1, 0), +1, (1, 0, 0),   hz,  hy,  hx,  sub_z, sub_y),  # правая    +X
+        (( 0, 0, 1), ( 0, 1, 0), -1, (1, 0, 0),   hz,  hy,  hx,  sub_z, sub_y),  # левая     -X
+        (( 1, 0, 0), ( 0, 0,-1), +1, (0, 1, 0),   hx,  hz,  hy,  sub_x, sub_z),  # верхняя   +Y
+        (( 1, 0, 0), ( 0, 0, 1), -1, (0, 1, 0),   hx,  hz,  hy,  sub_x, sub_z),  # нижняя    -Y
     ]
 
     all_points = []
     all_polys  = []
 
-    for (ux, uy, uz), (vx, vy, vz), w_sign, (wx, wy, wz) in face_axes:
+    for (ux, uy, uz), (vx, vy, vz), w_sign, (wx, wy, wz), hu, hv, hw, su, sv in face_defs:
         base = len(all_points)
-        n = subdivs + 1  # вершин на сторону
+        nu = su + 1  # вершин по u
+        nv = sv + 1  # вершин по v
 
         # Генерируем вершины грани в локальной (u,v)-системе
-        for row in range(n):
-            v_t = (row / subdivs) * 2.0 - 1.0  # [-1, +1]
-            for col in range(n):
-                u_t = (col / subdivs) * 2.0 - 1.0  # [-1, +1]
-                x = (ux*u_t + vx*v_t + wx*w_sign) * half
-                y = (uy*u_t + vy*v_t + wy*w_sign) * half
-                z = (uz*u_t + vz*v_t + wz*w_sign) * half
+        for row in range(nv):
+            v_t = (row / sv) * 2.0 - 1.0   # [-1, +1]
+            for col in range(nu):
+                # Тип SURF_SHIFT: нечётные строки сдвигаются на полшага по u
+                if surface == SURF_SHIFT and row % 2 == 1:
+                    u_t = ((col + 0.5) / su) * 2.0 - 1.0
+                else:
+                    u_t = (col / su) * 2.0 - 1.0   # [-1, +1]
+
+                x = (ux*u_t*hu + vx*v_t*hv + wx*w_sign*hw)
+                y = (uy*u_t*hu + vy*v_t*hv + wy*w_sign*hw)
+                z = (uz*u_t*hu + vz*v_t*hv + wz*w_sign*hw)
+
+                # Смещение чередующихся вершин вдоль нормали грани
+                if star_offset != 0.0 and (row + col) % 2 == 0:
+                    x += wx * w_sign * star_offset
+                    y += wy * w_sign * star_offset
+                    z += wz * w_sign * star_offset
+
                 all_points.append(c4d.Vector(x, y, z))
 
-        # Генерируем треугольники (через вырожденный CPolygon: d == c)
-        for row in range(subdivs):
-            for col in range(subdivs):
-                bl = base + row*n + col
-                br = base + row*n + (col+1)
-                tl = base + (row+1)*n + col
-                tr = base + (row+1)*n + (col+1)
-                if triangulate:
-                    # Треугольник 1: bl, br, tl  (d=tl — вырожденный)
-                    all_polys.append(c4d.CPolygon(bl, br, tl, tl))
-                    # Треугольник 2: br, tr, tl  (d=tl — вырожденный)
-                    all_polys.append(c4d.CPolygon(br, tr, tl, tl))
-                else:
-                    # Квад: bl, br, tr, tl
+        # Генерируем полигоны в зависимости от типа поверхности
+        for row in range(sv):
+            for col in range(su):
+                bl = base + row*nu + col
+                br = base + row*nu + (col+1)
+                tl = base + (row+1)*nu + col
+                tr = base + (row+1)*nu + (col+1)
+
+                if surface == SURF_QUAD or surface == SURF_SHIFT:
+                    # Квадратная / смещённая — квады
                     all_polys.append(c4d.CPolygon(bl, br, tr, tl))
+                elif surface == SURF_HBONE:
+                    # Ёлочка — чередование диагоналей по (row+col) чётности
+                    if (row + col) % 2 == 0:
+                        all_polys.append(c4d.CPolygon(bl, br, tl, tl))  # диагональ bl-tl
+                        all_polys.append(c4d.CPolygon(br, tr, tl, tl))
+                    else:
+                        all_polys.append(c4d.CPolygon(bl, br, tr, tr))  # диагональ br-tr
+                        all_polys.append(c4d.CPolygon(bl, tr, tl, tl))
+                else:
+                    # SURF_TRI — единообразные треугольники (диагональ bl-tr)
+                    all_polys.append(c4d.CPolygon(bl, br, tl, tl))
+                    all_polys.append(c4d.CPolygon(br, tr, tl, tl))
 
     return all_points, all_polys
 
@@ -213,7 +268,7 @@ class _MeshPrimitiveBase(c4d.plugins.ObjectData):
     """
 
     OBJECT_NAME  = "MeshPrimitive"
-    _first_ud_id = TC_SIZE   # переопределяется в подклассах
+    _first_ud_id = TC_SIZE_X   # переопределяется в подклассах
 
     def Init(self, op, isload=False):
         if not isload:
@@ -265,27 +320,55 @@ class TriCubeObject(_MeshPrimitiveBase):
     """Куб с треугольной сеткой."""
 
     OBJECT_NAME  = "TriCube"
-    _first_ud_id = TC_SIZE
+    _first_ud_id = TC_SIZE_X
 
     def _create_ud(self, op, grp_subid):
+        # Размеры по осям
         _add_in_group(op, grp_subid, _make_float_bc(
-            "Размер", 200.0, 1.0, 100000.0))
+            "Размер X", 200.0, 1.0, 100000.0))
+        _add_in_group(op, grp_subid, _make_float_bc(
+            "Размер Y", 200.0, 1.0, 100000.0))
+        _add_in_group(op, grp_subid, _make_float_bc(
+            "Размер Z", 200.0, 1.0, 100000.0))
+        # Подразделения по осям
         _add_in_group(op, grp_subid, _make_int_bc(
-            "Подразделения", 3, 1, 50))
+            "Подразделения X", 3, 1, 50))
+        _add_in_group(op, grp_subid, _make_int_bc(
+            "Подразделения Y", 3, 1, 50))
+        _add_in_group(op, grp_subid, _make_int_bc(
+            "Подразделения Z", 3, 1, 50))
+        # Тип поверхности
+        _add_in_group(op, grp_subid, _make_cycle_bc(
+            "Поверхность", SURF_TRI,
+            ["Треугольники", "Квады", "Ёлочка", "Смещённые ряды"]))
+        # Смещение (звезда)
         _add_in_group(op, grp_subid, _make_bool_bc(
-            "Триангуляция", True))
+            "Смещение (звезда)", False))
+        _add_in_group(op, grp_subid, _make_float_bc(
+            "Величина смещения", 0.0, -10000.0, 10000.0))
 
     def _set_defaults(self, op):
-        _ud_set_default(op, TC_SIZE,    200.0)
-        _ud_set_default(op, TC_SUBDIVS, 3)
-        _ud_set_default(op, TC_NOTRI,   True)
+        _ud_set_default(op, TC_SIZE_X,     200.0)
+        _ud_set_default(op, TC_SIZE_Y,     200.0)
+        _ud_set_default(op, TC_SIZE_Z,     200.0)
+        _ud_set_default(op, TC_SUB_X,      3)
+        _ud_set_default(op, TC_SUB_Y,      3)
+        _ud_set_default(op, TC_SUB_Z,      3)
+        _ud_set_default(op, TC_SURFACE,    SURF_TRI)
+        _ud_set_default(op, TC_STAR_EN,    False)
+        _ud_set_default(op, TC_STAR_OFFSET, 0.0)
 
     def _build_mesh(self, op):
-        size       = _ud_get(op, TC_SIZE,    200.0)
-        subdivs    = _ud_get(op, TC_SUBDIVS, 3)
-        triangulate = bool(_ud_get(op, TC_NOTRI, True))
-        subdivs = max(1, int(subdivs))
-        return build_tricube(size, subdivs, triangulate)
+        size_x  = _ud_get(op, TC_SIZE_X,  200.0)
+        size_y  = _ud_get(op, TC_SIZE_Y,  200.0)
+        size_z  = _ud_get(op, TC_SIZE_Z,  200.0)
+        sub_x   = max(1, int(_ud_get(op, TC_SUB_X,  3)))
+        sub_y   = max(1, int(_ud_get(op, TC_SUB_Y,  3)))
+        sub_z   = max(1, int(_ud_get(op, TC_SUB_Z,  3)))
+        surface = int(_ud_get(op, TC_SURFACE, SURF_TRI))
+        star_en = bool(_ud_get(op, TC_STAR_EN, False))
+        star_offset = float(_ud_get(op, TC_STAR_OFFSET, 0.0)) if star_en else 0.0
+        return build_tricube(size_x, size_y, size_z, sub_x, sub_y, sub_z, surface, star_offset)
 
 
 _ICON_TC = (
