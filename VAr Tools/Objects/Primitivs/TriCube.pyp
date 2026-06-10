@@ -14,7 +14,7 @@ import tempfile
 
 ID_TRICUBE = 1068871
 
-NAME_TRICUBE = "TriCube v1.3"
+NAME_TRICUBE = "TriCube v1.4"
 
 # ─── UserData SubID (общая схема: SubID=1 — группа, поля с 2) ────────────────
 
@@ -305,26 +305,27 @@ def build_tricube(size_x, size_y, size_z, sub_x, sub_y, sub_z,
 
     # ─── Закрытие швов (star_cap) ────────────────────────────────────────────────
     # Все 6 граней уже сгенерированы. Для каждого из 12 рёбер куба берём
-    # последовательности вершин с обеих смежных граней и соединяем их квадами/треугольниками.
-    # Порядок обхода квада: fB[i], fB[i+1], fA[i+1], fA[i] — нормаль наружу куба.
+    # последовательности вершин с обеих смежных граней и соединяем их двумя треугольниками.
+    # flip_seam в таблице cube_edges определяет порядок обхода (нормаль наружу).
     # Для рёбер с rev_B=True последовательность грани B реверсируется перед соединением.
     if star_offset != 0.0 and star_cap and surface != SURF_HEX:
-        # 12 рёбер куба: (face_A, тип_ребра_A, знач_A, face_B, тип_ребра_B, знач_B, rev_B)
+        # 12 рёбер куба: (face_A, тип_ребра_A, знач_A, face_B, тип_ребра_B, знач_B, rev_B, flip_seam)
         # тип: "col" — фиксированный столбец (ребро по v), "row" — фиксированная строка (ребро по u)
         # знач: число или "su"/"sv" — последний индекс по соответствующей оси
+        # flip_seam: инвертирует порядок вершин в треугольниках заплатки (нормаль наружу)
         cube_edges = [
-            (0, "col", "su", 2, "col", 0,    False),  # передняя+правая
-            (0, "col", 0,    3, "col", "su", False),  # передняя+левая
-            (0, "row", "sv", 4, "row", 0,    False),  # передняя+верхняя
-            (0, "row", 0,    5, "row", "sv", False),  # передняя+нижняя
-            (1, "col", 0,    2, "col", "su", False),  # задняя+правая
-            (1, "col", "su", 3, "col", 0,    False),  # задняя+левая
-            (1, "row", "sv", 4, "row", "sv", True),   # задняя+верхняя
-            (1, "row", 0,    5, "row", 0,    True),   # задняя+нижняя
-            (2, "row", "sv", 4, "col", "su", False),  # правая+верхняя
-            (2, "row", 0,    5, "col", "su", True),   # правая+нижняя
-            (3, "row", "sv", 4, "col", 0,    True),   # левая+верхняя
-            (3, "row", 0,    5, "col", 0,    False),  # левая+нижняя
+            (0, "col", "su", 2, "col", 0,    False, False),  # передняя+правая
+            (0, "col", 0,    3, "col", "su", False, True),   # передняя+левая
+            (0, "row", "sv", 4, "row", 0,    False, True),   # передняя+верхняя
+            (0, "row", 0,    5, "row", "sv", False, False),  # передняя+нижняя
+            (1, "col", 0,    2, "col", "su", False, True),   # задняя+правая
+            (1, "col", "su", 3, "col", 0,    False, False),  # задняя+левая
+            (1, "row", "sv", 4, "row", "sv", True,  True),   # задняя+верхняя
+            (1, "row", 0,    5, "row", 0,    True,  False),  # задняя+нижняя
+            (2, "row", "sv", 4, "col", "su", False, True),   # правая+верхняя
+            (2, "row", 0,    5, "col", "su", True,  False),  # правая+нижняя
+            (3, "row", "sv", 4, "col", 0,    True,  True),   # левая+верхняя
+            (3, "row", 0,    5, "col", 0,    False, False),  # левая+нижняя
         ]
 
         def edge_seq(fi, etype, eval_):
@@ -344,7 +345,7 @@ def build_tricube(size_x, size_y, size_z, sub_x, sub_y, sub_z,
             base_f, nu_f, _, _ = face_bases[fi]
             return base_f + row * nu_f + col
 
-        for fi_a, ta, va, fi_b, tb, vb, rev_b in cube_edges:
+        for fi_a, ta, va, fi_b, tb, vb, rev_b, flip_seam in cube_edges:
             if face_bases[fi_a] is None or face_bases[fi_b] is None:
                 continue
             seq_a = edge_seq(fi_a, ta, va)
@@ -367,8 +368,72 @@ def build_tricube(size_x, size_y, size_z, sub_x, sub_y, sub_z,
                 # Добавляем заплатку только если хотя бы одна вершина смещена
                 # (иначе грани уже совпадают в пространстве и заплатка не нужна)
                 if sh_a0 or sh_a1 or sh_b0 or sh_b1:
-                    # Порядок обхода: ib0, ib1, ia1, ia0 — нормаль наружу куба
-                    all_polys.append(c4d.CPolygon(ib0, ib1, ia1, ia0))
+                    # Диагональ выбирается через смещённую вершину, чтобы треугольники
+                    # огибали выступ, а не проваливались вовнутрь.
+                    # Диагональ ia1–ib0 используется если смещена ia1 или ib0,
+                    # иначе диагональ ia0–ib1 (смещена ia0 или ib1, или ни одна).
+                    use_alt_diag = (sh_a1 or sh_b0) and not (sh_a0 or sh_b1)
+                    if flip_seam:
+                        if use_alt_diag:
+                            all_polys.append(c4d.CPolygon(ib0, ia0, ia1, ia1))
+                            all_polys.append(c4d.CPolygon(ib0, ia1, ib1, ib1))
+                        else:
+                            all_polys.append(c4d.CPolygon(ib0, ia0, ib1, ib1))
+                            all_polys.append(c4d.CPolygon(ia0, ia1, ib1, ib1))
+                    else:
+                        if use_alt_diag:
+                            all_polys.append(c4d.CPolygon(ib0, ia1, ia0, ia0))
+                            all_polys.append(c4d.CPolygon(ib0, ib1, ia1, ia1))
+                        else:
+                            all_polys.append(c4d.CPolygon(ib0, ib1, ia0, ia0))
+                            all_polys.append(c4d.CPolygon(ia0, ib1, ia1, ia1))
+
+        # ─── Угловые заплатки ────────────────────────────────────────────────────────
+        # В каждом из 8 углов куба сходятся 3 грани. Рёберные заплатки не закрывают
+        # угловой треугольник между тремя гранями — добавляем его явно.
+        # Для каждого угла: (fi_a, row_a, col_a, fi_b, row_b, col_b, fi_c, row_c, col_c, flip)
+        # flip=True инвертирует порядок вершин (нормаль наружу зависит от знака угла).
+        # "su"/"sv" в row/col заменяются на реальные значения через face_bases.
+        cube_corners = [
+            #  fa   ra    ca    fb   rb    cb    fc   rc    cc    flip
+            (0, "sv","su", 2,"sv",  0,   4,  0, "su", False),  # +X+Y+Z
+            (0, "sv",  0,  3,"sv","su",  4,  0,   0,  True),   # -X+Y+Z
+            (0,   0, "su", 2,  0,   0,  5,"sv","su", True),    # +X-Y+Z
+            (0,   0,   0,  3,  0, "su", 5,"sv",  0,  False),   # -X-Y+Z
+            (1, "sv",  0,  2,"sv","su",  4,"sv","su", True),    # +X+Y-Z
+            (1, "sv","su", 3,"sv",  0,  4,"sv",  0,  False),   # -X+Y-Z
+            (1,   0,   0,  2,  0, "su", 5,  0, "su", False),   # +X-Y-Z
+            (1,   0, "su", 3,  0,   0,  5,  0,   0,  True),    # -X-Y-Z
+        ]
+
+        def _resolve(fb, val):
+            """Заменяет 'su'/'sv' на реальное значение из face_bases."""
+            _, _, su_f, sv_f = fb
+            if val == "su": return su_f
+            if val == "sv": return sv_f
+            return val
+
+        for fa, ra, ca, fb_, rb, cb, fc, rc, cc, flip in cube_corners:
+            if face_bases[fa] is None or face_bases[fb_] is None or face_bases[fc] is None:
+                continue
+            ra_ = _resolve(face_bases[fa], ra)
+            ca_ = _resolve(face_bases[fa], ca)
+            rb_ = _resolve(face_bases[fb_], rb)
+            cb_ = _resolve(face_bases[fb_], cb)
+            rc_ = _resolve(face_bases[fc], rc)
+            cc_ = _resolve(face_bases[fc], cc)
+            # Добавляем заплатку только если хотя бы одна угловая вершина смещена
+            sh_a = (ra_ + ca_) % 2 == 0
+            sh_b = (rb_ + cb_) % 2 == 0
+            sh_c = (rc_ + cc_) % 2 == 0
+            if sh_a or sh_b or sh_c:
+                ia = vert_idx(fa, ra_, ca_)
+                ib = vert_idx(fb_, rb_, cb_)
+                ic = vert_idx(fc, rc_, cc_)
+                if flip:
+                    all_polys.append(c4d.CPolygon(ia, ic, ib, ib))
+                else:
+                    all_polys.append(c4d.CPolygon(ia, ib, ic, ic))
 
     return all_points, all_polys
 
