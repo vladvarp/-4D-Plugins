@@ -14,7 +14,7 @@ import tempfile
 
 ID_DIAMONDCYLINDER = 1068873
 
-NAME_DIAMONDCYLINDER = "DiamondCylinder v1.2"
+NAME_DIAMONDCYLINDER = "DiamondCylinder v1.3"
 
 # ─── UserData SubID (общая схема: SubID=1 — группа, поля с 2) ────────────────
 
@@ -27,6 +27,7 @@ DC_SEGS_R  = 4
 DC_SEGS_H  = 5
 DC_CAPS    = 6
 DC_SURFACE = 7   # Тип поверхности (enum)
+DC_TWIST   = 8   # Скрутка по оси Y (градусы)
 
 # Значения для DC_SURFACE
 SURF_ZIGZAG  = 0   # Зигзаг (ромбы) — исходный режим
@@ -140,10 +141,11 @@ def _ud_set_default(op, uid, value):
 
 # ─── Генераторы мешей ─────────────────────────────────────────────────────────
 
-def build_diamond_cylinder(radius, height, segs_r, segs_h, add_caps):
+def build_diamond_cylinder(radius, height, segs_r, segs_h, add_caps, twist=0.0):
     """
     Цилиндр с ромбической сеткой.
     Нечётные ряды вершин смещены на полшага по углу — ячейки становятся ромбами.
+    twist — угол скрутки по оси Y в радианах (0 = без скрутки).
     Возвращает (points, polys).
     """
     verts = []
@@ -154,8 +156,10 @@ def build_diamond_cylinder(radius, height, segs_r, segs_h, add_caps):
         y = t * height - height / 2.0
         # Нечётные ряды сдвигаем на полшага по углу
         offset_angle = (math.pi / segs_r) if (row % 2 == 1) else 0.0
+        # Скрутка: линейно от 0 до twist по высоте цилиндра
+        twist_angle = twist * t
         for col in range(segs_r):
-            angle = col / segs_r * 2.0 * math.pi + offset_angle
+            angle = col / segs_r * 2.0 * math.pi + offset_angle + twist_angle
             x = radius * math.cos(angle)
             z = radius * math.sin(angle)
             verts.append(c4d.Vector(x, y, z))
@@ -172,10 +176,10 @@ def build_diamond_cylinder(radius, height, segs_r, segs_h, add_caps):
 
             if row % 2 == 0:
                 # Чётный ряд → нечётный (сдвинутый): ромб вытянут вправо-вверх
-                polys.append(c4d.CPolygon(curr, next_col, up_next, up_col))
+                polys.append(c4d.CPolygon(curr, up_col, up_next, next_col))
             else:
                 # Нечётный ряд → чётный: ромб вытянут влево-вверх
-                polys.append(c4d.CPolygon(curr, next_col, up_next, up_col))
+                polys.append(c4d.CPolygon(curr, up_col, up_next, next_col))
 
     if add_caps:
         # Нижняя крышка
@@ -201,10 +205,11 @@ def build_diamond_cylinder(radius, height, segs_r, segs_h, add_caps):
     return verts, polys
 
 
-def build_spiral_cylinder(radius, height, segs_r, segs_h, add_caps):
+def build_spiral_cylinder(radius, height, segs_r, segs_h, add_caps, twist=0.0):
     """
     Цилиндр со спиральной сеткой.
     Каждый ряд вершин повёрнут на фиксированный шаг — рёбра уходят по спирали.
+    twist — угол скрутки по оси Y в радианах (0 = без скрутки).
     Возвращает (points, polys).
     """
     verts = []
@@ -216,8 +221,10 @@ def build_spiral_cylinder(radius, height, segs_r, segs_h, add_caps):
         t = row / segs_h
         y = t * height - height / 2.0
         base_angle = row * spiral_step
+        # Скрутка: линейно от 0 до twist по высоте цилиндра
+        twist_angle = twist * t
         for col in range(segs_r):
-            angle = col / segs_r * 2.0 * math.pi + base_angle
+            angle = col / segs_r * 2.0 * math.pi + base_angle + twist_angle
             x = radius * math.cos(angle)
             z = radius * math.sin(angle)
             verts.append(c4d.Vector(x, y, z))
@@ -230,7 +237,7 @@ def build_spiral_cylinder(radius, height, segs_r, segs_h, add_caps):
             next_col = row * segs_r + (col + 1) % segs_r
             up_col   = (row + 1) * segs_r + col
             up_next  = (row + 1) * segs_r + (col + 1) % segs_r
-            polys.append(c4d.CPolygon(curr, next_col, up_next, up_col))
+            polys.append(c4d.CPolygon(curr, up_col, up_next, next_col))
 
     if add_caps:
         bottom_center_idx = len(verts)
@@ -251,12 +258,13 @@ def build_spiral_cylinder(radius, height, segs_r, segs_h, add_caps):
     return verts, polys
 
 
-def build_hex_cylinder(radius, height, segs_r, segs_h, add_caps):
+def build_hex_cylinder(radius, height, segs_r, segs_h, add_caps, twist=0.0):
     """
     Цилиндр с гексагональной (шестиугольной) сеткой.
     Чётные ряды смещаются на полшага — образуются правильные шестиугольники.
     Каждая ячейка разбивается на два треугольника/четырёхугольника так, чтобы
     получалась классическая «кирпичная» укладка гексагонов.
+    twist — угол скрутки по оси Y в радианах (0 = без скрутки).
     Возвращает (points, polys).
     """
     # Гексагональная сетка на цилиндре: нечётные ряды сдвинуты на полшага,
@@ -269,8 +277,10 @@ def build_hex_cylinder(radius, height, segs_r, segs_h, add_caps):
         y = t * height - height / 2.0
         # Чётные ряды — сдвиг на полшага (противоположно zigzag)
         offset_angle = (math.pi / segs_r) if (row % 2 == 0) else 0.0
+        # Скрутка: линейно от 0 до twist по высоте цилиндра
+        twist_angle = twist * t
         for col in range(segs_r):
-            angle = col / segs_r * 2.0 * math.pi + offset_angle
+            angle = col / segs_r * 2.0 * math.pi + offset_angle + twist_angle
             x = radius * math.cos(angle)
             z = radius * math.sin(angle)
             verts.append(c4d.Vector(x, y, z))
@@ -287,12 +297,12 @@ def build_hex_cylinder(radius, height, segs_r, segs_h, add_caps):
             if row % 2 == 0:
                 # Нижний ряд смещён → верхний нет:
                 # левый треугольник + правый треугольник (имитация гексагона)
-                polys.append(c4d.CPolygon(curr, next_col, up_col, up_col))
-                polys.append(c4d.CPolygon(next_col, up_next, up_col, up_col))
+                polys.append(c4d.CPolygon(curr, up_col, next_col, next_col))
+                polys.append(c4d.CPolygon(next_col, up_col, up_next, up_next))
             else:
                 # Нижний ряд не смещён → верхний смещён:
-                polys.append(c4d.CPolygon(curr, next_col, up_next, up_next))
-                polys.append(c4d.CPolygon(curr, up_next, up_col, up_col))
+                polys.append(c4d.CPolygon(curr, up_next, next_col, next_col))
+                polys.append(c4d.CPolygon(curr, up_col, up_next, up_next))
 
     if add_caps:
         bottom_center_idx = len(verts)
@@ -313,10 +323,11 @@ def build_hex_cylinder(radius, height, segs_r, segs_h, add_caps):
     return verts, polys
 
 
-def build_straight_cylinder(radius, height, segs_r, segs_h, add_caps):
+def build_straight_cylinder(radius, height, segs_r, segs_h, add_caps, twist=0.0):
     """
     Цилиндр с прямой сеткой (без смещения рядов).
     Классические прямоугольники / ровные колонки.
+    twist — угол скрутки по оси Y в радианах (0 = без скрутки).
     Возвращает (points, polys).
     """
     verts = []
@@ -324,8 +335,10 @@ def build_straight_cylinder(radius, height, segs_r, segs_h, add_caps):
     for row in range(segs_h + 1):
         t = row / segs_h
         y = t * height - height / 2.0
+        # Скрутка: линейно от 0 до twist по высоте цилиндра
+        twist_angle = twist * t
         for col in range(segs_r):
-            angle = col / segs_r * 2.0 * math.pi
+            angle = col / segs_r * 2.0 * math.pi + twist_angle
             x = radius * math.cos(angle)
             z = radius * math.sin(angle)
             verts.append(c4d.Vector(x, y, z))
@@ -338,7 +351,7 @@ def build_straight_cylinder(radius, height, segs_r, segs_h, add_caps):
             next_col = row * segs_r + (col + 1) % segs_r
             up_col   = (row + 1) * segs_r + col
             up_next  = (row + 1) * segs_r + (col + 1) % segs_r
-            polys.append(c4d.CPolygon(curr, next_col, up_next, up_col))
+            polys.append(c4d.CPolygon(curr, up_col, up_next, next_col))
 
     if add_caps:
         bottom_center_idx = len(verts)
@@ -466,7 +479,9 @@ class DiamondCylinderObject(_MeshPrimitiveBase):
             "Крышки", True))
         _add_in_group(op, grp_subid, _make_cycle_bc(
             "Тип поверхности", SURF_ZIGZAG,
-            ["Зигзаг (ромбы)", "Спираль", "Гексагональная", "Прямая сетка"]))
+            ["Зигзаг (ромбы)", "Спираль", "Гармошка", "Прямая сетка"]))
+        _add_in_group(op, grp_subid, _make_float_bc(
+            "Скрутка (°)", 0.0, -3600.0, 3600.0, unit=c4d.DESC_UNIT_DEGREE))
 
     def _set_defaults(self, op):
         _ud_set_default(op, DC_RADIUS, 100.0)
@@ -475,6 +490,7 @@ class DiamondCylinderObject(_MeshPrimitiveBase):
         _ud_set_default(op, DC_SEGS_H, 6)
         _ud_set_default(op, DC_CAPS,    True)
         _ud_set_default(op, DC_SURFACE, SURF_ZIGZAG)
+        _ud_set_default(op, DC_TWIST,   0.0)
 
     def _build_mesh(self, op):
         radius = _ud_get(op, DC_RADIUS, 100.0)
@@ -483,15 +499,16 @@ class DiamondCylinderObject(_MeshPrimitiveBase):
         segs_h = max(1,  int(_ud_get(op, DC_SEGS_H, 6)))
         caps   = bool(_ud_get(op, DC_CAPS, True))
         surf   = int(_ud_get(op, DC_SURFACE, SURF_ZIGZAG))
+        twist  = math.radians(_ud_get(op, DC_TWIST, 0.0))  # скрутка по Y, переводим в радианы
 
         if surf == SURF_SPIRAL:
-            return build_spiral_cylinder(radius, height, segs_r, segs_h, caps)
+            return build_spiral_cylinder(radius, height, segs_r, segs_h, caps, twist)
         elif surf == SURF_HEX:
-            return build_hex_cylinder(radius, height, segs_r, segs_h, caps)
+            return build_hex_cylinder(radius, height, segs_r, segs_h, caps, twist)
         elif surf == SURF_DIAMOND:
-            return build_straight_cylinder(radius, height, segs_r, segs_h, caps)
+            return build_straight_cylinder(radius, height, segs_r, segs_h, caps, twist)
         else:  # SURF_ZIGZAG (default)
-            return build_diamond_cylinder(radius, height, segs_r, segs_h, caps)
+            return build_diamond_cylinder(radius, height, segs_r, segs_h, caps, twist)
 
 
 _ICON_DC = (
