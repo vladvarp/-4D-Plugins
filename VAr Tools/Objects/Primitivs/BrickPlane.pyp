@@ -15,7 +15,7 @@ import random
 
 ID_BRICKPLANE = 1068875
 
-NAME_BRICKPLANE = "BrickPlane v1.5"
+NAME_BRICKPLANE = "BrickPlane v1.6"
 
 # ─── UserData SubID (общая схема: SubID=1 — группа, поля с 2) ────────────────
 
@@ -344,48 +344,57 @@ def _build_third_bond(width, height, segs_w, segs_h, mortar_frac=0.0):
 
 def _build_herringbone(width, height, segs_w, segs_h, mortar_frac=0.0):
     """
-    Ёлочка (herringbone / паркет 45°).
-    Чередует горизонтальные и вертикальные прямоугольники 1×2.
-    segs_w и segs_h определяют число пар по X и Y.
+    Ёлочка (herringbone): чередование H- и V-кирпичей 1×2 без перекрытий.
+    Каждая «мета-ячейка» 2×2 содержит ровно 2 кирпича:
+      - чётные блоки (row+col чётное): горизонтальный (2×1)
+      - нечётные блоки (row+col нечётное): вертикальный (1×2)
     """
-    m    = max(0.0, min(mortar_frac, 0.45))
-    # Базовый размер одного "кирпича" ёлочки
-    tile_w = width  / (segs_w * 2.0)  # одна единица
+    m      = max(0.0, min(mortar_frac, 0.45))
+    tile_w = width  / (segs_w * 2.0)
     tile_h = height / (segs_h * 2.0)
-    hm_x  = min(tile_w, tile_h) * m * 0.5
-    hm_y  = hm_x
+    hm_x   = min(tile_w, tile_h) * m * 0.5
+    hm_y   = hm_x
 
     verts = []
     polys = []
 
-    for row in range(segs_h * 2):
-        for col in range(segs_w * 2):
-            # Чётность суммы определяет ориентацию: горизонтальный или вертикальный
-            if (row + col) % 2 == 0:
-                # Горизонтальный кирпич: ширина = 2*tile_w, высота = tile_h
+    # Итерируем по строкам и столбцам с шагом 1,
+    # но ориентация определяется чётностью (row//1 + col//1),
+    # и каждый тип кирпича занимает 2 ячейки — поэтому шагаем через 2
+    for row in range(0, segs_h * 2, 1):
+        for col in range(0, segs_w * 2, 1):
+            parity = (row + col) % 4  # период паттерна = 4
+
+            if parity == 0:
+                # Горизонтальный кирпич: 2 tile_w × 1 tile_h
                 x0 = col * tile_w - width  / 2.0
                 z0 = row * tile_h - height / 2.0
                 x1 = x0 + 2.0 * tile_w
                 z1 = z0 + tile_h
-                # Пропускаем, если выходим за правую границу
                 if x1 > width / 2.0 + 1e-4:
                     continue
-            else:
-                # Вертикальный кирпич: ширина = tile_w, высота = 2*tile_h
+            elif parity == 2:
+                # Вертикальный кирпич: 1 tile_w × 2 tile_h
                 x0 = col * tile_w - width  / 2.0
                 z0 = row * tile_h - height / 2.0
                 x1 = x0 + tile_w
                 z1 = z0 + 2.0 * tile_h
                 if z1 > height / 2.0 + 1e-4:
                     continue
+            else:
+                # Ячейки parity 1 и 3 — уже заняты соседними кирпичами
+                continue
+
+            eff_w = (x1 - hm_x) - (x0 + hm_x)
+            eff_h = (z1 - hm_y) - (z0 + hm_y)
+            if eff_w < 1e-6 or eff_h < 1e-6:
+                continue
 
             base = len(verts)
             verts.append(c4d.Vector(x0 + hm_x, 0.0, z0 + hm_y))
             verts.append(c4d.Vector(x1 - hm_x, 0.0, z0 + hm_y))
             verts.append(c4d.Vector(x1 - hm_x, 0.0, z1 - hm_y))
             verts.append(c4d.Vector(x0 + hm_x, 0.0, z1 - hm_y))
-            if (x1 - hm_x) - (x0 + hm_x) < 1e-6 or (z1 - hm_y) - (z0 + hm_y) < 1e-6:
-                continue
             polys.append(c4d.CPolygon(base, base+3, base+2, base+1))
 
     return verts, polys
@@ -639,7 +648,7 @@ class BrickPlaneObject(_MeshPrimitiveBase):
         _add_in_group(op, grp_subid, _make_float_bc(
             "Высота", 400.0, 1.0, 100000.0))
         _add_in_group(op, grp_subid, _make_int_bc(
-            "Кирпичей (X)", 4, 1, 200))
+            "Рядов (X)", 4, 1, 200))
         _add_in_group(op, grp_subid, _make_int_bc(
             "Рядов (Y)", 4, 1, 200))
         # Тип паттерна (выпадающий список)
