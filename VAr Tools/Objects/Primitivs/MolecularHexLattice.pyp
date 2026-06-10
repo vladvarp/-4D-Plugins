@@ -53,7 +53,7 @@ import zlib
 # ══════════════════════════════════════════════════════════════════════════════
 
 ID_MOLHEXLATTICE  = 1068899
-NAME_MOLHEXLATTICE = "MolecularHexLattice v1.2"
+NAME_MOLHEXLATTICE = "MolecularHexLattice v1.3"
 
 # ══════════════════════════════════════════════════════════════════════════════
 #  UserData SubID — СТРОГО совпадают с порядком вызовов AddUserData
@@ -493,7 +493,7 @@ def _make_poly_object(pts, cpolys, name):
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-#  Гексагональная сфера с отверстиями (гексагоны на местах трубок удалены)
+#  Гексагональная сфера — цельная, полигоны не удаляются
 # ══════════════════════════════════════════════════════════════════════════════
 
 def _fan_triangulate(indices, pts):
@@ -510,12 +510,13 @@ def _fan_triangulate(indices, pts):
 
 def _build_sphere_with_holes(radius, subdivisions, hole_face_indices):
     """
-    Строит dual icosphere с удалёнными полигонами на позициях hole_face_indices.
+    Строит цельную dual icosphere — полигоны НЕ удаляются.
+    Зазор между шаром и трубкой закрывается фаской с цилиндрической экструзией.
 
     Возвращает:
       (PolygonObject, hole_centers, hole_normals)
-      hole_centers — c4d.Vector центров отверстий (в локальном пространстве)
-      hole_normals — unit c4d.Vector нормалей отверстий
+      hole_centers — c4d.Vector точек на поверхности сферы (центры граней связей)
+      hole_normals — unit c4d.Vector нормалей этих граней (наружу)
     """
     sphere_pts, dual_polys, face_normals, dual_verts_unit = \
         _build_hex_sphere_data(radius, subdivisions)
@@ -524,14 +525,13 @@ def _build_sphere_with_holes(radius, subdivisions, hole_face_indices):
     cpols  = []
     hidden = []
 
-    hole_centers  = []
-    hole_normals  = []
-
-    hole_set = set(hole_face_indices)
+    # Центры и нормали граней связей — нужны для позиционирования фасок
+    hole_centers = []
+    hole_normals = []
 
     for fi, poly_idx_list in enumerate(dual_polys):
-        if fi in hole_set:
-            # Вычисляем центр и нормаль отверстия
+        if fi in set(hole_face_indices):
+            # Вычисляем центр грани на поверхности сферы (для фаски)
             cx = cy = cz = 0.0
             for idx in poly_idx_list:
                 cx += pts[idx].x
@@ -541,7 +541,7 @@ def _build_sphere_with_holes(radius, subdivisions, hole_face_indices):
             cx /= n_p; cy /= n_p; cz /= n_p
             hole_centers.append(c4d.Vector(cx, cy, cz))
             hole_normals.append(c4d.Vector(*face_normals[fi]))
-            continue   # пропускаем полигон — это и есть отверстие
+            # Полигон НЕ пропускаем — шар остаётся цельным
 
         start = len(cpols)
         new_cps = _fan_triangulate(poly_idx_list, pts)
@@ -667,13 +667,34 @@ def _build_tube_between(pt_a, pt_b, tube_radius, segs_r, segs_h,
             bev_pts   = []
             bev_cpols = []
 
-            # Профиль фаски: четверть окружности от tube_radius до tube_radius+actual_bevel
-            # по Y: от ±inner_half до ±(inner_half+actual_bevel) = ±half_length
-            for ring in range(n_bev + 1):
-                t     = ring / n_bev
-                angle = t * math.pi * 0.5   # 0..90°
-                r_ring = tube_radius + actual_bevel * math.sin(angle)
-                y_ring = end_sign * (inner_half + actual_bevel * (1.0 - math.cos(angle)))
+            # Профиль фаски (от стыка с трубкой к поверхности шара):
+            #   Секция A (кольца 0..n_bev): четверть дуги — радиус растёт
+            #     от tube_radius до tube_radius+actual_bevel,
+            #     Y идёт от ±inner_half до ±(inner_half + actual_bevel*(1-cos))
+            #     → максимальный Y дуги = ±(inner_half + actual_bevel)
+            #     (т.е. ровно ±half_length = поверхность шара)
+            #   Секция B (кольца n_bev..n_bev+1): прямой цилиндрический выступ
+            #     r = tube_radius+actual_bevel, Y идёт ещё на actual_bevel внутрь шара
+            #     Это «шип», утопленный в шар — закрывает зазор.
+            #
+            # Итого n_bev+2 кольца точек, n_bev+1 полос полигонов.
+
+            n_rings = n_bev + 2  # 0..n_bev — дуга, n_bev+1 — конец шипа
+
+            for ring in range(n_rings):
+                if ring <= n_bev:
+                    # Секция A: четверть окружности (скругление-фаска)
+                    t     = ring / n_bev
+                    angle = t * math.pi * 0.5   # 0..90°
+                    r_ring = tube_radius + actual_bevel * math.sin(angle)
+                    y_ring = end_sign * (inner_half + actual_bevel * (1.0 - math.cos(angle)))
+                else:
+                    # Секция B: прямой цилиндрический выступ в тело шара
+                    # r фиксирован = tube_radius+actual_bevel
+                    # Y сдвигается ещё на actual_bevel в сторону шара
+                    r_ring = tube_radius + actual_bevel
+                    y_ring = end_sign * (inner_half + actual_bevel + actual_bevel)
+
                 for col in range(segs_r):
                     a = col / segs_r * 2.0 * math.pi
                     bev_pts.append(c4d.Vector(
@@ -682,7 +703,7 @@ def _build_tube_between(pt_a, pt_b, tube_radius, segs_r, segs_h,
                         r_ring * math.sin(a)
                     ))
 
-            for ring in range(n_bev):
+            for ring in range(n_rings - 1):
                 for col in range(segs_r):
                     bl = ring * segs_r + col
                     br = ring * segs_r + (col + 1) % segs_r
