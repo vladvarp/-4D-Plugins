@@ -14,7 +14,7 @@ import tempfile
 
 ID_DIAMONDCYLINDER = 1068873
 
-NAME_DIAMONDCYLINDER = "DiamondCylinder v1.4"
+NAME_DIAMONDCYLINDER = "DiamondCylinder v1.5"
 
 # ─── UserData SubID (общая схема: SubID=1 — группа, поля с 2) ────────────────
 
@@ -75,7 +75,7 @@ def _add_in_group(op, grp_subid, bc):
     return op.AddUserData(bc)
 
 
-def _make_float_bc(name, default, minval, maxval, unit=c4d.DESC_UNIT_METER):
+def _make_float_bc(name, default, minval, maxval, unit=c4d.DESC_UNIT_METER, step=1.0):
     bc = c4d.GetCustomDatatypeDefault(c4d.DTYPE_REAL)
     bc[c4d.DESC_NAME]       = name
     bc[c4d.DESC_SHORT_NAME] = name
@@ -83,7 +83,7 @@ def _make_float_bc(name, default, minval, maxval, unit=c4d.DESC_UNIT_METER):
     bc[c4d.DESC_MIN]        = minval
     bc[c4d.DESC_MAX]        = maxval
     bc[c4d.DESC_UNIT]       = unit
-    bc[c4d.DESC_STEP]       = 1.0
+    bc[c4d.DESC_STEP]       = step
     bc[c4d.DESC_ANIMATE]    = c4d.DESC_ANIMATE_ON
     return bc
 
@@ -481,7 +481,7 @@ class DiamondCylinderObject(_MeshPrimitiveBase):
             "Тип поверхности", SURF_ZIGZAG,
             ["Зигзаг (ромбы)", "Спираль", "Гармошка", "Прямая сетка"]))
         _add_in_group(op, grp_subid, _make_float_bc(
-            "Скрутка (°)", 0.0, -3600.0, 3600.0, unit=c4d.DESC_UNIT_DEGREE))
+            "Скрутка (°)", 0.0, math.radians(-3600.0), math.radians(3600.0), unit=c4d.DESC_UNIT_DEGREE, step=math.radians(0.1)))
 
     def _set_defaults(self, op):
         _ud_set_default(op, DC_RADIUS, 100.0)
@@ -499,7 +499,7 @@ class DiamondCylinderObject(_MeshPrimitiveBase):
         segs_h = max(1,  int(_ud_get(op, DC_SEGS_H, 6)))
         caps   = bool(_ud_get(op, DC_CAPS, True))
         surf   = int(_ud_get(op, DC_SURFACE, SURF_ZIGZAG))
-        twist  = math.radians(_ud_get(op, DC_TWIST, 0.0))  # скрутка по Y, переводим в радианы
+        twist  = _ud_get(op, DC_TWIST, 0.0)  # скрутка по Y, хранится в радианах (C4D конвертирует из °)
 
         if surf == SURF_SPIRAL:
             return build_spiral_cylinder(radius, height, segs_r, segs_h, caps, twist)
