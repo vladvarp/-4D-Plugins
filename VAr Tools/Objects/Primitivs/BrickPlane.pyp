@@ -16,7 +16,7 @@ import random
 
 ID_BRICKPLANE = 1068875
 
-NAME_BRICKPLANE = "BrickPlane v1.6"
+NAME_BRICKPLANE = "BrickPlane v1.6.1"
 
 # ─── UserData SubID (общая схема: SubID=1 — группа, поля с 2) ────────────────
 
@@ -457,9 +457,9 @@ def _build_hexagonal(width, height, segs_w, segs_h, mortar_frac=0.0):
 
             # Один N-гон (6 вершин) — без триангуляции
             # C4D CPolygon поддерживает только quads, поэтому используем 4+2:
-            # quad0: v0,v1,v2,v3  quad1: v0,v3,v4,v5
-            polys.append(c4d.CPolygon(base+0, base+1, base+2, base+3))
-            polys.append(c4d.CPolygon(base+0, base+3, base+4, base+5))
+            # quad0: v0,v3,v2,v1  quad1: v0,v5,v4,v3  (CCW → нормаль вверх)
+            polys.append(c4d.CPolygon(base+0, base+3, base+2, base+1))
+            polys.append(c4d.CPolygon(base+0, base+5, base+4, base+3))
 
     return verts, polys
 
