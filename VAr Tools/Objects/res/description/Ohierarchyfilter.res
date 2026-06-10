@@ -1,4 +1,0 @@
-CONTAINER Ohierarchyfilter
-{
-  NAME Ohierarchyfilter;
-}

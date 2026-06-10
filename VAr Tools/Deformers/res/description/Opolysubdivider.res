@@ -1,4 +1,0 @@
-CONTAINER Opolysubdivider
-{
-  NAME Opolysubdivider;
-}
