@@ -15,7 +15,7 @@ import random
 
 ID_BRICKPLANE = 1068875
 
-NAME_BRICKPLANE = "BrickPlane v1.2"
+NAME_BRICKPLANE = "BrickPlane v1.3"
 
 # ─── UserData SubID (общая схема: SubID=1 — группа, поля с 2) ────────────────
 
@@ -221,9 +221,10 @@ def _build_running_bond(width, height, segs_w, segs_h, mortar_frac=0.0):
     m = max(0.0, min(mortar_frac, 0.45))  # ограничиваем шов
     step_x = width  / segs_w
     step_y = height / segs_h
-    # Половина шва в единицах
-    hm_x = step_x * m * 0.5
-    hm_y = step_y * m * 0.5
+    # Единое абсолютное значение полушва — равномерное по обеим осям
+    hm = min(step_x, step_y) * m * 0.5
+    hm_x = hm
+    hm_y = hm
 
     # Строим полную сетку вершин: (segs_w*2 + 1) × (segs_h + 1)
     # Это даёт нам все нужные точки для смещённых рядов
@@ -302,8 +303,8 @@ def _build_stack_bond(width, height, segs_w, segs_h, mortar_frac=0.0):
     m     = max(0.0, min(mortar_frac, 0.45))
     step_x = width  / segs_w
     step_y = height / segs_h
-    hm_x  = step_x * m * 0.5
-    hm_y  = step_y * m * 0.5
+    hm_x  = min(step_x, step_y) * m * 0.5
+    hm_y  = hm_x
 
     verts = []
     polys = []
@@ -331,8 +332,8 @@ def _build_third_bond(width, height, segs_w, segs_h, mortar_frac=0.0):
     m     = max(0.0, min(mortar_frac, 0.45))
     step_x = width  / segs_w
     step_y = height / segs_h
-    hm_x  = step_x * m * 0.5
-    hm_y  = step_y * m * 0.5
+    hm_x  = min(step_x, step_y) * m * 0.5
+    hm_y  = hm_x
 
     verts = []
     polys = []
@@ -371,8 +372,8 @@ def _build_herringbone(width, height, segs_w, segs_h, mortar_frac=0.0):
     # Базовый размер одного "кирпича" ёлочки
     tile_w = width  / (segs_w * 2.0)  # одна единица
     tile_h = height / (segs_h * 2.0)
-    hm_x  = tile_w * m * 0.5
-    hm_y  = tile_h * m * 0.5
+    hm_x  = min(tile_w, tile_h) * m * 0.5
+    hm_y  = hm_x
 
     verts = []
     polys = []
@@ -477,26 +478,21 @@ def _build_basket_weave(width, height, segs_w, segs_h, mortar_frac=0.0):
     # Каждая ячейка = 2 кирпича (1×2 или 2×1)
     cell_w = width  / segs_w
     cell_h = height / segs_h
-    # Кирпич = cell/2 × cell
-    bw     = cell_w * 0.5
-    bh     = cell_h
-    hm_x   = bw * m * 0.5
-    hm_y   = cell_h * 0.5 * m * 0.5
+    # Единый абсолютный полушов от наименьшего измерения полуячейки
+    hm    = min(cell_w * 0.5, cell_h * 0.5) * m * 0.5
 
     verts = []
     polys = []
 
     def _add_brick(x0, z0, x1, z1):
         """Добавляет один кирпич (quad) в mesh."""
-        dx = (x1 - x0) * m * 0.5
-        dz = (z1 - z0) * m * 0.5
-        if (x1 - x0 - 2*dx) < 1e-6 or (z1 - z0 - 2*dz) < 1e-6:
+        if (x1 - x0 - 2*hm) < 1e-6 or (z1 - z0 - 2*hm) < 1e-6:
             return
         base = len(verts)
-        verts.append(c4d.Vector(x0 + dx, 0.0, z0 + dz))
-        verts.append(c4d.Vector(x1 - dx, 0.0, z0 + dz))
-        verts.append(c4d.Vector(x1 - dx, 0.0, z1 - dz))
-        verts.append(c4d.Vector(x0 + dx, 0.0, z1 - dz))
+        verts.append(c4d.Vector(x0 + hm, 0.0, z0 + hm))
+        verts.append(c4d.Vector(x1 - hm, 0.0, z0 + hm))
+        verts.append(c4d.Vector(x1 - hm, 0.0, z1 - hm))
+        verts.append(c4d.Vector(x0 + hm, 0.0, z1 - hm))
         polys.append(c4d.CPolygon(base, base+3, base+2, base+1))
 
     for row in range(segs_h):
