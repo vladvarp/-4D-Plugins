@@ -239,17 +239,23 @@ def build_tricube(size_x, size_y, size_z, sub_x, sub_y, sub_z,
     all_points = []
     all_polys  = []
 
+    # face_bases[i] = (base, nu, su, sv) для i-й грани (заполняется в цикле ниже)
+    # Используется для закрытия швов (star_cap) после генерации всех граней.
+    face_bases = []
+
     for (ux, uy, uz), (vx, vy, vz), w_sign, (wx, wy, wz), hu, hv, hw, su, sv in face_defs:
 
         # Гексагональная сетка — отдельный путь генерации
         if surface == SURF_HEX:
             _build_hex_face(ux, uy, uz, vx, vy, vz, w_sign, wx, wy, wz,
                             hu, hv, hw, su, sv, star_offset, all_points, all_polys)
+            face_bases.append(None)  # для HEX star_cap не применяется
             continue
 
         base = len(all_points)
         nu = su + 1  # вершин по u
         nv = sv + 1  # вершин по v
+        face_bases.append((base, nu, su, sv))
 
         # Генерируем вершины грани в локальной (u,v)-системе
         for row in range(nv):
@@ -297,61 +303,72 @@ def build_tricube(size_x, size_y, size_z, sub_x, sub_y, sub_z,
                     all_polys.append(c4d.CPolygon(bl, br, tl, tl))
                     all_polys.append(c4d.CPolygon(br, tr, tl, tl))
 
-        # Закрытие швов (star_cap): смещённые вершины на краях грани образуют разрыв
-        # с соседними гранями. Вдоль каждого ребра грани проходим последовательными
-        # парами соседних вершин. Если одна из пары смещена — добавляем треугольник,
-        # закрывающий щель между смещённой вершиной и её двумя соседями вдоль ребра.
-        # Ориентация: w_sign определяет направление нормали (наружу куба).
-        if star_offset != 0.0 and star_cap:
-            # Четыре ребра грани как последовательности (row, col):
-            # нижнее (row=0), верхнее (row=sv), левое (col=0), правое (col=su)
-            edge_sequences = [
-                [(0,  c) for c in range(su + 1)],   # нижнее ребро
-                [(sv, c) for c in range(su + 1)],   # верхнее ребро
-                [(r,  0) for r in range(sv + 1)],   # левое ребро
-                [(r, su) for r in range(sv + 1)],   # правое ребро
-            ]
+    # ─── Закрытие швов (star_cap) ────────────────────────────────────────────────
+    # Все 6 граней уже сгенерированы. Для каждого из 12 рёбер куба берём
+    # последовательности вершин с обеих смежных граней и соединяем их квадами/треугольниками.
+    # Порядок обхода квада: fB[i], fB[i+1], fA[i+1], fA[i] — нормаль наружу куба.
+    # Для рёбер с rev_B=True последовательность грани B реверсируется перед соединением.
+    if star_offset != 0.0 and star_cap and surface != SURF_HEX:
+        # 12 рёбер куба: (face_A, тип_ребра_A, знач_A, face_B, тип_ребра_B, знач_B, rev_B)
+        # тип: "col" — фиксированный столбец (ребро по v), "row" — фиксированная строка (ребро по u)
+        # знач: число или "su"/"sv" — последний индекс по соответствующей оси
+        cube_edges = [
+            (0, "col", "su", 2, "col", 0,    False),  # передняя+правая
+            (0, "col", 0,    3, "col", "su", False),  # передняя+левая
+            (0, "row", "sv", 4, "row", 0,    False),  # передняя+верхняя
+            (0, "row", 0,    5, "row", "sv", False),  # передняя+нижняя
+            (1, "col", 0,    2, "col", "su", False),  # задняя+правая
+            (1, "col", "su", 3, "col", 0,    False),  # задняя+левая
+            (1, "row", "sv", 4, "row", "sv", True),   # задняя+верхняя
+            (1, "row", 0,    5, "row", 0,    True),   # задняя+нижняя
+            (2, "row", "sv", 4, "col", "su", False),  # правая+верхняя
+            (2, "row", 0,    5, "col", "su", True),   # правая+нижняя
+            (3, "row", "sv", 4, "col", 0,    True),   # левая+верхняя
+            (3, "row", 0,    5, "col", 0,    False),  # левая+нижняя
+        ]
 
-            for seq in edge_sequences:
-                for i in range(len(seq) - 1):
-                    r0, c0 = seq[i]
-                    r1, c1 = seq[i + 1]
-                    shifted0 = (r0 + c0) % 2 == 0
-                    shifted1 = (r1 + c1) % 2 == 0
-                    idx0 = base + r0 * nu + c0
-                    idx1 = base + r1 * nu + c1
+        def edge_seq(fi, etype, eval_):
+            """Возвращает список (row, col) вершин вдоль ребра грани fi."""
+            fb = face_bases[fi]
+            if fb is None:
+                return []
+            _, _, su_f, sv_f = fb
+            v = su_f if eval_ == "su" else (sv_f if eval_ == "sv" else eval_)
+            if etype == "col":
+                return [(r, v) for r in range(sv_f + 1)]
+            else:
+                return [(v, c) for c in range(su_f + 1)]
 
-                    if shifted0 and not shifted1:
-                        # idx0 смещена, idx1 на поверхности грани.
-                        # Нужен треугольник: смещённая → левый сосед → правый сосед.
-                        # Предыдущая вершина вдоль ребра (если есть) — ещё один не-смещённый сосед.
-                        if i > 0:
-                            r_prev, c_prev = seq[i - 1]
-                            idx_prev = base + r_prev * nu + c_prev
-                            # Ориентация по w_sign: наружу куба
-                            if w_sign > 0:
-                                all_polys.append(c4d.CPolygon(idx0, idx_prev, idx1, idx1))
-                            else:
-                                all_polys.append(c4d.CPolygon(idx0, idx1, idx_prev, idx_prev))
-                        else:
-                            # Начало ребра — треугольник с одним соседом впереди
-                            if i + 2 < len(seq):
-                                r_next, c_next = seq[i + 2]
-                                idx_next = base + r_next * nu + c_next
-                                if w_sign > 0:
-                                    all_polys.append(c4d.CPolygon(idx0, idx1, idx_next, idx_next))
-                                else:
-                                    all_polys.append(c4d.CPolygon(idx0, idx_next, idx1, idx1))
+        def vert_idx(fi, row, col):
+            """Глобальный индекс вершины грани fi в позиции (row, col)."""
+            base_f, nu_f, _, _ = face_bases[fi]
+            return base_f + row * nu_f + col
 
-                    elif shifted1 and not shifted0:
-                        # idx1 смещена, idx0 на поверхности грани.
-                        if i + 2 < len(seq):
-                            r_next, c_next = seq[i + 2]
-                            idx_next = base + r_next * nu + c_next
-                            if w_sign > 0:
-                                all_polys.append(c4d.CPolygon(idx1, idx_next, idx0, idx0))
-                            else:
-                                all_polys.append(c4d.CPolygon(idx1, idx0, idx_next, idx_next))
+        for fi_a, ta, va, fi_b, tb, vb, rev_b in cube_edges:
+            if face_bases[fi_a] is None or face_bases[fi_b] is None:
+                continue
+            seq_a = edge_seq(fi_a, ta, va)
+            seq_b = edge_seq(fi_b, tb, vb)
+            if rev_b:
+                seq_b = seq_b[::-1]
+
+            n = min(len(seq_a), len(seq_b))
+            for i in range(n - 1):
+                ra0, ca0 = seq_a[i];     ra1, ca1 = seq_a[i + 1]
+                rb0, cb0 = seq_b[i];     rb1, cb1 = seq_b[i + 1]
+                ia0 = vert_idx(fi_a, ra0, ca0)
+                ia1 = vert_idx(fi_a, ra1, ca1)
+                ib0 = vert_idx(fi_b, rb0, cb0)
+                ib1 = vert_idx(fi_b, rb1, cb1)
+                sh_a0 = (ra0 + ca0) % 2 == 0
+                sh_a1 = (ra1 + ca1) % 2 == 0
+                sh_b0 = (rb0 + cb0) % 2 == 0
+                sh_b1 = (rb1 + cb1) % 2 == 0
+                # Добавляем заплатку только если хотя бы одна вершина смещена
+                # (иначе грани уже совпадают в пространстве и заплатка не нужна)
+                if sh_a0 or sh_a1 or sh_b0 or sh_b1:
+                    # Порядок обхода: ib0, ib1, ia1, ia0 — нормаль наружу куба
+                    all_polys.append(c4d.CPolygon(ib0, ib1, ia1, ia0))
 
     return all_points, all_polys
 
