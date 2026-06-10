@@ -14,7 +14,7 @@ import tempfile
 
 ID_DIAMONDCYLINDER = 1068873
 
-NAME_DIAMONDCYLINDER = "DiamondCylinder v1.3"
+NAME_DIAMONDCYLINDER = "DiamondCylinder v1.4"
 
 # ─── UserData SubID (общая схема: SubID=1 — группа, поля с 2) ────────────────
 
@@ -188,8 +188,8 @@ def build_diamond_cylinder(radius, height, segs_r, segs_h, add_caps, twist=0.0):
         for col in range(segs_r):
             a = col
             b = (col + 1) % segs_r
-            # Нормаль вниз: CPolygon(center, b, a, a) — CCW вид снизу
-            polys.append(c4d.CPolygon(bottom_center_idx, b, a, a))
+            # Нормаль вниз: CPolygon(center, a, b, b) — CCW вид снизу
+            polys.append(c4d.CPolygon(bottom_center_idx, a, b, b))
 
         # Верхняя крышка (последний ряд вершин — индекс segs_h)
         top_center_idx = len(verts)
@@ -199,8 +199,8 @@ def build_diamond_cylinder(radius, height, segs_r, segs_h, add_caps, twist=0.0):
         for col in range(segs_r):
             a = top_row_start + col
             b = top_row_start + (col + 1) % segs_r
-            # Нормаль вверх: CPolygon(center, a, b, b)
-            polys.append(c4d.CPolygon(top_center_idx, a, b, b))
+            # Нормаль вверх: CPolygon(center, b, a, a)
+            polys.append(c4d.CPolygon(top_center_idx, b, a, a))
 
     return verts, polys
 
@@ -245,7 +245,7 @@ def build_spiral_cylinder(radius, height, segs_r, segs_h, add_caps, twist=0.0):
         for col in range(segs_r):
             a = col
             b = (col + 1) % segs_r
-            polys.append(c4d.CPolygon(bottom_center_idx, b, a, a))
+            polys.append(c4d.CPolygon(bottom_center_idx, a, b, b))
 
         top_center_idx = len(verts)
         verts.append(c4d.Vector(0, height / 2.0, 0))
@@ -253,7 +253,7 @@ def build_spiral_cylinder(radius, height, segs_r, segs_h, add_caps, twist=0.0):
         for col in range(segs_r):
             a = top_row_start + col
             b = top_row_start + (col + 1) % segs_r
-            polys.append(c4d.CPolygon(top_center_idx, a, b, b))
+            polys.append(c4d.CPolygon(top_center_idx, b, a, a))
 
     return verts, polys
 
@@ -310,7 +310,7 @@ def build_hex_cylinder(radius, height, segs_r, segs_h, add_caps, twist=0.0):
         for col in range(segs_r):
             a = col
             b = (col + 1) % segs_r
-            polys.append(c4d.CPolygon(bottom_center_idx, b, a, a))
+            polys.append(c4d.CPolygon(bottom_center_idx, a, b, b))
 
         top_center_idx = len(verts)
         verts.append(c4d.Vector(0, height / 2.0, 0))
@@ -318,7 +318,7 @@ def build_hex_cylinder(radius, height, segs_r, segs_h, add_caps, twist=0.0):
         for col in range(segs_r):
             a = top_row_start + col
             b = top_row_start + (col + 1) % segs_r
-            polys.append(c4d.CPolygon(top_center_idx, a, b, b))
+            polys.append(c4d.CPolygon(top_center_idx, b, a, a))
 
     return verts, polys
 
@@ -359,7 +359,7 @@ def build_straight_cylinder(radius, height, segs_r, segs_h, add_caps, twist=0.0)
         for col in range(segs_r):
             a = col
             b = (col + 1) % segs_r
-            polys.append(c4d.CPolygon(bottom_center_idx, b, a, a))
+            polys.append(c4d.CPolygon(bottom_center_idx, a, b, b))
 
         top_center_idx = len(verts)
         verts.append(c4d.Vector(0, height / 2.0, 0))
@@ -367,7 +367,7 @@ def build_straight_cylinder(radius, height, segs_r, segs_h, add_caps, twist=0.0)
         for col in range(segs_r):
             a = top_row_start + col
             b = top_row_start + (col + 1) % segs_r
-            polys.append(c4d.CPolygon(top_center_idx, a, b, b))
+            polys.append(c4d.CPolygon(top_center_idx, b, a, a))
 
     return verts, polys
 
