@@ -53,7 +53,7 @@ import zlib
 # ══════════════════════════════════════════════════════════════════════════════
 
 ID_MOLHEXLATTICE  = 1068899
-NAME_MOLHEXLATTICE = "MolecularHexLattice v1.1"
+NAME_MOLHEXLATTICE = "MolecularHexLattice v1.2"
 
 # ══════════════════════════════════════════════════════════════════════════════
 #  UserData SubID — СТРОГО совпадают с порядком вызовов AddUserData
@@ -781,41 +781,38 @@ def _find_best_face(face_normals, direction):
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-#  Материальные теги
+#  Теги выделения полигонов (F, T, M)
 # ══════════════════════════════════════════════════════════════════════════════
 
-def _get_or_create_material(doc, name, color):
-    """Возвращает материал с данным именем или создаёт новый."""
-    mat = doc.GetFirstMaterial()
-    while mat:
-        if mat.GetName() == name:
-            return mat
-        mat = mat.GetNext()
-    # Создаём
-    mat = c4d.BaseMaterial(c4d.Mmaterial)
-    mat.SetName(name)
-    mat[c4d.MATERIAL_COLOR_COLOR] = color
-    doc.InsertMaterial(mat)
-    doc.AddUndo(c4d.UNDOTYPE_NEW, mat)
-    return mat
+def _apply_selection_tag(obj, selection_name):
+    """
+    Вешает тег выделения полигонов (Tpolygonselection) с именем selection_name
+    (F, T или M) на все полигоны объекта.
 
-
-def _apply_mat_tag(obj, doc, restriction, color):
-    """Назначает текстурный тег с ограничением выделения."""
-    if doc is None:
+    Материал пользователь назначает сам — drag-and-drop на примитив с
+    ограничением выделения F, T или M, либо без ограничения (на весь объект).
+    """
+    n_polys = obj.GetPolygonCount()
+    if n_polys == 0:
         return
-    mat = _get_or_create_material(doc, restriction, color)
-    tag = obj.MakeTag(c4d.Ttexture)
-    if tag:
-        tag[c4d.TEXTURETAG_MATERIAL]    = mat
-        tag[c4d.TEXTURETAG_RESTRICTION] = restriction
+
+    tag = obj.MakeTag(c4d.Tpolygonselection)
+    if tag is None:
+        return
+
+    tag.SetName(selection_name)
+
+    sel = tag.GetBaseSelect()
+    # Выделяем все полигоны объекта под данное имя выделения
+    for pi in range(n_polys):
+        sel.Select(pi)
 
 
 # ══════════════════════════════════════════════════════════════════════════════
 #  Главный генератор
 # ══════════════════════════════════════════════════════════════════════════════
 
-def _build_lattice(op, doc):
+def _build_lattice(op):
     """Строит всю молекулярную систему и возвращает нулевой объект-контейнер."""
 
     # ── Параметры ────────────────────────────────────────────────────────────
@@ -899,11 +896,6 @@ def _build_lattice(op, doc):
     g_bevels.SetName("Bevels")
     g_bevels.InsertUnder(root)
 
-    # Цвета материалов
-    col_m = c4d.Vector(0.20, 0.50, 1.00)   # синий  — шары
-    col_t = c4d.Vector(0.75, 0.80, 0.90)   # серый  — трубки
-    col_f = c4d.Vector(1.00, 0.65, 0.15)   # золото — фаски
-
     # ── Шары ─────────────────────────────────────────────────────────────────
     for node_idx, pos in enumerate(positions):
         hole_faces = [f for f in node_holes[node_idx] if f < n_faces]
@@ -913,7 +905,7 @@ def _build_lattice(op, doc):
 
         sphere_obj.SetAbsPos(pos)
         sphere_obj.SetName("Sphere_%03d" % node_idx)
-        _apply_mat_tag(sphere_obj, doc, "M", col_m)
+        _apply_selection_tag(sphere_obj, "M")
         sphere_obj.InsertUnder(g_spheres)
 
     # ── Трубки и фаски ────────────────────────────────────────────────────────
@@ -944,12 +936,12 @@ def _build_lattice(op, doc):
 
         if tube_obj is not None:
             tube_obj.SetName("Tube_%03d" % bond_idx)
-            _apply_mat_tag(tube_obj, doc, "T", col_t)
+            _apply_selection_tag(tube_obj, "T")
             tube_obj.InsertUnder(g_tubes)
 
         for bv_idx, bev_obj in enumerate(bevel_list):
             bev_obj.SetName("Bevel_%03d_%d" % (bond_idx, bv_idx))
-            _apply_mat_tag(bev_obj, doc, "F", col_f)
+            _apply_selection_tag(bev_obj, "F")
             bev_obj.InsertUnder(g_bevels)
 
     return root
@@ -1057,8 +1049,7 @@ class MolecularHexLatticeObject(c4d.plugins.ObjectData):
 
     def GetVirtualObjects(self, op, hh):
         self._ensure_ud(op)
-        doc = op.GetDocument()
-        return _build_lattice(op, doc)
+        return _build_lattice(op)
 
     def GetDDescription(self, op, description, flags):
         if not description.LoadDescription(op.GetType()):
