@@ -15,7 +15,7 @@ import random
 
 ID_BRICKPLANE = 1068875
 
-NAME_BRICKPLANE = "BrickPlane v1.4"
+NAME_BRICKPLANE = "BrickPlane v1.5"
 
 # ─── UserData SubID (общая схема: SubID=1 — группа, поля с 2) ────────────────
 
@@ -393,57 +393,63 @@ def _build_herringbone(width, height, segs_w, segs_h, mortar_frac=0.0):
 
 def _build_hexagonal(width, height, segs_w, segs_h, mortar_frac=0.0):
     """
-    Гексагональные плитки (flat-top ориентация, рядовая укладка).
+    Гексагональные плитки (flat-top ориентация).
     segs_w — число гексагонов по X, segs_h — по Y.
-    Каждый гексагон — 6-угольник (6 вершин, триангулируется в 4 треугольника).
-    mortar_frac — уменьшает радиус каждого гексагона.
+    Flat-top: верхняя/нижняя грань горизонтальны.
+      circumradius r  → ширина гекса = 2*r, высота = r*sqrt(3)
+      шаг по X: 1.5*r  (между центрами соседних колонок)
+      шаг по Z: r*sqrt(3)  (строки внутри колонки)
+      нечётные колонки смещены по Z на r*sqrt(3)/2
+    segs_w и segs_h задают число гексагонов по X и Y сетки.
+    mortar_frac — уменьшает радиус каждого гексагона (шов).
     """
-    m       = max(0.0, min(mortar_frac, 0.45))
-    # Радиус гексагона (от центра до вершины)
-    hex_r   = min(width / (segs_w * 2.0), height / (segs_h * math.sqrt(3))) * (1.0 - m)
-    # Шаг по X и Y для flat-top гексагональной сетки
-    step_x  = hex_r * 2.0 * (width  / (segs_w * hex_r * 2.0)) if hex_r > 1e-6 else 1.0
-    step_y  = hex_r * math.sqrt(3)
+    m = max(0.0, min(mortar_frac, 0.45))
 
-    # Пересчитываем реальные шаги равномерно
-    sx = width  / segs_w
-    sy = height / segs_h
-    r  = min(sx, sy / math.sqrt(3)) * 0.5 * (1.0 - m)
+    # Flat-top hex grid: step_x = 1.5*r (не 3*r!), step_z = r*sqrt(3)
+    # По X: segs_w колонок → total_x = 1.5*r*(segs_w-1) + 2*r = r*(1.5*segs_w + 0.5)
+    # По Z: segs_h строк   → total_z = r*sqrt(3)*(segs_h + 0.5) (с учётом смещения нечётных колонок)
+    r_from_x = width  / (1.5 * segs_w + 0.5)
+    r_from_z = height / (math.sqrt(3) * (segs_h + 0.5))
+    r_full   = min(r_from_x, r_from_z)
+    r        = r_full * (1.0 - m)  # уменьшаем на шов
+
+    # Шаги сетки (по центрам, не зависят от m)
+    step_x = 1.5 * r_full           # шаг по X между центрами соседних колонок
+    step_z = r_full * math.sqrt(3)  # шаг по Z между центрами строк
+
+    # Полный размер сетки и центрирование
+    total_x = step_x * (segs_w - 1) + 2.0 * r_full
+    total_z = step_z * segs_h + step_z * 0.5
+    off_x   = -total_x * 0.5 + r_full
+    off_z   = -total_z * 0.5 + step_z * 0.5
 
     verts = []
     polys = []
 
-    real_sx = sx
-    real_sy = sy * math.sqrt(3) / 2.0  # вертикальный шаг между рядами
+    for col in range(segs_w):
+        cx = col * step_x + off_x
+        # Нечётные колонки смещены по Z на полшага
+        z_shift = (step_z * 0.5) if (col % 2 == 1) else 0.0
 
-    for row in range(segs_h):
-        x_offset = (row % 2) * (real_sx * 0.5)  # нечётные ряды смещены
-        for col in range(segs_w):
-            cx = col * real_sx + x_offset - width  / 2.0 + real_sx * 0.5
-            cz = row * (sy * 0.75) - height / 2.0 + sy * 0.5
+        for row in range(segs_h):
+            cz = row * step_z + z_shift + off_z
 
-            # Вершины flat-top гексагона (6 точек по кругу, 0° = вправо)
+            # 6 вершин flat-top гексагона: 0° = вправо, вершины через 60°
             hex_pts = []
-            actual_r = min(real_sx, sy) * 0.5 * (1.0 - m)
             for i in range(6):
                 angle = math.radians(60.0 * i)
-                hx = cx + actual_r * math.cos(angle)
-                hz = cz + actual_r * math.sin(angle)
+                hx = cx + r * math.cos(angle)
+                hz = cz + r * math.sin(angle)
                 hex_pts.append(c4d.Vector(hx, 0.0, hz))
 
             base = len(verts)
             verts.extend(hex_pts)
-            # Центральная вершина для веерной триангуляции
-            verts.append(c4d.Vector(cx, 0.0, cz))
-            center_idx = base + 6
 
-            # 6 треугольников из центра
-            for i in range(6):
-                a = base + i
-                b = base + (i + 1) % 6
-                # Используем CPolygon с вырожденным 4-м индексом (треугольник)
-                # Обход CW сверху: center → b → a
-                polys.append(c4d.CPolygon(center_idx, b, a, a))
+            # Один N-гон (6 вершин) — без триангуляции
+            # C4D CPolygon поддерживает только quads, поэтому используем 4+2:
+            # quad0: v0,v1,v2,v3  quad1: v0,v3,v4,v5
+            polys.append(c4d.CPolygon(base+0, base+1, base+2, base+3))
+            polys.append(c4d.CPolygon(base+0, base+3, base+4, base+5))
 
     return verts, polys
 
