@@ -12,6 +12,16 @@ import base64
 from pathlib import Path
 from urllib.parse import unquote
 
+import ctypes
+
+# Скрываем консольное окно для всех дочерних процессов на Windows
+CREATE_NO_WINDOW = 0x08000000
+
+def _run(cmd, **kwargs):
+    """subprocess.run с флагом скрытия консоли."""
+    kwargs.setdefault("creationflags", CREATE_NO_WINDOW)
+    return subprocess.run(cmd, **kwargs)
+
 from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QLabel, QPushButton, QLineEdit, QFileDialog, QTableWidget,
@@ -207,7 +217,7 @@ def save_config(cfg: dict):
 
 def git_available() -> bool:
     try:
-        subprocess.run(["git", "--version"], capture_output=True, check=True)
+        _run(["git", "--version"], capture_output=True, check=True)
         return True
     except Exception:
         return False
@@ -227,7 +237,7 @@ def install_git(progress_cb, done_cb):
             tmp = tempfile.mktemp(suffix=".exe")
             urllib.request.urlretrieve(GIT_INSTALLER_URL, tmp)
             progress_cb("Устанавливаю Git (подождите)…")
-            subprocess.run(
+            _run(
                 [tmp, "/VERYSILENT", "/NORESTART",
                  "/COMPONENTS=icons,ext\\reg\\shellhere,assoc,assoc_sh"],
                 check=True
@@ -247,10 +257,10 @@ def sparse_clone_folder(repo_url: str, folder_path: str, dest: str, progress_cb)
     tmp_dir = tempfile.mkdtemp()
     try:
         progress_cb(f"Инициализирую репозиторий…")
-        subprocess.run([git, "init", tmp_dir], check=True, capture_output=True)
-        subprocess.run([git, "-C", tmp_dir, "remote", "add", "origin", repo_url],
+        _run([git, "init", tmp_dir], check=True, capture_output=True)
+        _run([git, "-C", tmp_dir, "remote", "add", "origin", repo_url],
                        check=True, capture_output=True)
-        subprocess.run([git, "-C", tmp_dir, "config", "core.sparseCheckout", "true"],
+        _run([git, "-C", tmp_dir, "config", "core.sparseCheckout", "true"],
                        check=True, capture_output=True)
 
         sparse_file = Path(tmp_dir) / ".git" / "info" / "sparse-checkout"
@@ -258,7 +268,7 @@ def sparse_clone_folder(repo_url: str, folder_path: str, dest: str, progress_cb)
         sparse_file.write_text(folder_path + "/\n", encoding="utf-8")
 
         progress_cb(f"Скачиваю «{folder_path}»…")
-        result = subprocess.run(
+        result = _run(
             [git, "-C", tmp_dir, "pull", "--depth=1", "origin", "main"],
             capture_output=True, text=True
         )
@@ -794,6 +804,13 @@ class MainWindow(QMainWindow):
                                 "Git не установлен. Нажмите «Установить выбранные» для автоустановки Git.")
             return
 
+        # Немедленно блокируем UI и показываем прогресс ДО запуска воркера
+        self.refresh_btn.setEnabled(False)
+        self.progress_bar.setRange(0, 0)
+        self.progress_bar.setVisible(True)
+        self.progress_lbl.setText(f"Подготовка к установке «{plugin['name']}»…")
+        QApplication.processEvents()
+
         self._run_worker([plugin], install_dir)
 
     def _delete_plugin(self, name: str):
@@ -820,8 +837,9 @@ class MainWindow(QMainWindow):
 
     def _run_worker(self, to_install, install_dir):
         self.refresh_btn.setEnabled(False)
-        self.progress_bar.setRange(0, 0)
-        self.progress_bar.setVisible(True)
+        if not self.progress_bar.isVisible():
+            self.progress_bar.setRange(0, 0)
+            self.progress_bar.setVisible(True)
 
         self.worker = InstallWorker(to_install, install_dir, self.config)
         self.worker.progress.connect(self.progress_lbl.setText)

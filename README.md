@@ -57,6 +57,9 @@
 | **PolySubdivider v1.0 (Experimental)** | Эксперементальный аналог Divider: несколько алгоритмов разбиения полигонов с возможностью лёгкого добавления новых типов. |
 
 ## Установка
+1. https://github.com/vladvarp/-4D-Plugins/releases/tag/C4D
+
+или
 
 1. Скопировать содержимое папки `VAr Tools` в директорию плагинов Cinema 4D:
    - **Windows**: `%APPDATA%\MAXON\Cinema 4D <версия>\plugins\`
