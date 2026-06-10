@@ -30,6 +30,7 @@ UserData SubID MAP (строго фиксировано):
   SubID=14 : g_sph (группа «Шары»)
   SubID=15 : ML_SPHERE_RADIUS
   SubID=16 : ML_SPHERE_SUBDIV
+  SubID=24 : ML_SPHERE_PHONG
   SubID=17 : g_tub (группа «Трубки»)
   SubID=18 : ML_TUBE_RADIUS
   SubID=19 : ML_TUBE_SEGS_R
@@ -37,6 +38,7 @@ UserData SubID MAP (строго фиксировано):
   SubID=21 : g_bev (группа «Фаска»)
   SubID=22 : ML_BEVEL_SIZE
   SubID=23 : ML_BEVEL_SUBDIV
+  SubID=24 : ML_SPHERE_PHONG
 """
 
 import c4d
@@ -53,7 +55,7 @@ import zlib
 # ══════════════════════════════════════════════════════════════════════════════
 
 ID_MOLHEXLATTICE  = 1068899
-NAME_MOLHEXLATTICE = "MolecularHexLattice v1.3"
+NAME_MOLHEXLATTICE = "MolecularHexLattice v1.5"
 
 # ══════════════════════════════════════════════════════════════════════════════
 #  UserData SubID — СТРОГО совпадают с порядком вызовов AddUserData
@@ -87,6 +89,8 @@ ML_TUBE_SEGS_H  = 20
 UD_G_BEV    = 21   # группа «Фаска»
 ML_BEVEL_SIZE   = 22
 ML_BEVEL_SUBDIV = 23
+
+ML_SPHERE_PHONG = 24   # угол фонг-сглаживания шаров (градусы)
 
 # Первый «настоящий» параметр данных (используется для проверки инициализации)
 ML_FIRST_PARAM = ML_SIZE_X  # SubID=2
@@ -497,18 +501,33 @@ def _make_poly_object(pts, cpolys, name):
 # ══════════════════════════════════════════════════════════════════════════════
 
 def _fan_triangulate(indices, pts):
-    """N-гон → список c4d.CPolygon (веер от hub=indices[0])."""
+    """N-гон → список c4d.CPolygon.
+    Для n==3,4 — стандартная триангуляция.
+    Для n>=5 (пятиугольники, гексагоны) — через центральную вершину (звезда):
+    центральная точка добавляется в pts, её индекс = len(pts) перед вызовом.
+    Возвращает список CPolygon; для n>=5 pts расширяется на 1 элемент (центр).
+    """
     n = len(indices)
     if n == 3:
         return [c4d.CPolygon(indices[0], indices[1], indices[2], indices[2])]
     if n == 4:
         return [c4d.CPolygon(indices[0], indices[1], indices[2], indices[3])]
-    hub = indices[0]
-    return [c4d.CPolygon(hub, indices[k], indices[k+1], indices[k+1])
-            for k in range(1, n - 1)]
+    # n >= 5: вычисляем центральную точку грани и добавляем в pts
+    cx = sum(pts[idx].x for idx in indices) / n
+    cy = sum(pts[idx].y for idx in indices) / n
+    cz = sum(pts[idx].z for idx in indices) / n
+    center_idx = len(pts)
+    pts.append(c4d.Vector(cx, cy, cz))
+    # Каждый треугольник: центр + два соседних периметральных угла
+    result = []
+    for k in range(n):
+        a = indices[k]
+        b = indices[(k + 1) % n]
+        result.append(c4d.CPolygon(center_idx, a, b, b))
+    return result
 
 
-def _build_sphere_with_holes(radius, subdivisions, hole_face_indices):
+def _build_sphere_with_holes(radius, subdivisions, hole_face_indices, phong_angle=45.0):
     """
     Строит цельную dual icosphere — полигоны НЕ удаляются.
     Зазор между шаром и трубкой закрывается фаской с цилиндрической экструзией.
@@ -547,15 +566,13 @@ def _build_sphere_with_holes(radius, subdivisions, hole_face_indices):
         new_cps = _fan_triangulate(poly_idx_list, pts)
         cpols.extend(new_cps)
 
-        # Помечаем внутренние рёбра веера как «скрытые» (N-gon в C4D)
+        # Для звёздной триангуляции (n>=5) — все внутренние рёбра скрыты
+        # (рёбра от центра к вершинам периметра — edge 0 каждого треугольника)
         n = len(poly_idx_list)
         if n > 4:
-            for t in range(n - 2):
+            for t in range(n):
                 pi = start + t
-                if t > 0:
-                    hidden.append(4 * pi + 0)
-                if t < n - 3:
-                    hidden.append(4 * pi + 2)
+                hidden.append(4 * pi + 0)  # ребро центр→вершина_a
 
     obj = _make_poly_object(pts, cpols, "MHL_Sphere")
 
@@ -564,7 +581,7 @@ def _build_sphere_with_holes(radius, subdivisions, hole_face_indices):
         for eid in hidden:
             eh.Select(eid)
 
-    _add_phong_tag(obj, 45.0)
+    _add_phong_tag(obj, phong_angle)
     return obj, hole_centers, hole_normals
 
 
@@ -860,6 +877,8 @@ def _build_lattice(op):
     bevel_size  = max(0.0,  float(_ud_get(op, ML_BEVEL_SIZE,    5.0)))
     bevel_sub   = max(0,    int(_ud_get(op, ML_BEVEL_SUBDIV,    2)))
 
+    sphere_phong = math.degrees(max(0.0, min(math.radians(180.0), float(_ud_get(op, ML_SPHERE_PHONG, math.radians(45.0))))))
+
     # ── Позиции узлов ────────────────────────────────────────────────────────
     positions_raw = _generate_positions(size_x, size_y, size_z, density, seed, jitter)
 
@@ -922,7 +941,7 @@ def _build_lattice(op):
         hole_faces = [f for f in node_holes[node_idx] if f < n_faces]
 
         sphere_obj, hole_centers, hole_normals = \
-            _build_sphere_with_holes(sphere_r, sphere_sub, hole_faces)
+            _build_sphere_with_holes(sphere_r, sphere_sub, hole_faces, sphere_phong)
 
         sphere_obj.SetAbsPos(pos)
         sphere_obj.SetName("Sphere_%03d" % node_idx)
@@ -1002,7 +1021,7 @@ def _create_userdata(op):
 
     # SubID=14 → g_sph
     g_sph = _add_group(op, "Шары  [M]")
-    # SubID=15..16
+    # SubID=15..16, 24
     _add_in_group(op, g_sph, _float_bc("Радиус шара",   40.0, 1.0, 100000.0))
     _add_in_group(op, g_sph, _int_bc  ("Подразделение",  2,    1,   4))
 
@@ -1018,6 +1037,10 @@ def _create_userdata(op):
     # SubID=22..23
     _add_in_group(op, g_bev, _float_bc("Размер фаски",           5.0,  0.0,  100000.0))
     _add_in_group(op, g_bev, _int_bc  ("Подразделение фаски",    2,    0,    8))
+
+    # SubID=24 → угол фонг-сглаживания шаров
+    _add_in_group(op, g_sph, _float_bc("Фонг шаров (°)",        math.radians(45.0),  0.0,  math.radians(180.0),
+                                        unit=c4d.DESC_UNIT_DEGREE, step=math.radians(1.0)))
 
 
 def _set_defaults(op):
@@ -1036,6 +1059,7 @@ def _set_defaults(op):
 
     _ud_set(op, ML_SPHERE_RADIUS, 40.0)
     _ud_set(op, ML_SPHERE_SUBDIV, 2)
+    _ud_set(op, ML_SPHERE_PHONG,  math.radians(45.0))
 
     _ud_set(op, ML_TUBE_RADIUS,  8.0)
     _ud_set(op, ML_TUBE_SEGS_R,  8)
