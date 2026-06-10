@@ -14,7 +14,7 @@ import tempfile
 
 ID_TRICUBE = 1068871
 
-NAME_TRICUBE = "TriCube v1.2"
+NAME_TRICUBE = "TriCube v1.1"
 
 # ─── UserData SubID (общая схема: SubID=1 — группа, поля с 2) ────────────────
 
@@ -38,6 +38,10 @@ SURF_TRI    = 0   # Треугольная сетка (диагональ еди
 SURF_QUAD   = 1   # Квадратная сетка
 SURF_HBONE  = 2   # Ёлочка (чередование диагоналей)
 SURF_SHIFT  = 3   # Смещённые ряды (кирпичная раскладка)
+SURF_HEX    = 4   # Гексагональная сетка
+
+# Галочка "Закрыть швы смещения"
+TC_STAR_CAP = 11  # Закрывает разрывы по рёбрам грани при star_offset != 0
 
 
 # ─── Вспомогательные функции UserData ────────────────────────────────────────
@@ -145,13 +149,70 @@ def _ud_set_default(op, uid, value):
 
 # ─── Генераторы мешей ─────────────────────────────────────────────────────────
 
-def build_tricube(size_x, size_y, size_z, sub_x, sub_y, sub_z, surface=SURF_TRI, star_offset=0.0):
+def _build_hex_face(ux, uy, uz, vx, vy, vz, w_sign, wx, wy, wz,
+                    hu, hv, hw, su, sv, star_offset, all_points, all_polys):
+    """
+    Гексагональная сетка на одной грани куба.
+    Каждая ячейка (row, col) — правильный шестиугольник с центром и 6 вершинами.
+    Центры шестиугольников укладываются в смещённую сетку (offset-grid):
+      нечётные строки сдвинуты на полшага по u.
+    Шестиугольники ориентированы вершинами вверх-вниз (flat-top).
+    star_offset — смещение центра шестиугольника вдоль нормали грани.
+    """
+    # Шаги между центрами гексагонов
+    step_u = (2.0 * hu) / su          # шаг по u
+    step_v = (2.0 * hv) / sv          # шаг по v
+    # Радиус вписанной окружности (апофема) и описанной для flat-top гексагона
+    r_out = min(step_u, step_v) * 0.5  # описанная (вершины)
+    r_in  = r_out * math.sqrt(3) * 0.5 # вписанная (середины рёбер)
+
+    # Углы 6 вершин flat-top гексагона (0°=правый, затем против часовой стрелки)
+    hex_angles = [math.radians(a) for a in (0, 60, 120, 180, 240, 300)]
+
+    for row in range(sv):
+        v_center = -hv + step_v * (row + 0.5)          # центр строки по v
+        u_off = step_u * 0.5 if row % 2 == 1 else 0.0  # сдвиг нечётных строк
+
+        for col in range(su):
+            u_center = -hu + step_u * (col + 0.5) + u_off  # центр по u
+
+            # Смещение центра вдоль нормали (звезда)
+            nrm_shift = star_offset if star_offset != 0.0 else 0.0
+
+            # Центральная точка гексагона
+            cx = ux*u_center*1.0 + vx*v_center*1.0 + wx*w_sign*hw + wx*w_sign*nrm_shift
+            cy = uy*u_center*1.0 + vy*v_center*1.0 + wy*w_sign*hw + wy*w_sign*nrm_shift
+            cz = uz*u_center*1.0 + vz*v_center*1.0 + wz*w_sign*hw + wz*w_sign*nrm_shift
+
+            center_idx = len(all_points)
+            all_points.append(c4d.Vector(cx, cy, cz))
+
+            # 6 вершин гексагона в плоскости грани (u-v)
+            vert_start = len(all_points)
+            for ang in hex_angles:
+                du = r_out * math.cos(ang)
+                dv = r_out * math.sin(ang)
+                x = cx + ux*du + vx*dv
+                y = cy + uy*du + vy*dv
+                z = cz + uz*du + vz*dv
+                all_points.append(c4d.Vector(x, y, z))
+
+            # 6 треугольных граней (центр + два соседних угла)
+            for k in range(6):
+                a = vert_start + k
+                b = vert_start + (k + 1) % 6
+                all_polys.append(c4d.CPolygon(center_idx, a, b, b))
+
+
+def build_tricube(size_x, size_y, size_z, sub_x, sub_y, sub_z,
+                  surface=SURF_TRI, star_offset=0.0, star_cap=False):
     """
     Куб с настраиваемой сеткой.
     size_x/y/z   — размеры по осям.
     sub_x/y/z    — подразделения по каждой оси (применяются к соответствующим граням).
-    surface      — тип сетки: SURF_TRI / SURF_QUAD / SURF_HBONE / SURF_SHIFT.
+    surface      — тип сетки: SURF_TRI / SURF_QUAD / SURF_HBONE / SURF_SHIFT / SURF_HEX.
     star_offset  — смещение чередующихся вершин вдоль нормали грани (эффект рельефа).
+    star_cap     — закрыть разрывы по краям грани заплаточными полигонами.
     Возвращает (points, polys) для c4d.PolygonObject.
     """
     hx = size_x / 2.0
@@ -175,6 +236,13 @@ def build_tricube(size_x, size_y, size_z, sub_x, sub_y, sub_z, surface=SURF_TRI,
     all_polys  = []
 
     for (ux, uy, uz), (vx, vy, vz), w_sign, (wx, wy, wz), hu, hv, hw, su, sv in face_defs:
+
+        # Гексагональная сетка — отдельный путь генерации
+        if surface == SURF_HEX:
+            _build_hex_face(ux, uy, uz, vx, vy, vz, w_sign, wx, wy, wz,
+                            hu, hv, hw, su, sv, star_offset, all_points, all_polys)
+            continue
+
         base = len(all_points)
         nu = su + 1  # вершин по u
         nv = sv + 1  # вершин по v
@@ -224,6 +292,55 @@ def build_tricube(size_x, size_y, size_z, sub_x, sub_y, sub_z, surface=SURF_TRI,
                     # SURF_TRI — единообразные треугольники (диагональ bl-tr)
                     all_polys.append(c4d.CPolygon(bl, br, tl, tl))
                     all_polys.append(c4d.CPolygon(br, tr, tl, tl))
+
+        # Закрытие швов (star_cap): смещённые вершины на краях грани образуют разрыв
+        # с соседними гранями. Добавляем узкие треугольники вдоль всех 4 рёбер грани,
+        # соединяя смещённую вершину края с её не-смещённым соседом по нормали грани.
+        # Логика: по рёбрам грани (row=0, row=sv, col=0, col=su) проходим пары
+        # соседних вершин и, если одна из них была смещена (чётная по (row+col)),
+        # добавляем заплаточный треугольник к «плоской» позиции на поверхности куба.
+        if star_offset != 0.0 and star_cap:
+            def flat_pt(row, col):
+                """Позиция вершины без смещения (на поверхности грани)."""
+                if surface == SURF_SHIFT and row % 2 == 1:
+                    u_t = ((col + 0.5) / su) * 2.0 - 1.0
+                else:
+                    u_t = (col / su) * 2.0 - 1.0
+                v_t = (row / sv) * 2.0 - 1.0
+                return c4d.Vector(
+                    ux*u_t*hu + vx*v_t*hv + wx*w_sign*hw,
+                    uy*u_t*hu + vy*v_t*hv + wy*w_sign*hw,
+                    uz*u_t*hu + vz*v_t*hv + wz*w_sign*hw,
+                )
+
+            # Четыре ребра: нижнее (row=0), верхнее (row=sv),
+            #               левое (col=0), правое (col=su)
+            edges = []
+            # нижнее ребро: row=0, col=0..su
+            edges += [(0, c) for c in range(su + 1)]
+            # верхнее ребро: row=sv, col=0..su
+            edges += [(sv, c) for c in range(su + 1)]
+            # левое ребро: col=0, row=0..sv
+            edges += [(r, 0) for r in range(sv + 1)]
+            # правое ребро: col=su, row=0..sv
+            edges += [(r, su) for r in range(sv + 1)]
+
+            for (row, col) in edges:
+                if (row + col) % 2 == 0:
+                    # Эта вершина была смещена — берём её индекс в all_points
+                    shifted_idx = base + row * nu + col
+                    # Плоская позиция (куда должна примыкать соседняя грань)
+                    flat_pos = flat_pt(row, col)
+                    flat_idx = len(all_points)
+                    all_points.append(flat_pos)
+                    # Ищем соседей вдоль ребра для заплатки
+                    # Для каждого смещённого угла добавляем треугольник:
+                    # (смещённая, плоская, ближайший не-смещённый сосед на грани)
+                    for dr, dc in ((-1, 0), (1, 0), (0, -1), (0, 1)):
+                        nr, nc = row + dr, col + dc
+                        if 0 <= nr <= sv and 0 <= nc <= su:
+                            nb_idx = base + nr * nu + nc
+                            all_polys.append(c4d.CPolygon(shifted_idx, flat_idx, nb_idx, nb_idx))
 
     return all_points, all_polys
 
@@ -340,12 +457,15 @@ class TriCubeObject(_MeshPrimitiveBase):
         # Тип поверхности
         _add_in_group(op, grp_subid, _make_cycle_bc(
             "Поверхность", SURF_TRI,
-            ["Треугольники", "Квады", "Ёлочка", "Смещённые ряды"]))
+            ["Треугольники", "Квады", "Ёлочка", "Смещённые ряды", "Гексагоны"]))
         # Смещение (звезда)
         _add_in_group(op, grp_subid, _make_bool_bc(
             "Смещение (звезда)", False))
         _add_in_group(op, grp_subid, _make_float_bc(
             "Величина смещения", 0.0, -10000.0, 10000.0))
+        # Закрыть швы смещения
+        _add_in_group(op, grp_subid, _make_bool_bc(
+            "Закрыть швы", False))
 
     def _set_defaults(self, op):
         _ud_set_default(op, TC_SIZE_X,     200.0)
