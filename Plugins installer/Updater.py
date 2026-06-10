@@ -150,6 +150,15 @@ def parse_list(raw: str) -> list[dict]:
         info_match = re.search(r"\{([^}]+)\}", line)
         info_text = info_match.group(1).strip() if info_match else ""
 
+        # Вычленяем url: из info_text, если есть
+        info_url = ""
+        if info_text:
+            url_match = re.search(r"(?:^|[\s,;]*)url:\s*(https?://\S+)", info_text)
+            if url_match:
+                info_url = url_match.group(1).strip()
+                # Убираем «url: <адрес>» из текста, оставляем остальное
+                info_text = re.sub(r"(?:^|[\s,;]*)url:\s*https?://\S+", "", info_text).strip().strip(",;.")
+
         line = re.sub(r"\{[^}]+\}", "", line).strip()
         m = re.search(r"\s+(v[\d.]+)\s*$", line)
         if not m:
@@ -177,6 +186,7 @@ def parse_list(raw: str) -> list[dict]:
             "repo_url": repo_url,
             "repo_path": repo_path,   # «VAr Tools», не «VAr%20Tools»
             "info": info_text,         # текст из {}, например «Пакет VAr Tools»
+            "info_url": info_url,      # url: из {}, если указан
         })
     return plugins
 
@@ -556,7 +566,7 @@ class MainWindow(QMainWindow):
 
         # Таблица: Плагин | Установлено | На GitHub | Статус | Действие | Удалить
         self.table = QTableWidget(0, 6)
-        self.table.setHorizontalHeaderLabels(["Плагин", "Установлено", "На GitHub", "Статус", "", ""])
+        self.table.setHorizontalHeaderLabels(["Плагин", "Текущая версия", "Актуальная версия", "Статус", "", ""])
         hh = self.table.horizontalHeader()
         hh.setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
         hh.setSectionResizeMode(1, QHeaderView.ResizeMode.Fixed)
@@ -565,10 +575,10 @@ class MainWindow(QMainWindow):
         hh.setSectionResizeMode(4, QHeaderView.ResizeMode.Fixed)
         hh.setSectionResizeMode(5, QHeaderView.ResizeMode.Fixed)
         self.table.setColumnWidth(1, 115)
-        self.table.setColumnWidth(2, 115)
-        self.table.setColumnWidth(3, 155)
-        self.table.setColumnWidth(4, 130)  # Установить / Обновить
-        self.table.setColumnWidth(5, 120)  # Удалить
+        self.table.setColumnWidth(2, 135)
+        self.table.setColumnWidth(3, 125)
+        self.table.setColumnWidth(4, 120)  # Установить / Обновить
+        self.table.setColumnWidth(5, 115)  # Удалить
         self.table.verticalHeader().setVisible(False)
         self.table.setSelectionMode(QAbstractItemView.SelectionMode.NoSelection)
         self.table.setFocusPolicy(Qt.FocusPolicy.NoFocus)
@@ -684,8 +694,8 @@ class MainWindow(QMainWindow):
 
             # Имя + info из {}
             name_item = QTableWidgetItem(name)
-            if p.get("info"):
-                name_item.setToolTip(p["info"])
+            if p.get("info") or p.get("info_url"):
+                name_item.setToolTip(p.get("info", "") or p.get("info_url", ""))
                 # Показываем info как подсказку прямо в ячейке через виджет
                 name_widget = QWidget()
                 name_widget.setStyleSheet("background:transparent;")
@@ -694,10 +704,23 @@ class MainWindow(QMainWindow):
                 nw_lay.setSpacing(1)
                 lbl_name = QLabel(name)
                 lbl_name.setStyleSheet(f"color:{TEXT}; font-size:12px; background:transparent;")
-                lbl_info = QLabel(p["info"])
-                lbl_info.setStyleSheet(f"color:{DIM}; font-size:10px; background:transparent;")
                 nw_lay.addWidget(lbl_name)
-                nw_lay.addWidget(lbl_info)
+                # Строка под именем: текст (если есть) + ссылка «Подробнее» (если есть url)
+                if p.get("info") or p.get("info_url"):
+                    sub_lay = QHBoxLayout()
+                    sub_lay.setContentsMargins(0, 0, 0, 0)
+                    sub_lay.setSpacing(4)
+                    if p.get("info"):
+                        lbl_info = QLabel(p["info"])
+                        lbl_info.setStyleSheet(f"color:{DIM}; font-size:10px; background:transparent;")
+                        sub_lay.addWidget(lbl_info)
+                    if p.get("info_url"):
+                        lbl_link = QLabel(f'<a href="{p["info_url"]}" style="color:#5b9bd5; font-size:10px;">Подробнее...</a>')
+                        lbl_link.setOpenExternalLinks(True)
+                        lbl_link.setStyleSheet("background:transparent;")
+                        sub_lay.addWidget(lbl_link)
+                    sub_lay.addStretch()
+                    nw_lay.addLayout(sub_lay)
                 self.table.setCellWidget(row, 0, name_widget)
             else:
                 self.table.setItem(row, 0, name_item)
@@ -713,7 +736,7 @@ class MainWindow(QMainWindow):
             # Статус
             if outdated:
                 needs += 1
-                status_text = "⬆ Нужно обновить" if local_ver else "✦ Не установлен"
+                status_text = "Есть обновление" if local_ver else ""
                 status_color = YELLOW if local_ver else ACCENT
             else:
                 status_text = "✓ Актуально"
