@@ -15,7 +15,7 @@ import random
 
 ID_BRICKPLANE = 1068875
 
-NAME_BRICKPLANE = "BrickPlane v1.3"
+NAME_BRICKPLANE = "BrickPlane v1.4"
 
 # ─── UserData SubID (общая схема: SubID=1 — группа, поля с 2) ────────────────
 
@@ -212,85 +212,65 @@ def _build_running_bond(width, height, segs_w, segs_h, mortar_frac=0.0):
     """
     Кирпичная кладка (running bond / половинное смещение).
     Нечётные ряды смещены на полшага по X.
-    Рёбра на границах нечётных рядов разрезаются дополнительными вершинами.
-    mortar_frac — доля шва от размера кирпича (0 = без шва, 0.1 = 10%).
+    Каждый кирпич — отдельный quad с уникальными вершинами.
+    mortar_frac — доля шва (0 = без шва, 0.4 = максимум).
     """
-    # Стратегия: для корректной топологии без T-стыков используем
-    # сетку с двойным количеством вершин по X и треугольниками на стыках
-
-    m = max(0.0, min(mortar_frac, 0.45))  # ограничиваем шов
+    m      = max(0.0, min(mortar_frac, 0.45))
     step_x = width  / segs_w
     step_y = height / segs_h
     # Единое абсолютное значение полушва — равномерное по обеим осям
-    hm = min(step_x, step_y) * m * 0.5
-    hm_x = hm
-    hm_y = hm
-
-    # Строим полную сетку вершин: (segs_w*2 + 1) × (segs_h + 1)
-    # Это даёт нам все нужные точки для смещённых рядов
-    nx = segs_w * 2 + 1   # вершин по X
-    ny = segs_h + 1        # вершин по Y (ряды)
+    hm     = min(step_x, step_y) * m * 0.5
 
     verts = []
-    # Все вершины: каждый ряд чередует обычные и смещённые позиции
-    for row in range(ny):
-        y_pos = row / segs_h * height - height / 2.0
-        for col in range(nx):
-            # col идёт с шагом step_x/2
-            x_pos = col * (step_x / 2.0) - width / 2.0
-            verts.append(c4d.Vector(x_pos, 0.0, y_pos))
-
     polys = []
-    for row in range(segs_h):
-        if row % 2 == 0:
-            # Чётный ряд: кирпичи начинаются с 0, каждый кирпич = 2 шага по X
-            for brick in range(segs_w):
-                # Нижние вершины кирпича (в глобальной сетке col*2 и col*2+2)
-                bl = row * nx + brick * 2
-                br = row * nx + brick * 2 + 2
-                tl = (row + 1) * nx + brick * 2
-                tr = (row + 1) * nx + brick * 2 + 2
-                # Средние вершины на верхнем и нижнем ребре
-                bm = row * nx + brick * 2 + 1
-                tm = (row + 1) * nx + brick * 2 + 1
 
-                # Полный кирпич = quad (bl, br, tr, tl)
-                # Но нам нужны средние точки для стыковки с нечётным рядом
-                # Нижняя половина кирпича
-                polys.append(c4d.CPolygon(bl, tl, tm, bm))
-                polys.append(c4d.CPolygon(bm, tm, tr, br))
+    for row in range(segs_h):
+        z0 = row       / segs_h * height - height / 2.0
+        z1 = (row + 1) / segs_h * height - height / 2.0
+
+        if row % 2 == 0:
+            # Чётный ряд: кирпичи начинаются с 0, каждый кирпич = step_x
+            for brick in range(segs_w):
+                x0 = brick * step_x - width / 2.0
+                x1 = x0 + step_x
+                base = len(verts)
+                verts.append(c4d.Vector(x0 + hm, 0.0, z0 + hm))
+                verts.append(c4d.Vector(x1 - hm, 0.0, z0 + hm))
+                verts.append(c4d.Vector(x1 - hm, 0.0, z1 - hm))
+                verts.append(c4d.Vector(x0 + hm, 0.0, z1 - hm))
+                polys.append(c4d.CPolygon(base, base+3, base+2, base+1))
         else:
             # Нечётный ряд: смещение на полкирпича
             # Первый полукирпич у левого края
-            bl = row * nx + 0
-            br = row * nx + 1
-            tl = (row + 1) * nx + 0
-            tr = (row + 1) * nx + 1
-            polys.append(c4d.CPolygon(bl, tl, tr, br))
+            x0 = -width / 2.0
+            x1 = x0 + step_x * 0.5
+            base = len(verts)
+            verts.append(c4d.Vector(x0,        0.0, z0 + hm))
+            verts.append(c4d.Vector(x1 - hm,   0.0, z0 + hm))
+            verts.append(c4d.Vector(x1 - hm,   0.0, z1 - hm))
+            verts.append(c4d.Vector(x0,        0.0, z1 - hm))
+            polys.append(c4d.CPolygon(base, base+3, base+2, base+1))
 
             # Полные кирпичи в середине
             for brick in range(segs_w - 1):
-                col_start = brick * 2 + 1
-                bl = row * nx + col_start
-                br = row * nx + col_start + 2
-                tl = (row + 1) * nx + col_start
-                tr = (row + 1) * nx + col_start + 2
-                bm = row * nx + col_start + 1
-                tm = (row + 1) * nx + col_start + 1
-                polys.append(c4d.CPolygon(bl, tl, tm, bm))
-                polys.append(c4d.CPolygon(bm, tm, tr, br))
+                x0 = brick * step_x + step_x * 0.5 - width / 2.0
+                x1 = x0 + step_x
+                base = len(verts)
+                verts.append(c4d.Vector(x0 + hm, 0.0, z0 + hm))
+                verts.append(c4d.Vector(x1 - hm, 0.0, z0 + hm))
+                verts.append(c4d.Vector(x1 - hm, 0.0, z1 - hm))
+                verts.append(c4d.Vector(x0 + hm, 0.0, z1 - hm))
+                polys.append(c4d.CPolygon(base, base+3, base+2, base+1))
 
             # Последний полукирпич у правого края
-            col_start = (segs_w - 1) * 2 + 1
-            bl = row * nx + col_start
-            br = row * nx + col_start + 1
-            tl = (row + 1) * nx + col_start
-            tr = (row + 1) * nx + col_start + 1
-            polys.append(c4d.CPolygon(bl, tl, tr, br))
-
-    # Если шов задан — применяем inset к каждому полигону
-    if m > 1e-6:
-        verts, polys = _inset_polys(verts, polys, hm_x, hm_y)
+            x0 = (segs_w - 1) * step_x + step_x * 0.5 - width / 2.0
+            x1 = width / 2.0
+            base = len(verts)
+            verts.append(c4d.Vector(x0 + hm, 0.0, z0 + hm))
+            verts.append(c4d.Vector(x1,      0.0, z0 + hm))
+            verts.append(c4d.Vector(x1,      0.0, z1 - hm))
+            verts.append(c4d.Vector(x0 + hm, 0.0, z1 - hm))
+            polys.append(c4d.CPolygon(base, base+3, base+2, base+1))
 
     return verts, polys
 
