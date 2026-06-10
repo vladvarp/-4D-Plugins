@@ -14,7 +14,7 @@ import tempfile
 
 ID_TRICUBE = 1068871
 
-NAME_TRICUBE = "TriCube v1.1"
+NAME_TRICUBE = "TriCube v1.3"
 
 # ─── UserData SubID (общая схема: SubID=1 — группа, поля с 2) ────────────────
 
@@ -179,15 +179,13 @@ def _build_hex_face(ux, uy, uz, vx, vy, vz, w_sign, wx, wy, wz,
             # Смещение центра вдоль нормали (звезда)
             nrm_shift = star_offset if star_offset != 0.0 else 0.0
 
-            # Центральная точка гексагона
+            # Базовая позиция центра (для расчёта координат вершин, сама точка не добавляется)
             cx = ux*u_center*1.0 + vx*v_center*1.0 + wx*w_sign*hw + wx*w_sign*nrm_shift
             cy = uy*u_center*1.0 + vy*v_center*1.0 + wy*w_sign*hw + wy*w_sign*nrm_shift
             cz = uz*u_center*1.0 + vz*v_center*1.0 + wz*w_sign*hw + wz*w_sign*nrm_shift
 
-            center_idx = len(all_points)
-            all_points.append(c4d.Vector(cx, cy, cz))
-
-            # 6 вершин гексагона в плоскости грани (u-v)
+            # 6 вершин гексагона в плоскости грани (u-v), без центральной точки
+            # Индексы: 0=правый, 1=верх-правый, 2=верх-левый, 3=левый, 4=низ-левый, 5=низ-правый
             vert_start = len(all_points)
             for ang in hex_angles:
                 du = r_out * math.cos(ang)
@@ -197,11 +195,17 @@ def _build_hex_face(ux, uy, uz, vx, vy, vz, w_sign, wx, wy, wz,
                 z = cz + uz*du + vz*dv
                 all_points.append(c4d.Vector(x, y, z))
 
-            # 6 треугольных граней (центр + два соседних угла)
-            for k in range(6):
-                a = vert_start + k
-                b = vert_start + (k + 1) % 6
-                all_polys.append(c4d.CPolygon(center_idx, a, b, b))
+            # 2 четырёхугольных полигона вместо 6 треугольников (без центральной точки):
+            # Quad 0: вершины 0, 1, 2, 3  (верхняя половина гексагона)
+            # Quad 1: вершины 0, 3, 4, 5  (нижняя половина гексагона)
+            v0 = vert_start + 0
+            v1 = vert_start + 1
+            v2 = vert_start + 2
+            v3 = vert_start + 3
+            v4 = vert_start + 4
+            v5 = vert_start + 5
+            all_polys.append(c4d.CPolygon(v0, v1, v2, v3))
+            all_polys.append(c4d.CPolygon(v0, v3, v4, v5))
 
 
 def build_tricube(size_x, size_y, size_z, sub_x, sub_y, sub_z,
@@ -294,53 +298,60 @@ def build_tricube(size_x, size_y, size_z, sub_x, sub_y, sub_z,
                     all_polys.append(c4d.CPolygon(br, tr, tl, tl))
 
         # Закрытие швов (star_cap): смещённые вершины на краях грани образуют разрыв
-        # с соседними гранями. Добавляем узкие треугольники вдоль всех 4 рёбер грани,
-        # соединяя смещённую вершину края с её не-смещённым соседом по нормали грани.
-        # Логика: по рёбрам грани (row=0, row=sv, col=0, col=su) проходим пары
-        # соседних вершин и, если одна из них была смещена (чётная по (row+col)),
-        # добавляем заплаточный треугольник к «плоской» позиции на поверхности куба.
+        # с соседними гранями. Вдоль каждого ребра грани проходим последовательными
+        # парами соседних вершин. Если одна из пары смещена — добавляем треугольник,
+        # закрывающий щель между смещённой вершиной и её двумя соседями вдоль ребра.
+        # Ориентация: w_sign определяет направление нормали (наружу куба).
         if star_offset != 0.0 and star_cap:
-            def flat_pt(row, col):
-                """Позиция вершины без смещения (на поверхности грани)."""
-                if surface == SURF_SHIFT and row % 2 == 1:
-                    u_t = ((col + 0.5) / su) * 2.0 - 1.0
-                else:
-                    u_t = (col / su) * 2.0 - 1.0
-                v_t = (row / sv) * 2.0 - 1.0
-                return c4d.Vector(
-                    ux*u_t*hu + vx*v_t*hv + wx*w_sign*hw,
-                    uy*u_t*hu + vy*v_t*hv + wy*w_sign*hw,
-                    uz*u_t*hu + vz*v_t*hv + wz*w_sign*hw,
-                )
+            # Четыре ребра грани как последовательности (row, col):
+            # нижнее (row=0), верхнее (row=sv), левое (col=0), правое (col=su)
+            edge_sequences = [
+                [(0,  c) for c in range(su + 1)],   # нижнее ребро
+                [(sv, c) for c in range(su + 1)],   # верхнее ребро
+                [(r,  0) for r in range(sv + 1)],   # левое ребро
+                [(r, su) for r in range(sv + 1)],   # правое ребро
+            ]
 
-            # Четыре ребра: нижнее (row=0), верхнее (row=sv),
-            #               левое (col=0), правое (col=su)
-            edges = []
-            # нижнее ребро: row=0, col=0..su
-            edges += [(0, c) for c in range(su + 1)]
-            # верхнее ребро: row=sv, col=0..su
-            edges += [(sv, c) for c in range(su + 1)]
-            # левое ребро: col=0, row=0..sv
-            edges += [(r, 0) for r in range(sv + 1)]
-            # правое ребро: col=su, row=0..sv
-            edges += [(r, su) for r in range(sv + 1)]
+            for seq in edge_sequences:
+                for i in range(len(seq) - 1):
+                    r0, c0 = seq[i]
+                    r1, c1 = seq[i + 1]
+                    shifted0 = (r0 + c0) % 2 == 0
+                    shifted1 = (r1 + c1) % 2 == 0
+                    idx0 = base + r0 * nu + c0
+                    idx1 = base + r1 * nu + c1
 
-            for (row, col) in edges:
-                if (row + col) % 2 == 0:
-                    # Эта вершина была смещена — берём её индекс в all_points
-                    shifted_idx = base + row * nu + col
-                    # Плоская позиция (куда должна примыкать соседняя грань)
-                    flat_pos = flat_pt(row, col)
-                    flat_idx = len(all_points)
-                    all_points.append(flat_pos)
-                    # Ищем соседей вдоль ребра для заплатки
-                    # Для каждого смещённого угла добавляем треугольник:
-                    # (смещённая, плоская, ближайший не-смещённый сосед на грани)
-                    for dr, dc in ((-1, 0), (1, 0), (0, -1), (0, 1)):
-                        nr, nc = row + dr, col + dc
-                        if 0 <= nr <= sv and 0 <= nc <= su:
-                            nb_idx = base + nr * nu + nc
-                            all_polys.append(c4d.CPolygon(shifted_idx, flat_idx, nb_idx, nb_idx))
+                    if shifted0 and not shifted1:
+                        # idx0 смещена, idx1 на поверхности грани.
+                        # Нужен треугольник: смещённая → левый сосед → правый сосед.
+                        # Предыдущая вершина вдоль ребра (если есть) — ещё один не-смещённый сосед.
+                        if i > 0:
+                            r_prev, c_prev = seq[i - 1]
+                            idx_prev = base + r_prev * nu + c_prev
+                            # Ориентация по w_sign: наружу куба
+                            if w_sign > 0:
+                                all_polys.append(c4d.CPolygon(idx0, idx_prev, idx1, idx1))
+                            else:
+                                all_polys.append(c4d.CPolygon(idx0, idx1, idx_prev, idx_prev))
+                        else:
+                            # Начало ребра — треугольник с одним соседом впереди
+                            if i + 2 < len(seq):
+                                r_next, c_next = seq[i + 2]
+                                idx_next = base + r_next * nu + c_next
+                                if w_sign > 0:
+                                    all_polys.append(c4d.CPolygon(idx0, idx1, idx_next, idx_next))
+                                else:
+                                    all_polys.append(c4d.CPolygon(idx0, idx_next, idx1, idx1))
+
+                    elif shifted1 and not shifted0:
+                        # idx1 смещена, idx0 на поверхности грани.
+                        if i + 2 < len(seq):
+                            r_next, c_next = seq[i + 2]
+                            idx_next = base + r_next * nu + c_next
+                            if w_sign > 0:
+                                all_polys.append(c4d.CPolygon(idx1, idx_next, idx0, idx0))
+                            else:
+                                all_polys.append(c4d.CPolygon(idx1, idx0, idx_next, idx_next))
 
     return all_points, all_polys
 
@@ -488,7 +499,8 @@ class TriCubeObject(_MeshPrimitiveBase):
         surface = int(_ud_get(op, TC_SURFACE, SURF_TRI))
         star_en = bool(_ud_get(op, TC_STAR_EN, False))
         star_offset = float(_ud_get(op, TC_STAR_OFFSET, 0.0)) if star_en else 0.0
-        return build_tricube(size_x, size_y, size_z, sub_x, sub_y, sub_z, surface, star_offset)
+        star_cap = bool(_ud_get(op, TC_STAR_CAP, False))
+        return build_tricube(size_x, size_y, size_z, sub_x, sub_y, sub_z, surface, star_offset, star_cap)
 
 
 _ICON_TC = (
