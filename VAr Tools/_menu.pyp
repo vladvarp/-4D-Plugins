@@ -45,9 +45,13 @@ MENU_ITEMS = [
 
         {"name": "XPressos objects", "items": [
             1068852,    # HierarchyFilter
-            1068900,    # ChildSelector
         ]},       
         
+
+    ]},
+
+    {"name": "Tegs", "items": [
+        1068900,    # ChildSelector
         1068859,    # TargetCamera
     ]},
 
