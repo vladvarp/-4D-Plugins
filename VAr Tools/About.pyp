@@ -9,7 +9,9 @@ from c4d import gui
 import webbrowser
 
 PLUGIN_ID   = 1068833
-PLUGIN_NAME = "About v2.28.0"
+VERS = 'v2.28.0'
+LABLE =  'VAr Tools'
+PLUGIN_NAME = "About"
 PLUGIN_HELP = "Информация о наборе плагинов VAr Tools"
 
 AUTHOR_URL  = "https://vladvarp.github.io/-4D-Plugins/web/plugin.html?md=plugins%2FVAr_Tools.md"
@@ -20,19 +22,15 @@ ID_BTN_CLOSE   = 1002
 
 # --- Текст о плагинах ---------------------------------------------------------
 ABOUT_TEXT = """\
-VAr Tools — набор практичных утилит для
-Cinema 4D, заточенных под реальный рабочий
-процесс. Вместо того чтобы делать одно
-большое всё-в-одном, каждый инструмент
-решает конкретную задачу: переименовать
-объекты пачкой, сбросить ось на пол,
-почистить сцену от мусорных нуллов,
-сгенерировать нестандартную геометрию.
+VAr Tools — набор практичных утилит для Cinema 4D, заточенных 
+под реальный рабочий процесс. Вместо того чтобы делать одно
+большое всё-в-одном, каждый инструмент решает конкретную задачу:
+переименовать объекты пачкой, сбросить ось на пол, почистить
+сцену от мусорных нуллов, сгенерировать нестандартную геометрию.
 
-Особенно полезен на стадии подготовки 
-сцены и финального клинапа — рутинные 
-операции, которые обычно съедают по 
-несколько минут, делаются в один клик.
+Особенно полезен на стадии подготовки сцены и финального клинапа,
+рутинные операции, которые обычно съедают по несколько минут,
+делаются в один клик.
 
 Автор:  V.Ar Production
 """
@@ -43,11 +41,11 @@ Cinema 4D, заточенных под реальный рабочий
 class AboutDialog(gui.GeDialog):
 
     def CreateLayout(self):
-        self.SetTitle("O плагине - VAr Tools")
+        self.SetTitle("O плагине - " + LABLE + " " + VERS)
 
         self.GroupBegin(0, c4d.BFH_SCALEFIT, 1, 0)
         self.GroupBorderSpace(12, 12, 12, 4)
-        self.AddStaticText(0, c4d.BFH_CENTER, name="VAr Tools")
+        self.AddStaticText(0, c4d.BFH_CENTER, name=LABLE)
         self.GroupEnd()
 
         self.AddSeparatorH(0, c4d.BFH_SCALEFIT)
@@ -57,8 +55,8 @@ class AboutDialog(gui.GeDialog):
         self.AddMultiLineEditText(
             1000,
             c4d.BFH_SCALEFIT | c4d.BFV_SCALEFIT,
-            initw=460,
-            inith=300,
+            initw=260,
+            inith=120,
             style=c4d.DR_MULTILINE_READONLY | c4d.DR_MULTILINE_MONOSPACED,
         )
         self.GroupEnd()
@@ -99,7 +97,7 @@ class AboutCommand(c4d.plugins.CommandData):
             dlgtype=c4d.DLG_TYPE_MODAL_RESIZEABLE,
             pluginid=PLUGIN_ID,
             defaultw=500,
-            defaulth=460,
+            defaulth=260,
         )
         return True
 
