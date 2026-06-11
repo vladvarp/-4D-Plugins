@@ -100,7 +100,7 @@ VAr Tools - набор инструментов для Cinema 4D,
 
     ***
 
-    - XPressos objects
+    - XPressos objects ----
 
     * HierarchyFilter
       Объект-Ноль с расширенными UserData для
