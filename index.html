@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Коллекция плагинов для Cinema 4D — инструменты для профессиональных 3D-художников">
+    <title>C4D Plugins — Коллекция плагинов для Cinema 4D</title>
+    <link rel="stylesheet" href="web/css/style.css">
+</head>
+<body class="page-index">
+
+    <!-- Шапка сайта -->
+    <header class="site-header">
+        <div class="header-inner">
+            <a href="index.html" class="site-logo">
+                <div class="logo-icon">C4</div>
+                C4D Plugins
+            </a>
+            <nav class="header-nav" aria-label="Основная навигация">
+                <a href="index.html">Плагины</a>
+            </nav>
+        </div>
+    </header>
+
+    <!-- Основной контент -->
+    <main>
+        <div class="page-wrapper">
+
+            <!-- Hero секция -->
+            <section class="hero" aria-label="Заголовок страницы">
+                <div class="hero-label">Cinema 4D Plugin Library</div>
+                <h1 class="hero-title">Плагины для<br><span class="accent">Cinema 4D</span>
+                </h1>
+                <p class="hero-description">
+                    Расширь возможности Cinema 4D с помощью плагинов для моделирования и автоматизации.
+                </p>
+                <div class="hero-stats">
+                    <div class="stat-item">
+                        <span class="stat-value" id="stat-plugins">0</span>
+                        <span class="stat-label">Активов</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-value">R26+</span>
+                        <span class="stat-label">Поддерживаемая версия</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-value">Windows</span>
+                        <span class="stat-label">Платформа</span>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Сетка плагинов -->
+            <section class="plugins-section" aria-label="Список плагинов">
+                <div class="section-header">
+                    <h2 class="section-title">Все плагины</h2>
+                    <span class="section-count" id="plugins-count">—</span>
+                </div>
+
+                <!-- Карточки генерируются JavaScript'ом из массива plugins[] в js/main.js -->
+                <div class="plugins-grid" id="plugins-grid" role="list">
+                    <!-- Индикатор загрузки пока JS не отработал -->
+                    <div class="loading-state">
+                        <div class="spinner" aria-hidden="true"></div>
+                        Загрузка плагинов…
+                    </div>
+                </div>
+            </section>
+
+        </div>
+    </main>
+
+    <!-- Подвал -->
+    <footer class="site-footer">
+        <div class="footer-inner">
+            <span class="footer-text">
+                C4D Plugins — коллекция плагинов для Cinema 4D
+            </span>
+            <nav class="footer-links" aria-label="Ссылки подвала">
+                <a>© V.Ar Production</a>
+            </nav>
+        </div>
+    </footer>
+
+    <script src="web/js/main.js"></script>
+</body>
+</html>

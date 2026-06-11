@@ -1,0 +1,557 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Руководство по синтаксису .md файлов для страниц плагинов Cinema 4D">
+    <title>Руководство по синтаксису — C4D Plugins</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body class="page-guide">
+
+    <!-- Шапка сайта -->
+    <header class="site-header">
+        <div class="header-inner">
+            <a href="index.html" class="site-logo">
+                <div class="logo-icon">C4</div>
+                C4D Plugins
+            </a>
+            <nav class="header-nav" aria-label="Основная навигация">
+                <a href="index.html">Плагины</a>
+                <a href="guide.html">Руководство</a>
+            </nav>
+        </div>
+    </header>
+
+    <!-- Основной контент -->
+    <main>
+        <div class="page-wrapper">
+
+            <!-- Hero секция руководства -->
+            <section class="hero" style="padding-bottom: 20px;">
+                <div class="hero-label">Документация</div>
+                <h1 class="hero-title">
+                    Руководство по<br>
+                    синтаксису <span class="accent">.md файлов</span>
+                </h1>
+                <p class="hero-description">
+                    Полное руководство по заполнению Markdown-файлов для страниц плагинов.
+                    Frontmatter, специальные блоки и примеры.
+                </p>
+            </section>
+
+            <!-- Двухколоночный макет: оглавление + контент -->
+            <div class="guide-layout">
+
+                <!-- Оглавление (только десктоп) -->
+                <aside class="guide-toc" aria-label="Содержание">
+                    <div class="toc-title">Содержание</div>
+                    <ul class="toc-list">
+                        <li><a href="#structure">Структура файла</a></li>
+                        <li><a href="#frontmatter">Frontmatter</a></li>
+                        <li><a href="#required-fields">Обязательные поля</a></li>
+                        <li><a href="#optional-fields">Необязательные поля</a></li>
+                        <li><a href="#markdown-basics">Базовый Markdown</a></li>
+                        <li><a href="#callouts">Блоки callout</a></li>
+                        <li><a href="#features">Сетка фич</a></li>
+                        <li><a href="#changelog">История изменений</a></li>
+                        <li><a href="#tables">Таблицы</a></li>
+                        <li><a href="#full-example">Полный пример</a></li>
+                    </ul>
+                </aside>
+
+                <!-- Основной контент руководства -->
+                <div class="md-content">
+
+                    <!-- Структура файла -->
+                    <section id="structure">
+                        <h2>Структура файла</h2>
+                        <p>
+                            Каждый .md файл плагина состоит из двух частей: <strong>frontmatter</strong>
+                            (мета-данные в начале файла) и <strong>тела документа</strong> (Markdown-контент).
+                        </p>
+                        <p>
+                            Файл должен находиться в папке <code>plugins/</code> и иметь расширение <code>.md</code>.
+                            Для открытия страницы плагина используется URL вида:
+                        </p>
+                        <div class="code-example">
+                            <div class="code-example-header">
+                                <span class="code-example-label">URL страницы плагина</span>
+                                <button class="copy-btn">Копировать</button>
+                            </div>
+                            <pre><code>plugin.html?md=plugins/название-плагина.md</code></pre>
+                        </div>
+                    </section>
+
+                    <!-- Frontmatter -->
+                    <section id="frontmatter">
+                        <h2>Frontmatter</h2>
+                        <p>
+                            Frontmatter — это блок с мета-данными в самом начале файла.
+                            Он обрамляется тремя дефисами <code>---</code> сверху и снизу.
+                            Используется формат <code>ключ: значение</code>.
+                        </p>
+                        <div class="code-example">
+                            <div class="code-example-header">
+                                <span class="code-example-label">Формат frontmatter</span>
+                                <button class="copy-btn">Копировать</button>
+                            </div>
+                            <pre><code>---
+ключ: значение
+другой_ключ: "значение со спецсимволами"
+список: [первый, второй, третий]
+---
+
+Здесь начинается основной контент...</code></pre>
+                        </div>
+                    </section>
+
+                    <!-- Обязательные поля -->
+                    <section id="required-fields">
+                        <h2>Обязательные поля</h2>
+                        <p>Эти поля обязательно должны быть заполнены — они используются в hero-секции страницы.</p>
+
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Поле</th>
+                                    <th>Тип</th>
+                                    <th>Описание</th>
+                                    <th>Пример</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td><code>title</code></td>
+                                    <td>строка</td>
+                                    <td>Название плагина</td>
+                                    <td><code>ScatterPro</code></td>
+                                </tr>
+                                <tr>
+                                    <td><code>tagline</code></td>
+                                    <td>строка</td>
+                                    <td>Краткое описание (1–2 предложения)</td>
+                                    <td><code>Мощный инструмент для скаттеринга</code></td>
+                                </tr>
+                                <tr>
+                                    <td><code>version</code></td>
+                                    <td>строка</td>
+                                    <td>Текущая версия</td>
+                                    <td><code>v2.4.1</code></td>
+                                </tr>
+                                <tr>
+                                    <td><code>author</code></td>
+                                    <td>строка</td>
+                                    <td>Имя автора или команды</td>
+                                    <td><code>Иван Петров</code></td>
+                                </tr>
+                                <tr>
+                                    <td><code>updated</code></td>
+                                    <td>строка</td>
+                                    <td>Дата последнего обновления</td>
+                                    <td><code>15 мая 2025</code></td>
+                                </tr>
+                            </tbody>
+                        </table>
+
+                        <div class="code-example">
+                            <div class="code-example-header">
+                                <span class="code-example-label">Пример обязательных полей</span>
+                                <button class="copy-btn">Копировать</button>
+                            </div>
+                            <pre><code>---
+title: ScatterPro
+tagline: Мощный инструмент для распределения объектов по поверхности с полным контролем над плотностью и масштабом.
+version: v2.4.1
+author: Иван Петров
+updated: 15 мая 2025
+---</code></pre>
+                        </div>
+                    </section>
+
+                    <!-- Необязательные поля -->
+                    <section id="optional-fields">
+                        <h2>Необязательные поля</h2>
+                        <p>Дополнительные поля для заполнения боковой панели и hero-секции.</p>
+
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Поле</th>
+                                    <th>Тип</th>
+                                    <th>Описание</th>
+                                    <th>Пример</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td><code>icon</code></td>
+                                    <td>символ</td>
+                                    <td>Emoji или Unicode символ иконки</td>
+                                    <td><code>✦</code></td>
+                                </tr>
+                                <tr>
+                                    <td><code>tags</code></td>
+                                    <td>список</td>
+                                    <td>Категории плагина</td>
+                                    <td><code>[Моделирование, Процедурный]</code></td>
+                                </tr>
+                                <tr>
+                                    <td><code>license</code></td>
+                                    <td>строка</td>
+                                    <td>Тип лицензии</td>
+                                    <td><code>MIT</code></td>
+                                </tr>
+                                <tr>
+                                    <td><code>cinema4d</code></td>
+                                    <td>строка</td>
+                                    <td>Поддерживаемые версии C4D</td>
+                                    <td><code>R21 — R2024</code></td>
+                                </tr>
+                                <tr>
+                                    <td><code>os</code></td>
+                                    <td>строка</td>
+                                    <td>Поддерживаемые операционные системы</td>
+                                    <td><code>Windows, macOS</code></td>
+                                </tr>
+                                <tr>
+                                    <td><code>renderer</code></td>
+                                    <td>строка</td>
+                                    <td>Поддерживаемые рендереры</td>
+                                    <td><code>Redshift, Arnold, Octane</code></td>
+                                </tr>
+                                <tr>
+                                    <td><code>download</code></td>
+                                    <td>URL</td>
+                                    <td>Ссылка на скачивание</td>
+                                    <td><code>https://example.com/download</code></td>
+                                </tr>
+                                <tr>
+                                    <td><code>github</code></td>
+                                    <td>URL</td>
+                                    <td>Ссылка на репозиторий GitHub</td>
+                                    <td><code>https://github.com/user/repo</code></td>
+                                </tr>
+                            </tbody>
+                        </table>
+
+                        <div class="code-example">
+                            <div class="code-example-header">
+                                <span class="code-example-label">Пример с необязательными полями</span>
+                                <button class="copy-btn">Копировать</button>
+                            </div>
+                            <pre><code>---
+title: ScatterPro
+tagline: Мощный инструмент для скаттеринга объектов по поверхностям.
+version: v2.4.1
+author: Иван Петров
+updated: 15 мая 2025
+icon: ✦
+tags: [Моделирование, Процедурный, Featured]
+license: Коммерческая
+cinema4d: R21 — R2024
+os: Windows, macOS
+renderer: Все
+download: https://example.com/scatter-pro/download
+github: https://github.com/username/scatter-pro
+---</code></pre>
+                        </div>
+                    </section>
+
+                    <!-- Базовый Markdown -->
+                    <section id="markdown-basics">
+                        <h2>Базовый Markdown</h2>
+                        <p>После frontmatter пишется обычный Markdown-контент.</p>
+
+                        <h3>Заголовки</h3>
+                        <div class="code-example">
+                            <div class="code-example-header">
+                                <span class="code-example-label">Синтаксис заголовков</span>
+                                <button class="copy-btn">Копировать</button>
+                            </div>
+                            <pre><code># Заголовок H1 (крупный)
+## Заголовок H2 (раздел)
+### Заголовок H3 (подраздел, выделяется синим)
+#### Заголовок H4 (мелкий)</code></pre>
+                        </div>
+
+                        <h3>Текстовое форматирование</h3>
+                        <div class="code-example">
+                            <div class="code-example-header">
+                                <span class="code-example-label">Форматирование текста</span>
+                                <button class="copy-btn">Копировать</button>
+                            </div>
+                            <pre><code>**Жирный текст**
+*Курсивный текст*
+***Жирный и курсивный***
+`инлайн код`
+[Текст ссылки](https://example.com)</code></pre>
+                        </div>
+
+                        <h3>Списки</h3>
+                        <div class="code-example">
+                            <div class="code-example-header">
+                                <span class="code-example-label">Ненумерованный и нумерованный списки</span>
+                                <button class="copy-btn">Копировать</button>
+                            </div>
+                            <pre><code>- Первый пункт
+- Второй пункт
+- Третий пункт
+
+1. Шаг первый
+2. Шаг второй
+3. Шаг третий</code></pre>
+                        </div>
+
+                        <h3>Цитаты и горизонтальная линия</h3>
+                        <div class="code-example">
+                            <div class="code-example-header">
+                                <span class="code-example-label">Цитата и разделитель</span>
+                                <button class="copy-btn">Копировать</button>
+                            </div>
+                            <pre><code>> Это цитата или важное замечание.
+
+---</code></pre>
+                        </div>
+
+                        <h3>Блоки кода</h3>
+                        <div class="code-example">
+                            <div class="code-example-header">
+                                <span class="code-example-label">Блок кода с подсветкой языка</span>
+                                <button class="copy-btn">Копировать</button>
+                            </div>
+                            <pre><code>```python
+import c4d
+
+def main():
+    doc = c4d.documents.GetActiveDocument()
+    print(doc.GetName())
+```</code></pre>
+                        </div>
+
+                        <h3>Изображения</h3>
+                        <div class="code-example">
+                            <div class="code-example-header">
+                                <span class="code-example-label">Вставка изображения</span>
+                                <button class="copy-btn">Копировать</button>
+                            </div>
+                            <pre><code>![Описание изображения](images/screenshot.png)
+![Пример работы плагина](https://example.com/image.jpg)</code></pre>
+                        </div>
+                    </section>
+
+                    <!-- Callout блоки -->
+                    <section id="callouts">
+                        <h2>Блоки Callout</h2>
+                        <p>
+                            Специальные блоки для выделения важной информации.
+                            Используется синтаксис <code>:::[тип]</code> … <code>:::</code>.
+                        </p>
+                        <p>Доступные типы: <code>info</code>, <code>warning</code>, <code>danger</code>, <code>tip</code>.</p>
+
+                        <div class="code-example">
+                            <div class="code-example-header">
+                                <span class="code-example-label">Синтаксис callout блоков</span>
+                                <button class="copy-btn">Копировать</button>
+                            </div>
+                            <pre><code>:::info
+Информационное сообщение. Используй для подсказок и полезных ссылок.
+:::
+
+:::warning
+Предупреждение. Используй для важных заметок, на которые нужно обратить внимание.
+:::
+
+:::danger
+Критическое предупреждение. Используй для описания деструктивных действий.
+:::
+
+:::tip
+Совет. Используй для лайфхаков и рекомендаций.
+:::</code></pre>
+                        </div>
+                    </section>
+
+                    <!-- Сетка фич -->
+                    <section id="features">
+                        <h2>Сетка фич</h2>
+                        <p>
+                            Для красивого отображения возможностей плагина используй блок <code>::::features</code>.
+                            Каждая фича начинается с <code>###</code>, затем иконка и название, следующая строка — описание.
+                        </p>
+
+                        <div class="code-example">
+                            <div class="code-example-header">
+                                <span class="code-example-label">Синтаксис сетки фич</span>
+                                <button class="copy-btn">Копировать</button>
+                            </div>
+                            <pre><code>::::features
+### ✦ Умное распределение
+Автоматически избегает пересечений объектов при распределении.
+
+### ⚡ Высокая скорость
+Обрабатывает миллионы полигонов без потери производительности.
+
+### 🎨 Кастомизация
+Полный контроль над плотностью, масштабом и вращением.
+
+### 📦 Пресеты
+Готовые пресеты для трав, камней, деревьев и другой растительности.
+::::</code></pre>
+                        </div>
+                    </section>
+
+                    <!-- История изменений -->
+                    <section id="changelog">
+                        <h2>История изменений</h2>
+                        <p>
+                            Для отображения changelog используй блок <code>::::changelog</code>.
+                            Каждая версия начинается с <code>### номер — дата</code>, изменения — через дефис.
+                        </p>
+
+                        <div class="code-example">
+                            <div class="code-example-header">
+                                <span class="code-example-label">Синтаксис changelog</span>
+                                <button class="copy-btn">Копировать</button>
+                            </div>
+                            <pre><code>::::changelog
+### v2.4.1 — 15 мая 2025
+- Исправлен краш при работе с объектами без полигонов
+- Улучшена производительность на сценах с большим количеством объектов
+
+### v2.4.0 — 3 апреля 2025
+- Добавлена поддержка Cinema 4D R2024
+- Новый алгоритм распределения по UV-координатам
+- Исправлены мелкие баги в интерфейсе
+
+### v2.3.0 — 10 января 2025
+- Добавлены 12 новых пресетов растительности
+- Поддержка Redshift Instancer
+::::</code></pre>
+                        </div>
+                    </section>
+
+                    <!-- Таблицы -->
+                    <section id="tables">
+                        <h2>Таблицы</h2>
+                        <p>Стандартный синтаксис таблиц Markdown.</p>
+
+                        <div class="code-example">
+                            <div class="code-example-header">
+                                <span class="code-example-label">Синтаксис таблицы</span>
+                                <button class="copy-btn">Копировать</button>
+                            </div>
+                            <pre><code>| Параметр       | Тип     | По умолчанию | Описание                        |
+|----------------|---------|-------------|----------------------------------|
+| density        | float   | 1.0          | Плотность распределения          |
+| seed           | integer | 42           | Случайное зерно для генерации    |
+| align_normal   | boolean | true         | Выравнивание по нормалям         |
+| min_scale      | float   | 0.8          | Минимальный масштаб объекта      |</code></pre>
+                        </div>
+                    </section>
+
+                    <!-- Полный пример -->
+                    <section id="full-example">
+                        <h2>Полный пример файла</h2>
+                        <p>
+                            Готовый шаблон .md файла. Скопируй его в папку <code>plugins/</code>
+                            и заполни своими данными.
+                        </p>
+
+                        <div class="code-example">
+                            <div class="code-example-header">
+                                <span class="code-example-label">plugins/my-plugin.md</span>
+                                <button class="copy-btn">Копировать</button>
+                            </div>
+                            <pre><code>---
+title: Название плагина
+tagline: Краткое описание плагина — что он делает и для кого.
+version: v1.0.0
+author: Имя Автора
+updated: 1 января 2025
+icon: ✦
+tags: [Категория, Другая категория]
+license: MIT
+cinema4d: R21 — R2024
+os: Windows, macOS
+renderer: Все рендереры
+download: https://example.com/download
+github: https://github.com/user/repo
+---
+
+## О плагине
+
+Развёрнутое описание плагина. Расскажи, какую проблему он решает и почему
+он полезен для 3D-художников.
+
+## Возможности
+
+::::features
+### ✦ Первая возможность
+Описание первой возможности плагина.
+
+### ⚡ Вторая возможность
+Описание второй возможности плагина.
+
+### 🎨 Третья возможность
+Описание третьей возможности плагина.
+::::
+
+## Установка
+
+1. Скачай архив с плагином
+2. Распакуй в папку `plugins` Cinema 4D
+3. Перезапусти Cinema 4D
+
+:::info
+Папка plugins обычно находится по адресу: `C:\Users\<имя>\AppData\Roaming\Maxon\Cinema 4D\plugins`
+:::
+
+## Использование
+
+Описание того, как использовать плагин после установки.
+
+## Параметры
+
+| Параметр | Тип    | Описание                     |
+|----------|--------|------------------------------|
+| param_1  | float  | Описание первого параметра   |
+| param_2  | int    | Описание второго параметра   |
+
+:::warning
+Не забудь сохранить сцену перед применением плагина к большим объектам.
+:::
+
+## История изменений
+
+::::changelog
+### v1.0.0 — 1 января 2025
+- Первый публичный релиз
+- Базовый функционал
+::::</code></pre>
+                        </div>
+
+                        <p>
+                            После создания файла добавь запись в массив <code>plugins[]</code>
+                            в файле <code>js/main.js</code>, чтобы карточка появилась на главной странице.
+                        </p>
+                    </section>
+
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Подвал -->
+    <footer class="site-footer">
+        <div class="footer-inner">
+            <span class="footer-text">C4D Plugins — коллекция плагинов для Cinema 4D</span>
+            <nav class="footer-links" aria-label="Ссылки подвала">
+                <a href="index.html">← Все плагины</a>
+            </nav>
+        </div>
+    </footer>
+
+    <script src="js/main.js"></script>
+</body>
+</html>
