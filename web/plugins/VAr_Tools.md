@@ -3,7 +3,7 @@ title: VAr Tools
 tagline: Набор утилит для Cinema 4D, созданных для ускорения повседневной работы. Все плагины находятся в меню VAr Tools.
 version: v2.28.0
 author: V.Ar Production
-updated: 15 мая 2025
+updated: Июнь 2026
 icon: ✦
 tags: [Моделирование, Процедурный, Автоматизация]
 license: GPL v3
