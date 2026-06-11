@@ -14,7 +14,7 @@ PLUGIN_ID_CMD = 1068859   # CommandData — кнопка меню
 PLUGIN_ID_TAG = 1068860   # TagData     — Expression-тег
 
 PLUGIN_NAME_CMD   = "Target Camera"
-PLUGIN_NAME_CMD_V = "Target Camera v1.7"
+PLUGIN_NAME_CMD_V = "Target Camera v1.8"
 PLUGIN_NAME_TAG   = "TargetCam Controller"
 
 # Ключ ссылки на таргет в BaseContainer тега
@@ -98,9 +98,13 @@ class TargetCamTag(c4d.plugins.TagData):
             new_target.SetName(cam.GetName() + ".target")
             new_target[c4d.NULLOBJECT_DISPLAY] = 11
             new_target[c4d.NULLOBJECT_RADIUS]  = 5.0
-            new_target.SetAbsPos(cam.GetAbsPos() + cam.GetMg().v3 * cam[c4d.CAMERAOBJECT_TARGETDISTANCE])
             _set_object_icon(new_target, _ICON_B64_2)  # иконка таргета
+            # Сначала вставляем в иерархию — только после этого SetMg работает в мировых координатах
             doc.InsertObject(new_target, cam.GetUp(), cam.GetPred())
+            world_pos = cam.GetMg().off + cam.GetMg().v3.GetNormalized() * cam[c4d.CAMERAOBJECT_TARGETDISTANCE]
+            mg = c4d.Matrix()
+            mg.off = world_pos
+            new_target.SetMg(mg)
             tag[TAG_LINK_TARGET] = new_target
             self._prev_dist = None
             c4d.EventAdd()
@@ -165,9 +169,13 @@ class TargetCameraCmd(c4d.plugins.CommandData):
         target.SetName(cam.GetName() + ".target")
         target[c4d.NULLOBJECT_DISPLAY] = 11
         target[c4d.NULLOBJECT_RADIUS]  = 5.0
-        target.SetAbsPos(c4d.Vector(0, 0, 0))
         _set_object_icon(target, _ICON_B64_2)  # иконка таргета
+        # Сначала вставляем в иерархию — только после этого SetMg работает в мировых координатах
         doc.InsertObject(target, cam.GetUp(), cam.GetPred())
+        world_pos = cam.GetMg().off + cam.GetMg().v3.GetNormalized() * cam[c4d.CAMERAOBJECT_TARGETDISTANCE]
+        mg = c4d.Matrix()
+        mg.off = world_pos
+        target.SetMg(mg)
         doc.AddUndo(c4d.UNDOTYPE_NEW, target)
         tag[TAG_LINK_TARGET] = target
 
