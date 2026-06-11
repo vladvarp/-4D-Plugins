@@ -43,7 +43,11 @@ MENU_ITEMS = [
             1068899,    # MolecularHexLattice 
         ]},
 
-        1068852,    # HierarchyFilter
+        {"name": "XPressos objects", "items": [
+            1068852,    # HierarchyFilter
+            1068900,    # ChildSelector
+        ]},       
+        
         1068859,    # TargetCamera
     ]},
 
