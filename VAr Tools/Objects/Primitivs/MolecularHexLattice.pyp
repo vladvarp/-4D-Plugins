@@ -56,7 +56,7 @@ import zlib
 # ══════════════════════════════════════════════════════════════════════════════
 
 ID_MOLHEXLATTICE  = 1068899
-NAME_MOLHEXLATTICE = "MolecularHexLattice v1.8"
+NAME_MOLHEXLATTICE = "MolecularHexLattice v1.9"
 
 # ══════════════════════════════════════════════════════════════════════════════
 #  UserData SubID — СТРОГО совпадают с порядком вызовов AddUserData
@@ -92,6 +92,7 @@ ML_BEVEL_SIZE   = 22
 ML_BEVEL_SUBDIV = 23
 
 ML_SPHERE_PHONG = 24   # угол фонг-сглаживания шаров (градусы)
+ML_HIDE_ISOLATED = 25  # галочка «Скрывать одиночные шары (без связей)»
 
 # Первый «настоящий» параметр данных (используется для проверки инициализации)
 ML_FIRST_PARAM = ML_SIZE_X  # SubID=2
@@ -100,9 +101,9 @@ ML_FIRST_PARAM = ML_SIZE_X  # SubID=2
 #  Дефолтные значения параметров
 # ══════════════════════════════════════════════════════════════════════════════
 
-DEFAULT_SIZE_X        = 500.0
-DEFAULT_SIZE_Y        = 500.0
-DEFAULT_SIZE_Z        = 500.0
+DEFAULT_SIZE_X        = 401.0
+DEFAULT_SIZE_Y        = 401.0
+DEFAULT_SIZE_Z        = 401.0
 DEFAULT_DENSITY       = 200.0
 DEFAULT_BOND_DENS     = 250.0
 DEFAULT_SEED          = 0
@@ -123,6 +124,8 @@ DEFAULT_TUBE_SEGS_H   = 2
 
 DEFAULT_BEVEL_SIZE    = 3.0
 DEFAULT_BEVEL_SUBDIV  = 0
+
+DEFAULT_HIDE_ISOLATED = True  # галочка «Скрывать одиночные шары»
 
 # ══════════════════════════════════════════════════════════════════════════════
 #  Вспомогательные функции UserData
@@ -211,6 +214,16 @@ def _cycle_bc(name, default, items):
     for i, label in enumerate(items):
         cyc[i] = label
     bc[c4d.DESC_CYCLE] = cyc
+    return bc
+
+
+def _bool_bc(name, default):
+    """Чекбокс (Bool) для UserData."""
+    bc = c4d.GetCustomDatatypeDefault(c4d.DTYPE_BOOL)
+    bc[c4d.DESC_NAME]       = name
+    bc[c4d.DESC_SHORT_NAME] = name
+    bc[c4d.DESC_DEFAULT]    = default
+    bc[c4d.DESC_ANIMATE]    = c4d.DESC_ANIMATE_ON
     return bc
 
 
@@ -797,6 +810,8 @@ def _build_lattice(op):
 
     sphere_phong = math.degrees(max(0.0, min(math.radians(180.0), float(_ud_get(op, ML_SPHERE_PHONG, DEFAULT_SPHERE_PHONG)))))
 
+    hide_isolated = bool(_ud_get(op, ML_HIDE_ISOLATED, DEFAULT_HIDE_ISOLATED))
+
     # ── Позиции узлов ────────────────────────────────────────────────────────
     positions_raw = _generate_positions(size_x, size_y, size_z, density, seed, jitter)
 
@@ -837,6 +852,31 @@ def _build_lattice(op):
             node_holes[i].append(fi_ij)
         if fi_ji not in node_holes[j]:
             node_holes[j].append(fi_ji)
+
+    # ── Фильтр одиночных шаров ───────────────────────────────────────────────
+    # Если галочка включена — узлы без единой связи полностью исключаются из генерации.
+    # bonds при этом не меняются (они ссылаются на оригинальные индексы через remap).
+    if hide_isolated:
+        # Множество узлов, участвующих хотя бы в одной связи
+        connected = set()
+        for i, j in bonds:
+            connected.add(i)
+            connected.add(j)
+
+        # Таблица переиндексации: старый индекс → новый
+        remap = {}
+        new_positions  = []
+        new_node_holes = []
+        for old_idx, pos in enumerate(positions):
+            if old_idx in connected:
+                remap[old_idx] = len(new_positions)
+                new_positions.append(pos)
+                new_node_holes.append(node_holes[old_idx])
+
+        positions  = new_positions
+        node_holes = new_node_holes
+        # Переиндексируем bonds под новые индексы узлов
+        bonds = [(remap[i], remap[j]) for i, j in bonds]
 
     # ── Строим иерархию ──────────────────────────────────────────────────────
     root = c4d.BaseObject(c4d.Onull)
@@ -960,6 +1000,9 @@ def _create_userdata(op):
     _add_in_group(op, g_sph, _float_bc("Фонг шаров (°)",        DEFAULT_SPHERE_PHONG,  0.0,  math.radians(180.0),
                                         unit=c4d.DESC_UNIT_DEGREE, step=math.radians(1.0)))
 
+    # SubID=25 → галочка скрытия одиночных шаров (без связей)
+    _add_in_group(op, g_lat, _bool_bc("Скрывать одиночные шары", DEFAULT_HIDE_ISOLATED))
+
 
 def _set_defaults(op):
     _ud_set(op, ML_SIZE_X,       DEFAULT_SIZE_X)
@@ -985,6 +1028,8 @@ def _set_defaults(op):
 
     _ud_set(op, ML_BEVEL_SIZE,   DEFAULT_BEVEL_SIZE)
     _ud_set(op, ML_BEVEL_SUBDIV, DEFAULT_BEVEL_SUBDIV)
+
+    _ud_set(op, ML_HIDE_ISOLATED, DEFAULT_HIDE_ISOLATED)
 
 
 # ══════════════════════════════════════════════════════════════════════════════
