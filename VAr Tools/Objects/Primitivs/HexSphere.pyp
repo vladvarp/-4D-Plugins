@@ -14,7 +14,7 @@ import tempfile
 
 ID_HEXSPHERE = 1068872
 
-NAME_HEXSPHERE = "HexSphere v1.2"
+NAME_HEXSPHERE = "Hex Sphere v1.2"
 
 # ─── UserData SubID (общая схема: SubID=1 — группа, поля с 2) ────────────────
 
@@ -554,7 +554,7 @@ class _MeshPrimitiveBase(c4d.plugins.ObjectData):
 class HexSphereObject(_MeshPrimitiveBase):
     """Сфера с гексагональной/пятиугольной сеткой (dual icosphere)."""
 
-    OBJECT_NAME  = "HexSphere"
+    OBJECT_NAME  = "Hex Sphere"
     _first_ud_id = HS_RADIUS
 
     def _create_ud(self, op, grp_subid):

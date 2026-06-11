@@ -14,7 +14,7 @@ import tempfile
 
 ID_TRITORUS = 1068874
 
-NAME_TRITORUS = "TriTorus v1.1"
+NAME_TRITORUS = "Tri Torus v1.1"
 
 # ─── UserData SubID (общая схема: SubID=1 — группа, поля с 2) ────────────────
 
@@ -247,7 +247,7 @@ class _MeshPrimitiveBase(c4d.plugins.ObjectData):
 class TriTorusObject(_MeshPrimitiveBase):
     """Тор с треугольной сеткой."""
 
-    OBJECT_NAME  = "TriTorus"
+    OBJECT_NAME  = "Tri Torus"
     _first_ud_id = TT_RADIUS_MAJOR
 
     def _create_ud(self, op, grp_subid):

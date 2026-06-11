@@ -20,8 +20,8 @@ import tempfile
 
 # ── ID плагина ──
 PLUGIN_ID = 1068837
-MENU_NAME = "PolySubdivider"
-MENU_NAME_V = "PolySubdivider v1.0 (Experimental)"
+MENU_NAME = "Poly Subdivider"
+MENU_NAME_V = "Poly Subdivider v1.0 (Experimental)"
 
 # ============================================================
 #  ID параметров (должны быть > 999, не пересекаться с C4D)

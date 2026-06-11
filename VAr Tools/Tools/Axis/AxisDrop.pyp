@@ -9,7 +9,7 @@ import c4d
 import base64
 
 PLUGIN_ID   = 1068830
-PLUGIN_NAME = "AxisDrop v1.1"
+PLUGIN_NAME = "Axis Drop v1.1"
 PLUGIN_HELP = "Опустить ось объекта на нижнюю грань его bounding box"
 
 _ICON_B64 = (

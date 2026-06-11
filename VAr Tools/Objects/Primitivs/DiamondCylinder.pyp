@@ -14,7 +14,7 @@ import tempfile
 
 ID_DIAMONDCYLINDER = 1068873
 
-NAME_DIAMONDCYLINDER = "DiamondCylinder v1.6"
+NAME_DIAMONDCYLINDER = "Diamond Cylinder v1.6"
 
 # ─── UserData SubID (общая схема: SubID=1 — группа, поля с 2) ────────────────
 
@@ -478,7 +478,7 @@ class _MeshPrimitiveBase(c4d.plugins.ObjectData):
 class DiamondCylinderObject(_MeshPrimitiveBase):
     """Цилиндр с ромбической сеткой."""
 
-    OBJECT_NAME  = "DiamondCylinder"
+    OBJECT_NAME  = "Diamond Cylinder"
     _first_ud_id = DC_RADIUS
 
     def _create_ud(self, op, grp_subid):

@@ -9,27 +9,33 @@ from c4d import gui
 MENU_NAME = "VAr Tools"
 
 MENU_ITEMS = [
-    1068825,    # Object Renamer Pro
-    1068834,    # Camera Resolution 
+    1068825,    # ObjectRenamerPro
+    1068834,    # CameraResolution 
 
     None,
     {"name": "Tools", "items": [
         {"name": "Axis", "items": [
             1068828,   # Axis2Center
             1068829,   # Axis2Bottom
-            1068830,   # Axis Drop
+            1068830,   # AxisDrop
         ]},
 
         {"name": "Location", "items": [
             1068826,   # Drop2Floor
-            1068827,   # Drop2Floor 0(XZ)
-            1068838,   # Center2Parent XZ
-            1068839,   # Center2World XZ
+            1068827,   # Drop2Floor0(XZ)
+            1068838,   # Center2ParentXZ
+            1068839,   # Center2WorldXZ
         ]},
 
         {"name": "Clean", "items": [
-            1068831,   # Clean Nulls
-            1068832,   # Clean Empty Nulls
+            1068831,   # CleanNulls
+            1068832,   # CleanEmptyNulls
+            1068908,   # CleanObjects
+            1068909,   # CleanEmptyObjects
+            1068910,   # CleanAllTags
+            1068911,   # CleanSelectTags
+            1068912,   # CleanEmptyMatTags
+            1068913,   # CleanSelectMatTags
         ]},
     ]},
 

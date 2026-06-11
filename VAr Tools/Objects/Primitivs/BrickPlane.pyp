@@ -16,7 +16,7 @@ import random
 
 ID_BRICKPLANE = 1068875
 
-NAME_BRICKPLANE = "BrickPlane v1.6.1"
+NAME_BRICKPLANE = "Brick Plane v1.6.1"
 
 # ─── UserData SubID (общая схема: SubID=1 — группа, поля с 2) ────────────────
 
@@ -640,7 +640,7 @@ class _MeshPrimitiveBase(c4d.plugins.ObjectData):
 class BrickPlaneObject(_MeshPrimitiveBase):
     """Плоскость с кирпичной сеткой (running bond)."""
 
-    OBJECT_NAME  = "BrickPlane"
+    OBJECT_NAME  = "Brick Plane"
     _first_ud_id = BP_WIDTH
 
     def _create_ud(self, op, grp_subid):

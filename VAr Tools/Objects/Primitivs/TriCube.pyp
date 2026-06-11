@@ -14,7 +14,7 @@ import tempfile
 
 ID_TRICUBE = 1068871
 
-NAME_TRICUBE = "TriCube v1.4"
+NAME_TRICUBE = "Tri Cube v1.4"
 
 # ─── UserData SubID (общая схема: SubID=1 — группа, поля с 2) ────────────────
 
@@ -529,7 +529,7 @@ class _MeshPrimitiveBase(c4d.plugins.ObjectData):
 class TriCubeObject(_MeshPrimitiveBase):
     """Куб с треугольной сеткой."""
 
-    OBJECT_NAME  = "TriCube"
+    OBJECT_NAME  = "Tri Cube"
     _first_ud_id = TC_SIZE_X
 
     def _create_ud(self, op, grp_subid):

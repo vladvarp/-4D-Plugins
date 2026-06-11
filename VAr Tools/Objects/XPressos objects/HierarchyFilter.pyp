@@ -13,8 +13,8 @@ __res__ = c4d.plugins.GeResource()
 __res__.Init(os.path.dirname(__file__))
 
 PLUGIN_ID   = 1068852
-PLUGIN_NAME = "HierarchyFilter v1.4"
-OBJECT_NAME = "HierarchyFilter"
+PLUGIN_NAME = "Hierarchy Filter v1.4"
+OBJECT_NAME = "Hierarchy Filter"
 PLUGIN_HELP = "Объект-фильтр иерархии для использования в Xpresso"
 
 # SubID UserData

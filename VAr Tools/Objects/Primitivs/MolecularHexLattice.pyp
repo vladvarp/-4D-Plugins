@@ -56,7 +56,7 @@ import zlib
 # ══════════════════════════════════════════════════════════════════════════════
 
 ID_MOLHEXLATTICE  = 1068899
-NAME_MOLHEXLATTICE = "MolecularHexLattice v1.9"
+NAME_MOLHEXLATTICE = "Molecular Hex Lattice v1.9"
 
 # ══════════════════════════════════════════════════════════════════════════════
 #  UserData SubID — СТРОГО совпадают с порядком вызовов AddUserData
@@ -1039,7 +1039,7 @@ def _set_defaults(op):
 class MolecularHexLatticeObject(c4d.plugins.ObjectData):
     """Генератор молекулярной гексагональной решётки."""
 
-    OBJECT_NAME = "MolecularHexLattice"
+    OBJECT_NAME = "Molecular Hex Lattice"
 
     def _ensure_ud(self, op):
         """Инициализирует UserData один раз (проверяет по первому параметру)."""
