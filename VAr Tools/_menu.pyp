@@ -53,6 +53,7 @@ MENU_ITEMS = [
     {"name": "Tegs", "items": [
         1068900,    # ChildSelector
         1068859,    # TargetCamera
+        1068903,    # CameraVisibility
     ]},
 
     {"name": "Deformers", "items": [
