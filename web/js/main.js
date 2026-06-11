@@ -48,7 +48,7 @@ function initIndexPage() {
             icon: '✦',
             tags: ['Моделирование', 'Процедурный', 'Автоматизация'],
             version: 'v2.28.0',
-            mdFile: 'web/plugins/VAr_Tools.md'
+            mdFile: 'plugins/VAr_Tools.md'
         }
     ];
 
@@ -80,7 +80,7 @@ function renderPluginCards(container, plugins) {
 function createPluginCard(plugin) {
     const a = document.createElement('a');
     a.className = 'plugin-card animate-in';
-    a.href = `plugin.html?md=${encodeURIComponent(plugin.mdFile)}`;
+    a.href = `web/plugin.html?md=${encodeURIComponent(plugin.mdFile)}`;
     a.setAttribute('aria-label', `Открыть страницу плагина ${plugin.title}`);
 
     // Формируем теги — первый всегда обычный, "Featured" — акцентный
