@@ -11,54 +11,22 @@ ChildSelector.pyp
 
 import c4d
 import base64
+import os
+import tempfile
 
 # ── ID плагинов ───────────────────────────────────────────────────────────────
 PLUGIN_ID_CMD = 1068900   # CommandData — кнопка в меню
 PLUGIN_ID_TAG = 1068901   # TagData     — тег
+
+PLUGIN_NAME_V = "Child Selector v1.1"
+TEG_NAME      = "Child Selector Tag"
+PLUGIN_HELP   = "Добавить тег выбора дочернего объекта"
 
 # ── ID пользовательских данных (UserData) ─────────────────────────────────────
 # Индексы фиксированы: создаём данные в строго определённом порядке.
 UD_DROPDOWN = 1   # выпадающий список дочерних объектов
 UD_NAME     = 2   # имя выбранного объекта
 UD_LINK     = 3   # ссылка на выбранный объект
-
-# ── Иконки (b64, 32×32 PNG) ───────────────────────────────────────────────────
-# Иконка кнопки — синий квадрат с буквой C
-_ICON_CMD_B64 = (
-    "iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAAyklEQVRYw+2WwQ2D"
-    "MBAE1xEFpAN6oAF6oAF6SAdQAutBCaQDSiAd0AEd0AEdQAkpgfUiRUJC4mzn6"
-    "Yt0u5b3xvYBAAAAAAAAAAAAAAAAAACg0jRNOefceymlNAzDGcdxrLWuta611tre"
-    "WmulSimllHPOOeecUkoppZRSSil1OI6jc84ppZRSSimllFJKKaWUUkqp0+M4Dq"
-    "WUUkoppZRSSql/3vf9TimllFJKKaWUUkop5b7v+1JKKaWUUkoppZRS6t/3fU8p"
-    "pZRSSimllFJKKeW+7/tSSimllFJKKaWUUuoBkXMnJAAAAABJRU5ErkJggg=="
-)
-
-# Иконка тега — оранжевый квадрат с буквой T
-_ICON_TAG_B64 = (
-    "iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAAy0lEQVRYw+2WwQ2D"
-    "MBAE1xEFpAN6oAF6oAF6SAeuB+ugA9IBJbgO6IAO6IAOKCEloF4kJCQkzna+vki"
-    "3a3lvbB8AAAAAAAAAAAAAAAAAAACA0jRNOefce+mcc/M8r2Mcx7bWuta211prpZ"
-    "RSSimllHPOOeecUkoppZRSSil1OI6jc84ppZRSSimllFJKKaWUUkqp0+M4DqWU"
-    "UkoppZRSSql/3vf9TimllFJKKaWUUkop5b7v+1JKKaWUUkoppZRS6t/3fU8ppZ"
-    "RSSimllFJKKeW+7/tSSimllFJKKaWUUuoBJa8nJQAAAABJRU5ErkJggg=="
-)
-
-
-def _make_icon(b64_str):
-    """Декодирует b64 PNG и возвращает BaseBitmap для иконки плагина."""
-    import tempfile, os
-    data = base64.b64decode(b64_str)
-    # В R26 BaseBitmap находится в c4d.bitmaps
-    bmp = c4d.bitmaps.BaseBitmap()
-    bmp.Init(32, 32, 32)
-    # Записываем через временный файл — единственный надёжный способ в C4D Python API
-    tmp = tempfile.NamedTemporaryFile(suffix=".png", delete=False)
-    tmp.write(data)
-    tmp.close()
-    bmp.InitWith(tmp.name)
-    os.unlink(tmp.name)
-    return bmp
-
 
 def _get_direct_children(obj):
     """Возвращает список прямых дочерних объектов (depth=1)."""
@@ -113,27 +81,24 @@ def _build_userdata(tag):
 
 class ChildSelectorTag(c4d.plugins.TagData):
 
+    def __init__(self):
+        self._cached_names = None  # кеш имён детей для избежания лишних пересозданий
+
     def Init(self, node):
         # При инициализации создаём пользовательские данные
         _build_userdata(node)
+        self._cached_names = None
         return True
 
-    def GetDDescription(self, node, description, flags):
+    def _rebuild_cycle(self, tag, children):
         """
-        Динамически перестраиваем список дочерних объектов в выпадающем меню
-        каждый раз когда C4D запрашивает описание тега (открытие AM, смена выделения).
+        Пересоздаёт DESC_CYCLE в UserData поле UD_DROPDOWN через SetUserDataContainer.
+        Это единственный рабочий способ обновить CYCLE динамически в R26.
+        Сохраняет текущий индекс выбора.
         """
-        # Для тегов с UserData грузим базовое описание через "tbaselist2d"
-        if not description.LoadDescription("tbaselist2d"):
-            return False
+        # Сохраняем текущий выбор перед пересозданием
+        current_idx = tag[c4d.ID_USERDATA, UD_DROPDOWN] or 0
 
-        obj = node.GetObject()
-        if obj is None:
-            return True, flags | c4d.DESCFLAGS_DESC_LOADED
-
-        children = _get_direct_children(obj)
-
-        # Формируем BaseContainer для CYCLE с актуальным списком детей
         cycle_bc = c4d.BaseContainer()
         if children:
             for i, child in enumerate(children):
@@ -141,30 +106,35 @@ class ChildSelectorTag(c4d.plugins.TagData):
         else:
             cycle_bc.SetString(0, "— нет дочерних —")
 
-        # DescID для UserData поля UD_DROPDOWN
-        ud_id = c4d.DescID(
-            c4d.DescLevel(c4d.ID_USERDATA, c4d.DTYPE_SUBCONTAINER, 0),
-            c4d.DescLevel(UD_DROPDOWN, c4d.DTYPE_LONG, 0)
-        )
+        # Обновляем DESC_CYCLE через SetUserDataContainer
+        for ud_id, ud_bc in tag.GetUserDataContainer():
+            if ud_id[1].id == UD_DROPDOWN:
+                ud_bc[c4d.DESC_CYCLE] = cycle_bc
+                tag.SetUserDataContainer(ud_id, ud_bc)
+                break
 
-        # Получаем текущий BaseContainer параметра, обновляем CYCLE, записываем обратно
-        bc = description.GetParameterI(ud_id, None)
-        if bc is not None:
-            bc[c4d.DESC_CYCLE] = cycle_bc
-            description.SetParameter(ud_id, bc, c4d.DESCFLAGS_DESC_SET)
-
-        return True, flags | c4d.DESCFLAGS_DESC_LOADED
+        # Восстанавливаем индекс (зажимаем в допустимые пределы)
+        max_idx = max(0, len(children) - 1) if children else 0
+        tag[c4d.ID_USERDATA, UD_DROPDOWN] = min(current_idx, max_idx)
 
     def Execute(self, tag, doc, op, bt, priority, flags):
         """
-        Обновляем поля Имя и Связь при каждом тике —
-        синхронизируем с текущим выбором в выпадающем списке.
+        Обновляем CYCLE и поля Имя/Связь при каждом тике.
+        CYCLE пересоздаётся только при изменении состава дочерних объектов.
         """
         obj = tag.GetObject()
         if obj is None:
             return c4d.EXECUTIONRESULT_OK
 
         children = _get_direct_children(obj)
+        names = [c.GetName() for c in children]
+
+        # Пересоздаём CYCLE только если состав детей изменился
+        if names != self._cached_names:
+            self._cached_names = names
+            self._rebuild_cycle(tag, children)
+            c4d.EventAdd()
+
         idx = tag[c4d.ID_USERDATA, UD_DROPDOWN]
 
         if children and idx is not None and 0 <= idx < len(children):
@@ -212,32 +182,91 @@ class ChildSelectorCmd(c4d.plugins.CommandData):
             return c4d.CMD_ENABLED
         return 0
 
+# ── Иконки (b64, 32×32 PNG) ───────────────────────────────────────────────────
+# Иконка кнопки — синий квадрат с буквой C
+_ICON_PLG_B64 = (
+    "iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAIAAAD8GO2jAAABoElEQVR4nGPU0NBgoCVgoqnpDAwMLJhC"
+    "169fp8RETU1NZC66Dyg0HdMERuQ4gMgxVt6gxIL/7RoMSP5A+IAqpsNNgPuDibqmY9oxEKkICjo0cUpB"
+    "QAUsMjFVViDiGbcFDAz////HJcXIyIii8kQKQspiDrIUFYLoxAmc7mDA7wPCRgcQLmbI9MGJE/8hplts"
+    "uGFhwYhHJUU+gAO0cKeCBRYWjIigr8BXupAfyRYbbjAQEQ34fICWFskDuC3A63EIsNhw40SAxokADfR4"
+    "JjKjEQ9omNEgMXGSYTYuBVTIyRYWjOYMqTS0AD8YrBkNBdAooxEJhr4FiGYLvN4X5mKudxbxUueR4Wd5"
+    "/fXvrFMfmve9YWBgyLEULLYVkuZj+fb7/+03v0ynPsBlKHLLBRHJmpqa169f/9+ucevNLwVB1rhVz7fd"
+    "/KInwe6sws3AwKAmwjbZT3zemY+5m16qirDWOokQYzoDWsOLgRotOwbU1iN6HEyYMIGKpjNg5oNnz54x"
+    "MDCsXbu2pqYGUzM7O7uOjk5OTo6FhUVtbe2aNWsI2gcAbDeLOb51KUEAAAAASUVORK5CYII="
+)
+
+# Иконка тега — оранжевый квадрат с буквой T
+_ICON_TAG_B64 = (
+    "iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAIAAAD8GO2jAAABh0lEQVR4nNVWv0uFUBg99xFIUFBEUy0t"
+    "8R48gqDwBkLQ2F9Qe9HiZltKQ2uBUDRUY0ugY2uThG9tcXhTDS4t0fCWhtvgS++74lX0SnU2/a7neL4f"
+    "+pFut4s20WmVHcBU/lYURU0Ye70efyk6aMieZyB8DcaxC9JIwWLgfGQO1LD/MKQ+OorZcxq/0UUJyHHJ"
+    "k+y88GQakgkAYIwVypOJZLLwIAvROz6kIEVhWPgekDsoxcCQUSeo6SAMWcKuB4RSWe81cpBCyLsCAUpJ"
+    "mnq+Z/KoX2Q9IKhQBpkDoRfroVBAbjyBHpCBwQYGE+pcddCqo8VBG1cCt0UHFEwypUTHYYsCcvzVQePR"
+    "1qBVxP8XyNaW7L8/vYCtU6zsYnYZo3e83CA8A4B1ExsWZpbwNcLHEPebhazc5pI5GG8yFsP+M9aOEJzg"
+    "ehGPe0i+SPOr2LnE2xOu5vCwjc/XKuwQFi+o2OwwuT2KNXBdVyE78nMQxzEA3/dt284/rGlav983TZNS"
+    "6jiO53mlet/UC3rDfQqS2gAAAABJRU5ErkJggg=="
+)
+
+def _make_icon_teg():
+    """Декодирует встроенный base64 PNG во временный файл и возвращает BaseBitmap."""
+    bmp = c4d.bitmaps.BaseBitmap()
+    try:
+        data = base64.b64decode(_ICON_TAG_B64.replace(" ", ""))
+        fd, tmp = tempfile.mkstemp(suffix=".png")
+        try:
+            os.write(fd, data)
+            os.close(fd)
+            bmp.InitWith(tmp)
+        finally:
+            try:
+                os.unlink(tmp)
+            except OSError:
+                pass
+    except Exception:
+        return None
+    return bmp
+
+def _make_icon_plg():
+    """Декодирует встроенный base64 PNG во временный файл и возвращает BaseBitmap."""
+    bmp = c4d.bitmaps.BaseBitmap()
+    try:
+        data = base64.b64decode(_ICON_PLG_B64.replace(" ", ""))
+        fd, tmp = tempfile.mkstemp(suffix=".png")
+        try:
+            os.write(fd, data)
+            os.close(fd)
+            bmp.InitWith(tmp)
+        finally:
+            try:
+                os.unlink(tmp)
+            except OSError:
+                pass
+    except Exception:
+        return None
+    return bmp    
+
+ICON_TEG = _make_icon_teg()
+ICON_PLG = _make_icon_plg()
 
 # ── Регистрация ───────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
-    # Иконка кнопки
-    cmd_icon = _make_icon(_ICON_CMD_B64)
-
-    # Иконка тега
-    tag_icon = _make_icon(_ICON_TAG_B64)
-
     # Регистрация тега
     c4d.plugins.RegisterTagPlugin(
         id=PLUGIN_ID_TAG,
-        str="Child Selector Tag",
+        str=TEG_NAME,
         info=c4d.TAG_EXPRESSION | c4d.TAG_VISIBLE,
         g=ChildSelectorTag,
         description="",
-        icon=tag_icon
+        icon=ICON_TEG
     )
 
     # Регистрация кнопки
     c4d.plugins.RegisterCommandPlugin(
         id=PLUGIN_ID_CMD,
-        str="Child Selector",
+        str=PLUGIN_NAME_V,
         info=0,
-        icon=cmd_icon,
-        help="Добавить тег выбора дочернего объекта",
+        icon=ICON_PLG,
+        help=PLUGIN_HELP,
         dat=ChildSelectorCmd()
     )
