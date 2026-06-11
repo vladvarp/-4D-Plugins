@@ -18,7 +18,7 @@ import tempfile
 PLUGIN_ID_CMD = 1068900   # CommandData — кнопка в меню
 PLUGIN_ID_TAG = 1068901   # TagData     — тег
 
-PLUGIN_NAME_V = "Child Selector v1.1"
+PLUGIN_NAME_V = "Child Selector Tag v1.1"
 TEG_NAME      = "Child Selector Tag"
 PLUGIN_HELP   = "Добавить тег выбора дочернего объекта"
 
