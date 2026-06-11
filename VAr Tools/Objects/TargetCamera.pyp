@@ -14,7 +14,7 @@ PLUGIN_ID_CMD = 1068859   # CommandData — кнопка меню
 PLUGIN_ID_TAG = 1068860   # TagData     — Expression-тег
 
 PLUGIN_NAME_CMD   = "Target Camera"
-PLUGIN_NAME_CMD_V = "Target Camera v1.4"
+PLUGIN_NAME_CMD_V = "Target Camera v1.6"
 PLUGIN_NAME_TAG   = "TargetCam Controller"
 
 # Ключ ссылки на таргет в BaseContainer тега
@@ -83,6 +83,18 @@ class TargetCamTag(c4d.plugins.TagData):
 
         target = tag[TAG_LINK_TARGET]
         if target is None or not target.IsAlive():
+            # Таргет удалён или не создан — пересоздаём.
+            # Это покрывает: ручное удаление таргета, ручное добавление тега на камеру.
+            new_target = c4d.BaseObject(c4d.Onull)
+            new_target.SetName(cam.GetName() + ".target")
+            new_target[c4d.NULLOBJECT_DISPLAY] = 11
+            new_target[c4d.NULLOBJECT_RADIUS]  = 5.0
+            new_target.SetAbsPos(cam.GetAbsPos() + cam.GetMg().v3 * cam[c4d.CAMERAOBJECT_TARGETDISTANCE])
+            _set_object_icon(new_target, _ICON_B64_2)  # иконка таргета
+            doc.InsertObject(new_target)
+            tag[TAG_LINK_TARGET] = new_target
+            self._prev_dist = None
+            c4d.EventAdd()
             return c4d.EXECUTIONRESULT_OK
 
         # Синхронизация имени
@@ -132,8 +144,14 @@ class TargetCameraCmd(c4d.plugins.CommandData):
         doc.InsertObject(cam)
         doc.AddUndo(c4d.UNDOTYPE_NEW, cam)
 
-        # ── 2. Таргет (Null) ──────────────────────────────────────────────────
-        # Имя сразу по правилу: "<имя камеры>.target"
+        # ── 2. Expression-тег на камере ───────────────────────────────────────
+        tag = cam.MakeTag(PLUGIN_ID_TAG)
+        tag.SetName("TargetCam Controller")
+        doc.AddUndo(c4d.UNDOTYPE_NEW, tag)
+
+        # ── 3. Таргет (Null) — создаётся после появления тега ────────────────
+        # Тег уже существует (MakeTag выше) — это и есть триггер.
+        # Имя по правилу: "<имя камеры>.target"
         target = c4d.BaseObject(c4d.Onull)
         target.SetName(cam.GetName() + ".target")
         target[c4d.NULLOBJECT_DISPLAY] = 11
@@ -142,12 +160,7 @@ class TargetCameraCmd(c4d.plugins.CommandData):
         _set_object_icon(target, _ICON_B64_2)  # иконка таргета
         doc.InsertObject(target)
         doc.AddUndo(c4d.UNDOTYPE_NEW, target)
-
-        # ── 3. Expression-тег на камере ───────────────────────────────────────
-        tag = cam.MakeTag(PLUGIN_ID_TAG)
-        tag.SetName("TargetCam Controller")
         tag[TAG_LINK_TARGET] = target
-        doc.AddUndo(c4d.UNDOTYPE_NEW, tag)
 
         doc.EndUndo()
         doc.SetActiveObject(cam)
@@ -228,7 +241,7 @@ if __name__ == "__main__":
     ok_tag = c4d.plugins.RegisterTagPlugin(
         id          = PLUGIN_ID_TAG,
         str         = PLUGIN_NAME_TAG,
-        info        = c4d.TAG_EXPRESSION,
+        info        = c4d.TAG_EXPRESSION | c4d.TAG_VISIBLE,
         g           = TargetCamTag,
         description = "",
         icon        = _make_icon_teg(),
