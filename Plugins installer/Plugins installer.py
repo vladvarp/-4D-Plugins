@@ -15,7 +15,7 @@ from urllib.parse import unquote, quote
 import ctypes
 
 PROGRAM_NAME = "4D Plugin Installer"
-PROGRAM_VER  = "v1.2"
+PROGRAM_VER  = "v1.3"
 
 # Скрываем консольное окно для всех дочерних процессов на Windows
 CREATE_NO_WINDOW = 0x08000000
@@ -40,9 +40,6 @@ LIST_JSON_URL = (
     "https://raw.githubusercontent.com/vladvarp/-4D-Plugins/main/update_data/uplist.json"
 )
 CONFIG_FILE = Path(os.getenv("APPDATA")) / "C4D_PluginInstaller" / "config.json"
-GIT_INSTALLER_URL = (
-    "https://github.com/git-for-windows/git/releases/download/v2.54.0.windows.1/Git-2.54.0-64-bit.exe"
-)
 GIT_RELEASES_PAGE = "https://github.com/git-for-windows/git/releases"
 # Кэш list.json в папке temp Windows (доступен при отсутствии сети)
 LIST_JSON_CACHE = Path(tempfile.gettempdir()) / "c4d_installer_list_cache.json"
@@ -260,6 +257,7 @@ def save_config(cfg: dict):
 # ── Git ───────────────────────────────────────────────────────────────────────
 
 def git_available() -> bool:
+    # return False  # <- временно для теста отсутствия GIT
     try:
         _run(["git", "--version"], capture_output=True, check=True)
         return True
@@ -273,44 +271,6 @@ def git_exe() -> str:
         return str(Path(path) / "bin" / "git.exe")
     except Exception:
         return "git"
-
-def get_git_installer_url() -> str:
-    """Берёт ссылку на установщик Git из uplist.json (app.git_installer_url),
-    при недоступности — fallback на GIT_INSTALLER_URL."""
-    try:
-        req = urllib.request.Request(LIST_JSON_URL, headers={"User-Agent": "C4D-Installer/1.0"})
-        with urllib.request.urlopen(req, timeout=5) as resp:
-            data = json.loads(resp.read().decode("utf-8"))
-        url = data.get("app", {}).get("git_installer_url")
-        if url:
-            return url
-    except Exception:
-        pass
-    return GIT_INSTALLER_URL
-
-def install_git(progress_cb, done_cb):
-    def worker():
-        try:
-            progress_cb("Скачиваю Git for Windows…")
-            git_url = get_git_installer_url()
-            tmp = tempfile.mktemp(suffix=".exe")
-            urllib.request.urlretrieve(git_url, tmp)
-            progress_cb("Устанавливаю Git (подождите)…")
-            _run(
-                [tmp, "/VERYSILENT", "/NORESTART",
-                 "/COMPONENTS=icons,ext\\reg\\shellhere,assoc,assoc_sh"],
-                check=True
-            )
-            os.remove(tmp)
-            done_cb(True, "Git установлен")
-        except Exception as e:
-            try:
-                QDesktopServices.openUrl(QUrl(GIT_RELEASES_PAGE))
-            except Exception:
-                pass
-            done_cb(False,
-                    f"{e}\n\nОткрыта страница релизов Git — установите его вручную: {GIT_RELEASES_PAGE}")
-    threading.Thread(target=worker, daemon=True).start()
 
 def sparse_clone_folder(repo_url: str, folder_path: str, dest: str, progress_cb):
     """
@@ -1138,29 +1098,24 @@ class MainWindow(QMainWindow):
         self._populate_table()
 
     def _ensure_git_installed(self):
-        """Вызывается при запуске: если Git не найден — устанавливает его автоматически."""
-        self.refresh_btn.setEnabled(False)
-        self.progress_bar.setRange(0, 0)
-        self.progress_bar.setVisible(True)
-        self.status_lbl.setText("Установка Git…")
-        self.progress_lbl.setText("Git не найден. Устанавливаю автоматически…")
+        """Вызывается при запуске: если Git не найден — показывает предупреждение."""
+        self.status_lbl.setText("Git не найден")
+        self.progress_lbl.setText("Для работы программы необходим Git")
 
-        def _done(ok: bool, msg: str):
-            self.progress_bar.setRange(0, 1)
-            self.progress_bar.setValue(1)
-            self.progress_bar.setVisible(False)
-            self.refresh_btn.setEnabled(True)
-            if ok:
-                self.status_lbl.setText("Git установлен")
-                self.progress_lbl.setText("Git успешно установлен. Готов к работе.")
-            else:
-                self.status_lbl.setText("Ошибка установки Git")
-                self.progress_lbl.setText(f"Не удалось установить Git: {msg}")
-
-        install_git(
-            lambda msg: (self.progress_lbl.setText(msg), QApplication.processEvents()),
-            _done
+        msg = QMessageBox(self)
+        msg.setWindowTitle("Требуется Git")
+        msg.setIcon(QMessageBox.Icon.Warning)
+        msg.setText(
+            "<b>Для работы программы необходим Git.</b><br><br>"
+            "Git не обнаружен на вашем компьютере.<br>"
+            "Пожалуйста, скачайте и установите Git, затем перезапустите программу."
         )
+        download_btn = msg.addButton("Скачать Git", QMessageBox.ButtonRole.ActionRole)
+        msg.addButton("Закрыть", QMessageBox.ButtonRole.RejectRole)
+        msg.exec()
+
+        if msg.clickedButton() == download_btn:
+            QDesktopServices.openUrl(QUrl(GIT_RELEASES_PAGE))
 
     def _install_single(self, plugin: dict):
         """Устанавливает/обновляет один плагин по кнопке в строке таблицы."""
@@ -1171,8 +1126,19 @@ class MainWindow(QMainWindow):
         os.makedirs(install_dir, exist_ok=True)
 
         if not git_available():
-            QMessageBox.warning(self, "Git не найден",
-                                "Git не установлен. Установаите GIT.")
+            msg = QMessageBox(self)
+            msg.setWindowTitle("Требуется Git")
+            msg.setIcon(QMessageBox.Icon.Warning)
+            msg.setText(
+                "<b>Для работы программы необходим Git.</b><br><br>"
+                "Git не обнаружен на вашем компьютере.<br>"
+                "Пожалуйста, скачайте и установите Git, затем перезапустите программу."
+            )
+            download_btn = msg.addButton("Скачать Git", QMessageBox.ButtonRole.ActionRole)
+            msg.addButton("Закрыть", QMessageBox.ButtonRole.RejectRole)
+            msg.exec()
+            if msg.clickedButton() == download_btn:
+                QDesktopServices.openUrl(QUrl(GIT_RELEASES_PAGE))
             return
 
         # Немедленно блокируем UI и показываем прогресс ДО запуска воркера
