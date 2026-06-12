@@ -530,6 +530,7 @@ class MainWindow(QMainWindow):
         self.remote_authors: list[dict] = []   # список авторов из list.json
         self.app_meta: dict = {}               # app-секция из list.json (кнопка «О плагинах»)
         self.offline_mode: bool = False        # флаг: нет подключения к сети
+        self.third_party_expanded: bool = False  # блок «Сторонние» свёрнут по умолчанию
         self.worker: InstallWorker | None = None
 
         root = QWidget()
@@ -1041,6 +1042,25 @@ class MainWindow(QMainWindow):
             header_widget.mousePressEvent = lambda e, a=captured_author: self._toggle_author(a)
             header_widget.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
 
+        # ── Сторонние плагины (блок выше всех, свёрнут по умолчанию) ─────────
+        if third_party:
+            filtered_third = [
+                tp for tp in third_party
+                if not search_query or search_query in tp["display_name"].lower()
+            ]
+            if filtered_third:
+                tp_expanded = self.third_party_expanded if not search_query else True
+                add_author_header("Сторонние", tp_expanded)
+                if tp_expanded:
+                    for tp in filtered_third:
+                        add_row(
+                            tp["folder_name"],
+                            tp["display_name"],
+                            tp["local_ver"],
+                            "",    # remote_ver неизвестен
+                            None   # нет записи в JSON
+                        )
+
         # ── Рендерим плагины по авторам ───────────────────────────────────────
         for author_entry in self.remote_authors:
             author_name = author_entry["name"]
@@ -1071,23 +1091,6 @@ class MainWindow(QMainWindow):
                         # remote_ver берётся из скачанного файла ver репозитория
                         add_row(p["name"], dn, local_ver, p.get("remote_ver", ""), p)
 
-        # ── Сторонние плагины ─────────────────────────────────────────────────
-        if third_party:
-            filtered_third = [
-                tp for tp in third_party
-                if not search_query or search_query in tp["display_name"].lower()
-            ]
-            if filtered_third:
-                add_author_header("Сторонние", True)
-                for tp in filtered_third:
-                    add_row(
-                        tp["folder_name"],
-                        tp["display_name"],
-                        tp["local_ver"],
-                        "",    # remote_ver неизвестен
-                        None   # нет записи в JSON
-                    )
-
         if needs:
             self.status_lbl.setText(f"Требуют обновления: {needs}")
             self.progress_lbl.setText("Нажмите «Установить» или «Обновить» напротив нужного плагина")
@@ -1097,10 +1100,13 @@ class MainWindow(QMainWindow):
 
     def _toggle_author(self, author_name: str):
         """Переключает состояние expanded для группы автора и перерисовывает таблицу."""
-        for author_entry in self.remote_authors:
-            if author_entry["name"] == author_name:
-                author_entry["expanded"] = not author_entry.get("expanded", True)
-                break
+        if author_name == "Сторонние":
+            self.third_party_expanded = not self.third_party_expanded
+        else:
+            for author_entry in self.remote_authors:
+                if author_entry["name"] == author_name:
+                    author_entry["expanded"] = not author_entry.get("expanded", True)
+                    break
         self._populate_table()
 
     def _install_single(self, plugin: dict):
