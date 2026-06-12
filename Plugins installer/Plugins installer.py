@@ -153,7 +153,7 @@ ICON_B64 = (
 
 def parse_list_json(raw: str) -> tuple[list[dict], dict]:
     """
-    Парсит новый JSON-формат list.json.
+    Парсит новый JSON-формат uplist.json.
 
     Формат файла:
     {
@@ -325,7 +325,7 @@ def sparse_clone_folder(repo_url: str, folder_path: str, dest: str, progress_cb)
             else:
                 raise FileNotFoundError(
                     f"Папка «{folder_path}» не найдена в репозитории. "
-                    f"Проверьте правильность пути в list.json."
+                    f"Проверьте правильность пути в uplist.json."
                 )
 
         target = Path(dest) / src.name
