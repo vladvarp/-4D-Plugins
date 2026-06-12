@@ -14,6 +14,9 @@ from urllib.parse import unquote, quote
 
 import ctypes
 
+PROGRAM_NAME = "4D Plugin Installer"
+PROGRAM_VER  = "v1.1"
+
 # Скрываем консольное окно для всех дочерних процессов на Windows
 CREATE_NO_WINDOW = 0x08000000
 
@@ -359,12 +362,9 @@ def read_plugin_ver(install_dir: str, folder_name: str) -> tuple[str, str]:
     return "", ""
 
 def write_plugin_ver(install_dir: str, name: str, version: str):
-    """
-    Ранее записывала версию в файл 'ver'. Теперь файл ver поставляется
-    вместе с плагином из репозитория — программа его не создаёт.
-    Функция оставлена как заглушка для совместимости вызывающего кода.
-    """
-    pass
+    """Записывает версию в файл 'ver' внутри папки плагина."""
+    ver_file = Path(install_dir) / name / "ver"
+    ver_file.write_text(version, encoding="utf-8")
 
 def remove_plugin_folder(install_dir: str, name: str):
     target = Path(install_dir) / name
@@ -409,8 +409,11 @@ class InstallWorker(QThread):
                     p["repo_url"], p["repo_path"], self.install_dir,
                     lambda msg: self.progress.emit(msg)
                 )
-                # Файл ver поставляется из репозитория — читаем уже установленную версию
+                # Если репозиторий не содержит файл ver — создаём его с "?"
                 installed_ver, _ = read_plugin_ver(self.install_dir, name)
+                if not installed_ver:
+                    write_plugin_ver(self.install_dir, name, "Не указан")
+                    installed_ver = "Не указан"
                 self.config["installed"][name] = {"version": installed_ver}
                 save_config(self.config)
                 self.plugin_done.emit(name, True, installed_ver)
@@ -522,7 +525,7 @@ QTableWidget::item[groupHeader="true"] {{ background: #202020; }}
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("4D Plugin Installer")
+        self.setWindowTitle(PROGRAM_NAME + " " + PROGRAM_VER)
         self.setMinimumSize(820, 560)
         self.resize(900, 620)
 
@@ -585,7 +588,7 @@ class MainWindow(QMainWindow):
         h.addWidget(self.logo_lbl)
         h.addSpacing(12)
 
-        title = QLabel("Plugin Installer")
+        title = QLabel(PROGRAM_NAME)
         title.setStyleSheet(f"font-size:18px; font-weight:700; color:{TEXT};")
         h.addWidget(title)
         h.addStretch()
