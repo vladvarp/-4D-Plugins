@@ -49,6 +49,24 @@ function initIndexPage() {
             tags: ['Моделирование', 'Процедурный', 'Автоматизация'],
             version: 'v2.28.0',
             mdFile: 'plugins/VAr_Tools.md'
+        },
+        {
+            id: '2',
+            title: 'Camera Resolution Manager',
+            description: 'Управление разрешением рендера для каждой камеры в сцене — назначай, активируй и переключай форматы прямо из плавающей панели.',
+            icon: '✦',
+            tags: ['Рендер', 'Автоматизация'],
+            version: 'v1.4',
+            mdFile: 'plugins/camera-resolution-manager.md'
+        },
+        {
+            id: '3',
+            title: 'Object Renamer PRO',
+            description: 'инструмент для наведения порядка в сцене. Плагин решает одну из самых рутинных задач 3D-художника: быстрое и массовое переименование объектов с полным контролем над результатом.',
+            icon: '✦',
+            tags: ['Автоматизация'],
+            version: 'v2.4',
+            mdFile: 'plugins/object-renamer-pro.md'
         }
     ];
 
