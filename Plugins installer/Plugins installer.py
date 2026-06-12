@@ -710,7 +710,7 @@ class MainWindow(QMainWindow):
 
         # Таблица: Плагин | Установлено | На GitHub | Статус | Действие | Удалить
         self.table = QTableWidget(0, 6)
-        self.table.setHorizontalHeaderLabels(["Плагин", "Текущая версия", "Актуальная версия", "Статус", "", ""])
+        self.table.setHorizontalHeaderLabels(["Плагин", "Текущая", "Актуальная", "Статус", "", ""])
         hh = self.table.horizontalHeader()
         hh.setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
         hh.setSectionResizeMode(1, QHeaderView.ResizeMode.Fixed)
@@ -718,9 +718,9 @@ class MainWindow(QMainWindow):
         hh.setSectionResizeMode(3, QHeaderView.ResizeMode.Fixed)
         hh.setSectionResizeMode(4, QHeaderView.ResizeMode.Fixed)
         hh.setSectionResizeMode(5, QHeaderView.ResizeMode.Fixed)
-        self.table.setColumnWidth(1, 115)
-        self.table.setColumnWidth(2, 135)
-        self.table.setColumnWidth(3, 125)
+        self.table.setColumnWidth(1, 90)  # Текущая
+        self.table.setColumnWidth(2, 90)  # Актуальная
+        self.table.setColumnWidth(3, 125)  # Статус
         self.table.setColumnWidth(4, 120)  # Установить / Обновить
         self.table.setColumnWidth(5, 115)  # Удалить
         self.table.verticalHeader().setVisible(False)
