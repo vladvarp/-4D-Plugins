@@ -41,8 +41,9 @@ LIST_JSON_URL = (
 )
 CONFIG_FILE = Path(os.getenv("APPDATA")) / "C4D_PluginInstaller" / "config.json"
 GIT_INSTALLER_URL = (
-    "https://github.com/git-for-windows/git/releases/latest/download/Git-64-bit.exe"
+    "https://github.com/git-for-windows/git/releases/download/v2.54.0.windows.1/Git-2.54.0-64-bit.exe"
 )
+GIT_RELEASES_PAGE = "https://github.com/git-for-windows/git/releases"
 # Кэш list.json в папке temp Windows (доступен при отсутствии сети)
 LIST_JSON_CACHE = Path(tempfile.gettempdir()) / "c4d_installer_list_cache.json"
 # URL логотипа в шапке
@@ -273,12 +274,27 @@ def git_exe() -> str:
     except Exception:
         return "git"
 
+def get_git_installer_url() -> str:
+    """Берёт ссылку на установщик Git из uplist.json (app.git_installer_url),
+    при недоступности — fallback на GIT_INSTALLER_URL."""
+    try:
+        req = urllib.request.Request(LIST_JSON_URL, headers={"User-Agent": "C4D-Installer/1.0"})
+        with urllib.request.urlopen(req, timeout=5) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+        url = data.get("app", {}).get("git_installer_url")
+        if url:
+            return url
+    except Exception:
+        pass
+    return GIT_INSTALLER_URL
+
 def install_git(progress_cb, done_cb):
     def worker():
         try:
             progress_cb("Скачиваю Git for Windows…")
+            git_url = get_git_installer_url()
             tmp = tempfile.mktemp(suffix=".exe")
-            urllib.request.urlretrieve(GIT_INSTALLER_URL, tmp)
+            urllib.request.urlretrieve(git_url, tmp)
             progress_cb("Устанавливаю Git (подождите)…")
             _run(
                 [tmp, "/VERYSILENT", "/NORESTART",
@@ -288,7 +304,12 @@ def install_git(progress_cb, done_cb):
             os.remove(tmp)
             done_cb(True, "Git установлен")
         except Exception as e:
-            done_cb(False, str(e))
+            try:
+                QDesktopServices.openUrl(QUrl(GIT_RELEASES_PAGE))
+            except Exception:
+                pass
+            done_cb(False,
+                    f"{e}\n\nОткрыта страница релизов Git — установите его вручную: {GIT_RELEASES_PAGE}")
     threading.Thread(target=worker, daemon=True).start()
 
 def sparse_clone_folder(repo_url: str, folder_path: str, dest: str, progress_cb):
@@ -1151,7 +1172,7 @@ class MainWindow(QMainWindow):
 
         if not git_available():
             QMessageBox.warning(self, "Git не найден",
-                                "Git не установлен. Нажмите «Установить выбранные» для автоустановки Git.")
+                                "Git не установлен. Установаите GIT.")
             return
 
         # Немедленно блокируем UI и показываем прогресс ДО запуска воркера
