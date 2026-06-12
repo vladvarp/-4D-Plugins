@@ -15,7 +15,7 @@ from urllib.parse import unquote, quote
 import ctypes
 
 PROGRAM_NAME = "4D Plugin Installer"
-PROGRAM_VER  = "v1.3"
+PROGRAM_VER  = "v1.4"
 
 # Скрываем консольное окно для всех дочерних процессов на Windows
 CREATE_NO_WINDOW = 0x08000000
@@ -316,8 +316,7 @@ def sparse_clone_folder(repo_url: str, folder_path: str, dest: str, progress_cb)
                     )
             else:
                 raise FileNotFoundError(
-                    f"Папка «{folder_path}» не найдена в репозитории. "
-                    f"Проверьте правильность пути в uplist.json."
+                    f"Папка «{folder_path}» не найдена в репозитории."
                 )
 
         target = Path(dest) / src.name
@@ -940,7 +939,7 @@ class MainWindow(QMainWindow):
                 self.table.setItem(row, 0, name_item)
 
             # Локальная версия
-            loc = QTableWidgetItem(local_ver or "не установлен")
+            loc = QTableWidgetItem(local_ver or " ")
             loc.setForeground(QColor(DIM if not local_ver else TEXT))
             self.table.setItem(row, 1, loc)
 
@@ -951,6 +950,11 @@ class MainWindow(QMainWindow):
             if p is None:
                 # Сторонний плагин — только показываем, действий нет
                 st = QTableWidgetItem("Сторонний")
+                st.setForeground(QColor(DIM))
+                self.table.setItem(row, 3, st)
+            elif self.offline_mode:
+                # Нет подключения — статус неизвестен
+                st = QTableWidgetItem("Нет подключения")
                 st.setForeground(QColor(DIM))
                 self.table.setItem(row, 3, st)
             elif not local_ver:
@@ -968,8 +972,8 @@ class MainWindow(QMainWindow):
                 st.setForeground(QColor(GREEN))
                 self.table.setItem(row, 3, st)
 
-            # Кнопка «Установить» / «Обновить» (только для плагинов из JSON)
-            if p is not None and (not local_ver or local_ver != remote_ver):
+            # Кнопка «Установить» / «Обновить» (только для плагинов из JSON и при наличии сети)
+            if p is not None and not self.offline_mode and (not local_ver or local_ver != remote_ver):
                 action_label = "Обновить" if local_ver else "Установить"
                 act_btn = QPushButton(action_label)
                 act_btn.setObjectName("update" if local_ver else "install")
