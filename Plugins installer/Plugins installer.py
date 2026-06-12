@@ -34,7 +34,7 @@ from PyQt6.QtCore import Qt, QThread, pyqtSignal, QTimer, QUrl
 # ── Конфигурация ──────────────────────────────────────────────────────────────
 
 LIST_JSON_URL = (
-    "https://raw.githubusercontent.com/vladvarp/-4D-Plugins/main/update_data/list.json"
+    "https://raw.githubusercontent.com/vladvarp/-4D-Plugins/main/update_data/uplist.json"
 )
 CONFIG_FILE = Path(os.getenv("APPDATA")) / "C4D_PluginInstaller" / "config.json"
 GIT_INSTALLER_URL = (
