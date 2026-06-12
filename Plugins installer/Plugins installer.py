@@ -10,7 +10,7 @@ import urllib.request
 import winreg
 import base64
 from pathlib import Path
-from urllib.parse import unquote
+from urllib.parse import unquote, quote
 
 import ctypes
 
@@ -214,14 +214,22 @@ def parse_list_json(raw: str) -> tuple[list[dict], dict]:
             # Имя папки — последний сегмент repo_path
             name = repo_path.rstrip("/").split("/")[-1]
 
+            # Raw URL для файла ver (читается как обычный текст без авторизации)
+            # Пример: https://raw.githubusercontent.com/user/repo/main/Plugins/Name/ver
+            # repo_path декодирован (пробелы) — для URL нужно закодировать обратно
+            branch = after_branch[0]
+            raw_base = parts[0].replace("github.com", "raw.githubusercontent.com")
+            raw_ver_url = f"{raw_base}/{branch}/{quote(repo_path, safe='/')}/ver"
+
             plugins_out.append({
-                "name":      name,
-                "url":       url,
-                "repo_url":  repo_url,
-                "repo_path": repo_path,  # декодированный путь, напр. «Plugins/VAr Tools»
-                "info":      info_text,
-                "info_url":  info_url,
-                "author":    author_name,
+                "name":        name,
+                "url":         url,
+                "repo_url":    repo_url,
+                "repo_path":   repo_path,  # декодированный путь, напр. «Plugins/VAr Tools»
+                "info":        info_text,
+                "info_url":    info_url,
+                "author":      author_name,
+                "raw_ver_url": raw_ver_url,  # URL для чтения актуальной версии с GitHub
             })
 
         authors_out.append({
@@ -362,6 +370,22 @@ def remove_plugin_folder(install_dir: str, name: str):
     target = Path(install_dir) / name
     if target.exists():
         shutil.rmtree(target)
+
+def fetch_remote_ver(raw_ver_url: str) -> str:
+    """
+    Скачивает файл ver с GitHub (raw) и возвращает первую строку — версию.
+    При любой ошибке возвращает пустую строку.
+    """
+    try:
+        req = urllib.request.Request(
+            raw_ver_url, headers={"User-Agent": "C4D-Installer/1.0"}
+        )
+        with urllib.request.urlopen(req, timeout=8) as r:
+            text = r.read().decode("utf-8")
+        lines = text.splitlines()
+        return lines[0].strip() if lines else ""
+    except Exception:
+        return ""
 
 # ── Worker ────────────────────────────────────────────────────────────────────
 
@@ -738,7 +762,7 @@ class MainWindow(QMainWindow):
             self.config["install_dir"] = d
             save_config(self.config)
             # Перечитываем таблицу с новой папкой (версии из файлов 'ver')
-            if self.remote_plugins:
+            if self.remote_authors:
                 self._populate_table()
 
     def _browse_dir(self):
@@ -751,7 +775,7 @@ class MainWindow(QMainWindow):
             self.config["install_dir"] = d
             save_config(self.config)
             # Перечитываем таблицу с новой папкой (версии из файлов 'ver')
-            if self.remote_plugins:
+            if self.remote_authors:
                 self._populate_table()
 
     def _check_updates(self):
@@ -793,6 +817,21 @@ class MainWindow(QMainWindow):
             if raw:
                 try:
                     authors, app_meta = parse_list_json(raw)
+                    # Скачиваем актуальную версию с GitHub для каждого плагина (файл ver)
+                    if not is_offline:
+                        threads = []
+                        for author_entry in authors:
+                            for p in author_entry["plugins"]:
+                                p["remote_ver"] = ""  # инициализируем
+                                def _fetch(plugin=p):
+                                    plugin["remote_ver"] = fetch_remote_ver(
+                                        plugin.get("raw_ver_url", "")
+                                    )
+                                t = threading.Thread(target=_fetch, daemon=True)
+                                t.start()
+                                threads.append(t)
+                        for t in threads:
+                            t.join(timeout=10)
                     self._pending = (authors, app_meta, is_offline, None)
                 except Exception as parse_err:
                     self._pending = ([], {}, is_offline, str(parse_err))
@@ -926,12 +965,12 @@ class MainWindow(QMainWindow):
                 st.setForeground(QColor(DIM))
                 self.table.setItem(row, 3, st)
             elif not local_ver:
-                needs += 1
+                # Не установлен — не входит в счётчик обновлений
                 st = QTableWidgetItem("")
                 st.setForeground(QColor(ACCENT))
                 self.table.setItem(row, 3, st)
             elif local_ver != remote_ver:
-                needs += 1
+                needs += 1  # считаем только установленные с устаревшей версией
                 st = QTableWidgetItem("Есть обновление")
                 st.setForeground(QColor(YELLOW))
                 self.table.setItem(row, 3, st)
@@ -1021,19 +1060,16 @@ class MainWindow(QMainWindow):
                 for p in matched:
                     local_ver, display_name = read_plugin_ver(install_dir, p["name"]) if install_dir else ("", "")
                     dn = display_name or p["name"]
-                    # Получаем версию из JSON через файл ver в репозитории (нет локального аналога)
-                    # remote_ver — читаем из ver-файла репо недоступно, берём из local если нет remote
-                    # Для remote_ver читаем ver в папке — версия хранится только там
-                    # Если не установлен — remote_ver неизвестен, показываем «—»
-                    # NOTE: remote_ver теперь берётся из ver-файла — для не установленных он неизвестен
-                    add_row(p["name"], dn, local_ver, local_ver or "", p)
+                    # remote_ver берётся из скачанного файла ver репозитория
+                    add_row(p["name"], dn, local_ver, p.get("remote_ver", ""), p)
             else:
                 add_author_header(author_name, expanded)
                 if expanded:
                     for p in author_entry["plugins"]:
                         local_ver, display_name = read_plugin_ver(install_dir, p["name"]) if install_dir else ("", "")
                         dn = display_name or p["name"]
-                        add_row(p["name"], dn, local_ver, local_ver or "", p)
+                        # remote_ver берётся из скачанного файла ver репозитория
+                        add_row(p["name"], dn, local_ver, p.get("remote_ver", ""), p)
 
         # ── Сторонние плагины ─────────────────────────────────────────────────
         if third_party:
