@@ -1,7 +1,8 @@
 {
   "app": {
     "about_label": "Обновление",
-    "about_url": "https://github.com/vladvarp/-4D-Plugins/releases"
+    "about_url": "https://github.com/vladvarp/-4D-Plugins/releases",
+    "git_installer_url": "https://github.com/git-for-windows/git/releases/download/v2.54.0.windows.1/Git-2.54.0-64-bit.exe"
   },
   "authors": [
     {

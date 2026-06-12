@@ -15,7 +15,7 @@ from urllib.parse import unquote, quote
 import ctypes
 
 PROGRAM_NAME = "4D Plugin Installer"
-PROGRAM_VER  = "v1.1"
+PROGRAM_VER  = "v1.2"
 
 # Скрываем консольное окно для всех дочерних процессов на Windows
 CREATE_NO_WINDOW = 0x08000000
@@ -561,6 +561,10 @@ class MainWindow(QMainWindow):
         # Загружаем логотип заголовка из GitHub
         QTimer.singleShot(100, self._load_header_logo)
 
+        # Проверяем наличие Git при запуске и устанавливаем если нужно
+        if not git_available():
+            QTimer.singleShot(500, self._ensure_git_installed)
+
     # ── Построение UI ─────────────────────────────────────────────────────────
 
     def mousePressEvent(self, event):
@@ -724,6 +728,7 @@ class MainWindow(QMainWindow):
         self.table.setColumnWidth(4, 120)  # Установить / Обновить
         self.table.setColumnWidth(5, 115)  # Удалить
         self.table.verticalHeader().setVisible(False)
+        self.table.verticalHeader().setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
         self.table.setSelectionMode(QAbstractItemView.SelectionMode.NoSelection)
         self.table.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self.table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
@@ -926,28 +931,27 @@ class MainWindow(QMainWindow):
                 name_widget = QWidget()
                 name_widget.setStyleSheet("background:transparent;")
                 nw_lay = QVBoxLayout(name_widget)
-                nw_lay.setContentsMargins(10, 2, 6, 2)
-                nw_lay.setSpacing(1)
+                nw_lay.setContentsMargins(10, 4, 6, 4)
+                nw_lay.setSpacing(2)
                 lbl_name = QLabel(display_name)
                 lbl_name.setStyleSheet(f"color:{TEXT}; font-size:12px; background:transparent;")
                 nw_lay.addWidget(lbl_name)
-                sub_lay = QHBoxLayout()
-                sub_lay.setContentsMargins(0, 0, 0, 0)
-                sub_lay.setSpacing(4)
                 if p.get("info"):
                     lbl_info = QLabel(p["info"])
                     lbl_info.setStyleSheet(f"color:{DIM}; font-size:10px; background:transparent;")
-                    sub_lay.addWidget(lbl_info)
+                    lbl_info.setWordWrap(True)
+                    nw_lay.addWidget(lbl_info)
                 if p.get("info_url"):
                     lbl_link = QLabel(
                         f'<a href="{p["info_url"]}" style="color:#5b9bd5; font-size:10px;">Подробнее...</a>'
                     )
                     lbl_link.setOpenExternalLinks(True)
                     lbl_link.setStyleSheet("background:transparent;")
-                    sub_lay.addWidget(lbl_link)
-                sub_lay.addStretch()
-                nw_lay.addLayout(sub_lay)
+                    nw_lay.addWidget(lbl_link)
                 self.table.setCellWidget(row, 0, name_widget)
+                # Сбрасываем фиксированную высоту — строка растянется по контенту
+                self.table.setRowHeight(row, 0)
+                self.table.resizeRowToContents(row)
             else:
                 name_item = QTableWidgetItem(display_name)
                 if p and p.get("info"):
@@ -1111,6 +1115,31 @@ class MainWindow(QMainWindow):
                     author_entry["expanded"] = not author_entry.get("expanded", True)
                     break
         self._populate_table()
+
+    def _ensure_git_installed(self):
+        """Вызывается при запуске: если Git не найден — устанавливает его автоматически."""
+        self.refresh_btn.setEnabled(False)
+        self.progress_bar.setRange(0, 0)
+        self.progress_bar.setVisible(True)
+        self.status_lbl.setText("Установка Git…")
+        self.progress_lbl.setText("Git не найден. Устанавливаю автоматически…")
+
+        def _done(ok: bool, msg: str):
+            self.progress_bar.setRange(0, 1)
+            self.progress_bar.setValue(1)
+            self.progress_bar.setVisible(False)
+            self.refresh_btn.setEnabled(True)
+            if ok:
+                self.status_lbl.setText("Git установлен")
+                self.progress_lbl.setText("Git успешно установлен. Готов к работе.")
+            else:
+                self.status_lbl.setText("Ошибка установки Git")
+                self.progress_lbl.setText(f"Не удалось установить Git: {msg}")
+
+        install_git(
+            lambda msg: (self.progress_lbl.setText(msg), QApplication.processEvents()),
+            _done
+        )
 
     def _install_single(self, plugin: dict):
         """Устанавливает/обновляет один плагин по кнопке в строке таблицы."""
