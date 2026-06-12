@@ -7,65 +7,57 @@ from c4d import gui
 # Структура меню:
 
 MENU_NAME = "VAr Tools"
-
 MENU_ITEMS = [
-    1068825,    # ObjectRenamerPro
-    1068834,    # CameraResolution 
+        {"name": "Tools", "items": [
+            {"name": "Axis", "items": [
+                1068828,   # Axis2Center
+                1068829,   # Axis2Bottom
+                1068830,   # AxisDrop
+            ]},
 
-    None,
-    {"name": "Tools", "items": [
-        {"name": "Axis", "items": [
-            1068828,   # Axis2Center
-            1068829,   # Axis2Bottom
-            1068830,   # AxisDrop
+            {"name": "Location", "items": [
+                1068826,   # Drop2Floor
+                1068827,   # Drop2Floor0(XZ)
+                1068838,   # Center2ParentXZ
+                1068839,   # Center2WorldXZ
+            ]},
+
+            {"name": "Clean", "items": [
+                1068831,   # CleanNulls
+                1068832,   # CleanEmptyNulls
+                1068908,   # CleanObjects
+                1068909,   # CleanEmptyObjects
+                1068910,   # CleanAllTags
+                1068911,   # CleanSelectTags
+                1068912,   # CleanEmptyMatTags
+                1068913,   # CleanSelectMatTags
+            ]},
         ]},
 
-        {"name": "Location", "items": [
-            1068826,   # Drop2Floor
-            1068827,   # Drop2Floor0(XZ)
-            1068838,   # Center2ParentXZ
-            1068839,   # Center2WorldXZ
+        {"name": "Objects", "items": [
+            {"name": "Primitivs", "items": [
+                1068871,    # TriCube
+                1068872,    # HexSphere
+                1068873,    # DiamondCylinder
+                1068874,    # TriTorus
+                1068875,    # BrickPlane
+                1068899,    # MolecularHexLattice 
+            ]},
+
+            {"name": "XPressos objects", "items": [
+                1068852,    # HierarchyFilter
+            ]},
         ]},
 
-        {"name": "Clean", "items": [
-            1068831,   # CleanNulls
-            1068832,   # CleanEmptyNulls
-            1068908,   # CleanObjects
-            1068909,   # CleanEmptyObjects
-            1068910,   # CleanAllTags
-            1068911,   # CleanSelectTags
-            1068912,   # CleanEmptyMatTags
-            1068913,   # CleanSelectMatTags
-        ]},
-    ]},
-
-    {"name": "Objects", "items": [
-        {"name": "Primitivs", "items": [
-            1068871,    # TriCube
-            1068872,    # HexSphere
-            1068873,    # DiamondCylinder
-            1068874,    # TriTorus
-            1068875,    # BrickPlane
-            1068899,    # MolecularHexLattice 
+        {"name": "Tegs", "items": [
+            1068900,    # ChildSelector
+            1068859,    # TargetCamera
+            1068903,    # CameraVisibility
         ]},
 
-        {"name": "XPressos objects", "items": [
-            1068852,    # HierarchyFilter
-        ]},       
-        
-
-    ]},
-
-    {"name": "Tegs", "items": [
-        1068900,    # ChildSelector
-        1068859,    # TargetCamera
-        1068903,    # CameraVisibility
-    ]},
-
-    {"name": "Deformers", "items": [
-        1068837,    # PolySubdivider
-    ]},
-
+        {"name": "Deformers", "items": [
+            1068837,    # PolySubdivider
+        ]},
     None,
     1068833,    # AboutVArTools
 ]
