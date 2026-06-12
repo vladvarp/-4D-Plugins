@@ -200,7 +200,7 @@ class RenamerDialog(gui.GeDialog):
         self.AddButton(BTN_SEL_SAME_NAME, c4d.BFH_SCALEFIT, 0, 0, "По имени")
         self.AddButton(BTN_SEL_SAME_TYPE, c4d.BFH_SCALEFIT, 0, 0, "По типу")
         self.AddButton(BTN_SEL_SAME_TAG,  c4d.BFH_SCALEFIT, 0, 0, "По первому тегу")
-        self.AddButton(BTN_SEL_SAME_MAT,  c4d.BFH_SCALEFIT, 0, 0, "По первому материалу")
+        self.AddButton(BTN_SEL_SAME_MAT,  c4d.BFH_SCALEFIT, 0, 0, "По материалу")
         self.GroupEnd()
 
         self.GroupEnd()

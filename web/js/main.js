@@ -54,8 +54,8 @@ function initIndexPage() {
             id: '2',
             title: 'Camera Resolution Manager',
             description: 'Управление разрешением рендера для каждой камеры в сцене — назначай, активируй и переключай форматы прямо из плавающей панели.',
-            icon: '✦',
-            tags: ['Рендер', 'Автоматизация'],
+            icon: '🎥',
+            tags: ['Рендер', 'Автоматизация', 'Камера'],
             version: 'v1.4',
             mdFile: 'plugins/camera-resolution-manager.md'
         },
@@ -63,8 +63,8 @@ function initIndexPage() {
             id: '3',
             title: 'Object Renamer PRO',
             description: 'инструмент для наведения порядка в сцене. Плагин решает одну из самых рутинных задач 3D-художника: быстрое и массовое переименование объектов с полным контролем над результатом.',
-            icon: '✦',
-            tags: ['Автоматизация'],
+            icon: '🔬',
+            tags: ['Автоматизация', 'Утилиты'],
             version: 'v2.4',
             mdFile: 'plugins/object-renamer-pro.md'
         }
