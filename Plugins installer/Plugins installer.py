@@ -15,7 +15,7 @@ from urllib.parse import unquote, quote
 import ctypes
 
 PROGRAM_NAME = "4D Plugin Installer"
-PROGRAM_VER  = "v1.6"
+PROGRAM_VER  = "v1.6.1"
 
 # Скрываем консольное окно для всех дочерних процессов на Windows
 CREATE_NO_WINDOW = 0x08000000
@@ -206,6 +206,8 @@ def parse_list_json(raw: str) -> tuple[list[dict], dict]:
             info_url  = p.get("info_url", "")
             # Версия из JSON (если указана — приоритет над файлом ver)
             json_version = p.get("version", "").strip()
+            # Отображаемое имя из JSON (если указано — приоритет над файлом ver и именем папки)
+            json_display_name = p.get("name", "").strip()
 
             # Разбираем github-url: https://github.com/user/repo/tree/branch/path
             parts = url.split("/tree/", 1)
@@ -216,8 +218,8 @@ def parse_list_json(raw: str) -> tuple[list[dict], dict]:
             # repo_path декодируем — git sparse-checkout требует реальные имена
             repo_path = unquote(after_branch[1]) if len(after_branch) > 1 else unquote(after_branch[0])
 
-            # Имя папки — последний сегмент repo_path
-            name = repo_path.rstrip("/").split("/")[-1]
+            # Имя папки — последний сегмент repo_path (всегда используется как folder_name)
+            folder_name = repo_path.rstrip("/").split("/")[-1]
 
             # Raw URL для файла ver (читается как обычный текст без авторизации)
             # Пример: https://raw.githubusercontent.com/user/repo/main/Plugins/Name/ver
@@ -227,15 +229,16 @@ def parse_list_json(raw: str) -> tuple[list[dict], dict]:
             raw_ver_url = f"{raw_base}/{branch}/{quote(repo_path, safe='/')}/ver"
 
             plugins_out.append({
-                "name":        name,
-                "url":         url,
-                "repo_url":    repo_url,
-                "repo_path":   repo_path,  # декодированный путь, напр. «Plugins/VAr Tools»
-                "info":        info_text,
-                "info_url":    info_url,
-                "author":      author_name,
-                "raw_ver_url": raw_ver_url,  # URL для чтения актуальной версии с GitHub
-                "version":     json_version,  # версия из JSON (приоритет над файлом ver)
+                "name":             folder_name,   # имя папки (используется для всех файловых операций)
+                "display_name":     json_display_name,  # отображаемое имя из JSON (приоритет 1)
+                "url":              url,
+                "repo_url":         repo_url,
+                "repo_path":        repo_path,  # декодированный путь, напр. «Plugins/VAr Tools»
+                "info":             info_text,
+                "info_url":         info_url,
+                "author":           author_name,
+                "raw_ver_url":      raw_ver_url,  # URL для чтения актуальной версии с GitHub
+                "version":          json_version,  # версия из JSON (приоритет над файлом ver)
             })
 
         authors_out.append({
@@ -1196,16 +1199,18 @@ class MainWindow(QMainWindow):
                     continue
                 add_author_header(author_name, True)
                 for p in matched:
-                    local_ver, display_name = read_plugin_ver(install_dir, p["name"]) if install_dir else ("", "")
-                    dn = display_name or p["name"]
+                    local_ver, ver_display_name = read_plugin_ver(install_dir, p["name"]) if install_dir else ("", "")
+                    # Приоритет отображаемого имени: 1) JSON "name", 2) файл ver, 3) имя папки
+                    dn = p.get("display_name") or ver_display_name or p["name"]
                     # remote_ver берётся из скачанного файла ver репозитория
                     add_row(p["name"], dn, local_ver, p.get("remote_ver", None), p)
             else:
                 add_author_header(author_name, expanded)
                 if expanded:
                     for p in author_entry["plugins"]:
-                        local_ver, display_name = read_plugin_ver(install_dir, p["name"]) if install_dir else ("", "")
-                        dn = display_name or p["name"]
+                        local_ver, ver_display_name = read_plugin_ver(install_dir, p["name"]) if install_dir else ("", "")
+                        # Приоритет отображаемого имени: 1) JSON "name", 2) файл ver, 3) имя папки
+                        dn = p.get("display_name") or ver_display_name or p["name"]
                         # remote_ver берётся из скачанного файла ver репозитория
                         add_row(p["name"], dn, local_ver, p.get("remote_ver", None), p)
 
@@ -1305,8 +1310,9 @@ class MainWindow(QMainWindow):
                     row_name = labels[0].text()
 
             # Сопоставляем с именем плагина (folder_name или display_name)
-            local_ver, display_name = read_plugin_ver(install_dir, p["name"]) if install_dir else ("", "")
-            dn = display_name or p["name"]
+            local_ver, ver_display_name = read_plugin_ver(install_dir, p["name"]) if install_dir else ("", "")
+            # Приоритет отображаемого имени: 1) JSON "name", 2) файл ver, 3) имя папки
+            dn = p.get("display_name") or ver_display_name or p["name"]
             if row_name not in (p["name"], dn):
                 continue
 
@@ -1512,8 +1518,17 @@ class MainWindow(QMainWindow):
                     row_name = labels[0].text()
             # Сравниваем по folder_name (name) и по display_name
             install_dir = self.path_edit.text().strip()
-            _, display_name = read_plugin_ver(install_dir, name) if install_dir else ("", "")
-            if row_name not in (name, display_name or name):
+            _, ver_display_name = read_plugin_ver(install_dir, name) if install_dir else ("", "")
+            # Ищем json_display_name из remote_authors
+            json_display_name = ""
+            for ae in self.remote_authors:
+                for pp in ae["plugins"]:
+                    if pp["name"] == name:
+                        json_display_name = pp.get("display_name", "")
+                        break
+            # Приоритет: 1) JSON "name", 2) файл ver, 3) имя папки
+            dn = json_display_name or ver_display_name or name
+            if row_name not in (name, dn):
                 continue
             if ok:
                 self.table.item(row, 1).setText(info)
