@@ -1,8 +1,8 @@
 {
   "app": {
     "about_label": "GitHub",
-    "about_url": "https://github.com/vladvarp/-4D-Plugins/releases",
-    "actual_version": "v1.5"
+    "about_url": "https://github.com/vladvarp/-4D-Plugins/releases/download/C4D/4DPluginInstaller.exe",
+    "actual_version": "v1.6"
   },
   "authors": [
     {
@@ -13,7 +13,7 @@
           "url": "https://github.com/vladvarp/-4D-Plugins/tree/main/Plugins/VAr Tools",
           "info": "Пакет плагинов VAr Tools",
           "info_url": "https://vladvarp.github.io/-4D-Plugins/web/plugin.html?md=plugins%2FVAr_Tools.md",
-          "version": "v2.28.2"
+          "version": ""
         },
         {
           "url": "https://github.com/vladvarp/-4D-Plugins/tree/main/Plugins/Camera Resolution",

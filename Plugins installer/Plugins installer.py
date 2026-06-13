@@ -15,7 +15,7 @@ from urllib.parse import unquote, quote
 import ctypes
 
 PROGRAM_NAME = "4D Plugin Installer"
-PROGRAM_VER  = "v1.5"
+PROGRAM_VER  = "v1.6"
 
 # Скрываем консольное окно для всех дочерних процессов на Windows
 CREATE_NO_WINDOW = 0x08000000
@@ -43,6 +43,8 @@ CONFIG_FILE = Path(os.getenv("APPDATA")) / "C4D_PluginInstaller" / "config.json"
 GIT_RELEASES_PAGE = "https://github.com/git-for-windows/git/releases"
 # Кэш list.json в папке temp Windows (доступен при отсутствии сети)
 LIST_JSON_CACHE = Path(tempfile.gettempdir()) / "c4d_installer_list_cache.json"
+# Файл состояния свёрнутых/развёрнутых групп авторов
+GROUPS_STATE_FILE = Path(tempfile.gettempdir()) / "c4d_installer_groups_state.json"
 # URL логотипа в шапке
 HEADER_LOGO_URL = (
     "https://raw.githubusercontent.com/vladvarp/-4D-Plugins/refs/heads/main/Plugins%20installer/icon.png"
@@ -182,8 +184,8 @@ def parse_list_json(raw: str) -> tuple[list[dict], dict]:
       app_meta     — словарь {"about_label": ..., "about_url": ...}
 
     Каждый плагин после разбора содержит:
-      name, url, repo_url, repo_path, info, info_url, author
-    (version НЕ хранится — берётся из файла ver внутри папки)
+      name, url, repo_url, repo_path, info, info_url, author, version
+    version — если указан в JSON, имеет приоритет над файлом ver в папке плагина.
     """
     data = json.loads(raw)
 
@@ -202,6 +204,8 @@ def parse_list_json(raw: str) -> tuple[list[dict], dict]:
 
             info_text = p.get("info", "")
             info_url  = p.get("info_url", "")
+            # Версия из JSON (если указана — приоритет над файлом ver)
+            json_version = p.get("version", "").strip()
 
             # Разбираем github-url: https://github.com/user/repo/tree/branch/path
             parts = url.split("/tree/", 1)
@@ -231,6 +235,7 @@ def parse_list_json(raw: str) -> tuple[list[dict], dict]:
                 "info_url":    info_url,
                 "author":      author_name,
                 "raw_ver_url": raw_ver_url,  # URL для чтения актуальной версии с GitHub
+                "version":     json_version,  # версия из JSON (приоритет над файлом ver)
             })
 
         authors_out.append({
@@ -253,6 +258,24 @@ def save_config(cfg: dict):
     CONFIG_FILE.parent.mkdir(parents=True, exist_ok=True)
     with open(CONFIG_FILE, "w", encoding="utf-8") as f:
         json.dump(cfg, f, ensure_ascii=False, indent=2)
+
+def load_groups_state() -> dict:
+    """Загружает состояние свёрнутых/развёрнутых групп из временного файла."""
+    if GROUPS_STATE_FILE.exists():
+        try:
+            with open(GROUPS_STATE_FILE, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            pass
+    return {}
+
+def save_groups_state(state: dict):
+    """Сохраняет состояние свёрнутых/развёрнутых групп во временный файл."""
+    try:
+        with open(GROUPS_STATE_FILE, "w", encoding="utf-8") as f:
+            json.dump(state, f, ensure_ascii=False)
+    except Exception:
+        pass
 
 # ── Git ───────────────────────────────────────────────────────────────────────
 
@@ -544,6 +567,8 @@ class MainWindow(QMainWindow):
         self.offline_mode: bool = False        # флаг: нет подключения к сети
         self.third_party_expanded: bool = False  # блок «Сторонние» свёрнут по умолчанию
         self.worker: InstallWorker | None = None
+        # Состояние развёрнутых/свёрнутых групп (ключ — имя автора, значение — bool)
+        self._groups_state: dict = load_groups_state()
 
         root = QWidget()
         root.setObjectName("root")
@@ -835,10 +860,14 @@ class MainWindow(QMainWindow):
             if raw:
                 try:
                     authors, app_meta = parse_list_json(raw)
-                    # Инициализируем remote_ver как None (ещё не загружено) для каждого плагина
+                    # Инициализируем remote_ver: если версия указана в JSON — берём её,
+                    # иначе None (будет загружена из файла ver репозитория)
                     for author_entry in authors:
                         for p in author_entry["plugins"]:
-                            p["remote_ver"] = None  # None = ещё загружается
+                            if p.get("version"):
+                                p["remote_ver"] = p["version"]  # приоритет JSON-версии
+                            else:
+                                p["remote_ver"] = None  # None = ещё загружается
                     self._pending = (authors, app_meta, is_offline, None)
                 except Exception as parse_err:
                     self._pending = ([], {}, is_offline, str(parse_err))
@@ -869,7 +898,18 @@ class MainWindow(QMainWindow):
                     self.app_meta = app_meta
                     # Обновляем кнопку «О плагинах» согласно данным из JSON
                     about_label = app_meta.get("about_label", "О плагинах")
-                    self.readme_btn.setText(about_label)
+                    actual_ver = app_meta.get("actual_version", "")
+                    if actual_ver and actual_ver != PROGRAM_VER:
+                        # Версия программы устарела — сигнализируем на кнопке
+                        self.readme_btn.setText(about_label + ": Доступно обновление" + " " + actual_ver)
+                        self.readme_btn.setStyleSheet(
+                            f"background: transparent; color: #e8622a; "
+                            f"border: 1px solid #7a3a10; border-radius: 6px; "
+                            f"padding: 5px 14px; font-size: 11px; font-weight: 600;"
+                        )
+                    else:
+                        self.readme_btn.setText(about_label)
+                        self.readme_btn.setStyleSheet("")  # возвращаем стиль из STYLE
                     self._populate_table()
                     # Запускаем постепенную загрузку версий по одному плагину
                     if not is_offline:
@@ -877,6 +917,8 @@ class MainWindow(QMainWindow):
         QTimer.singleShot(80, poll)
 
     def _populate_table(self):
+        # Запоминаем текущую позицию прокрутки чтобы не сбрасывать при обновлении
+        scroll_pos = self.table.verticalScrollBar().value()
         self.table.setRowCount(0)
         install_dir = self.path_edit.text().strip()
         needs = 0
@@ -1116,7 +1158,12 @@ class MainWindow(QMainWindow):
                 if not search_query or search_query in tp["display_name"].lower()
             ]
             if filtered_third:
-                tp_expanded = self.third_party_expanded if not search_query else True
+                # Состояние из файла приоритетнее self.third_party_expanded
+                if "Сторонние" in self._groups_state:
+                    tp_expanded = self._groups_state["Сторонние"]
+                else:
+                    tp_expanded = self.third_party_expanded
+                tp_expanded = tp_expanded if not search_query else True
                 add_author_header("Сторонние", tp_expanded)
                 if tp_expanded:
                     for tp in filtered_third:
@@ -1131,7 +1178,11 @@ class MainWindow(QMainWindow):
         # ── Рендерим плагины по авторам ───────────────────────────────────────
         for author_entry in self.remote_authors:
             author_name = author_entry["name"]
-            expanded = author_entry.get("expanded", True)
+            # Берём состояние из сохранённого файла (приоритет над JSON)
+            if author_name in self._groups_state:
+                expanded = self._groups_state[author_name]
+            else:
+                expanded = author_entry.get("expanded", True)
 
             # При активном поиске — показываем группу только если есть совпадения
             if search_query:
@@ -1165,15 +1216,27 @@ class MainWindow(QMainWindow):
             self.status_lbl.setText("Всё актуально")
             self.progress_lbl.setText("Все плагины актуальны")
 
+        # Восстанавливаем позицию прокрутки после перестройки таблицы
+        QTimer.singleShot(0, lambda pos=scroll_pos: self.table.verticalScrollBar().setValue(pos))
+
     def _toggle_author(self, author_name: str):
         """Переключает состояние expanded для группы автора и перерисовывает таблицу."""
         if author_name == "Сторонние":
             self.third_party_expanded = not self.third_party_expanded
+            self._groups_state["Сторонние"] = self.third_party_expanded
         else:
             for author_entry in self.remote_authors:
                 if author_entry["name"] == author_name:
-                    author_entry["expanded"] = not author_entry.get("expanded", True)
+                    # Текущее состояние берём из _groups_state если есть
+                    current = self._groups_state.get(
+                        author_name, author_entry.get("expanded", True)
+                    )
+                    new_state = not current
+                    author_entry["expanded"] = new_state
+                    self._groups_state[author_name] = new_state
                     break
+        # Сохраняем во временный файл
+        save_groups_state(self._groups_state)
         self._populate_table()
 
     def _start_progressive_ver_fetch(self):
