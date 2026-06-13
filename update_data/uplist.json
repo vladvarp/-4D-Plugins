@@ -2,7 +2,7 @@
   "app": {
     "about_label": "VARP",
     "about_url": "https://vladvarp.github.io/-4D-Plugins/web/index.html",
-    "actual_version": "v1.6.1"
+    "actual_version": "v1.6.2"
   },
   "authors": [
     {
@@ -14,7 +14,7 @@
           "url": "https://github.com/vladvarp/-4D-Plugins/tree/main/Plugins/VAr Tools",
           "info": "Пакет плагинов VAr Tools",
           "info_url": "https://vladvarp.github.io/-4D-Plugins/web/plugin.html?md=plugins%2FVAr_Tools.md",
-          "version": "0"
+          "version": ""
         },
         {
           "url": "https://github.com/vladvarp/-4D-Plugins/tree/main/Plugins/Camera Resolution",

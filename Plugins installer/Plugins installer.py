@@ -15,7 +15,7 @@ from urllib.parse import unquote, quote
 import ctypes
 
 PROGRAM_NAME = "4D Plugin Installer"
-PROGRAM_VER  = "v1.6.1"
+PROGRAM_VER  = "v1.6.2"
 
 # Скрываем консольное окно для всех дочерних процессов на Windows
 CREATE_NO_WINDOW = 0x08000000
@@ -206,8 +206,6 @@ def parse_list_json(raw: str) -> tuple[list[dict], dict]:
             info_url  = p.get("info_url", "")
             # Версия из JSON (если указана — приоритет над файлом ver)
             json_version = p.get("version", "").strip()
-            # Отображаемое имя из JSON (если указано — приоритет над файлом ver и именем папки)
-            json_display_name = p.get("name", "").strip()
 
             # Разбираем github-url: https://github.com/user/repo/tree/branch/path
             parts = url.split("/tree/", 1)
@@ -218,8 +216,8 @@ def parse_list_json(raw: str) -> tuple[list[dict], dict]:
             # repo_path декодируем — git sparse-checkout требует реальные имена
             repo_path = unquote(after_branch[1]) if len(after_branch) > 1 else unquote(after_branch[0])
 
-            # Имя папки — последний сегмент repo_path (всегда используется как folder_name)
-            folder_name = repo_path.rstrip("/").split("/")[-1]
+            # Имя папки — последний сегмент repo_path
+            name = repo_path.rstrip("/").split("/")[-1]
 
             # Raw URL для файла ver (читается как обычный текст без авторизации)
             # Пример: https://raw.githubusercontent.com/user/repo/main/Plugins/Name/ver
@@ -229,16 +227,15 @@ def parse_list_json(raw: str) -> tuple[list[dict], dict]:
             raw_ver_url = f"{raw_base}/{branch}/{quote(repo_path, safe='/')}/ver"
 
             plugins_out.append({
-                "name":             folder_name,   # имя папки (используется для всех файловых операций)
-                "display_name":     json_display_name,  # отображаемое имя из JSON (приоритет 1)
-                "url":              url,
-                "repo_url":         repo_url,
-                "repo_path":        repo_path,  # декодированный путь, напр. «Plugins/VAr Tools»
-                "info":             info_text,
-                "info_url":         info_url,
-                "author":           author_name,
-                "raw_ver_url":      raw_ver_url,  # URL для чтения актуальной версии с GitHub
-                "version":          json_version,  # версия из JSON (приоритет над файлом ver)
+                "name":        name,
+                "url":         url,
+                "repo_url":    repo_url,
+                "repo_path":   repo_path,  # декодированный путь, напр. «Plugins/VAr Tools»
+                "info":        info_text,
+                "info_url":    info_url,
+                "author":      author_name,
+                "raw_ver_url": raw_ver_url,  # URL для чтения актуальной версии с GitHub
+                "version":     json_version,  # версия из JSON (приоритет над файлом ver)
             })
 
         authors_out.append({
@@ -381,17 +378,18 @@ def remove_plugin_folder(install_dir: str, name: str):
     if target.exists():
         shutil.rmtree(target)
 
-def fetch_remote_ver(raw_ver_url: str) -> str:
+def fetch_remote_ver(raw_ver_url: str) -> tuple[str, str]:
     """
-    Скачивает файл ver с GitHub (raw) и возвращает первую строку — версию.
+    Скачивает файл ver с GitHub (raw) и возвращает (версия, display_name).
+    Первая строка файла — версия, вторая (необязательная) — отображаемое имя.
     Возвращает:
-      - строку с версией при успехе
-      - "not_found" если файл ver отсутствует в репозитории (HTTP 404)
-      - "error"     при сетевой ошибке (с одной повторной попыткой)
+      - (версия, имя)       при успехе
+      - ("not_found", "")   если файл ver отсутствует в репозитории (HTTP 404)
+      - ("error", "")       при сетевой ошибке (с одной повторной попыткой)
     """
     import urllib.error
 
-    def _try_fetch() -> str:
+    def _try_fetch() -> tuple[str, str]:
         req = urllib.request.Request(
             raw_ver_url, headers={"User-Agent": "C4D-Installer/1.0"}
         )
@@ -399,28 +397,30 @@ def fetch_remote_ver(raw_ver_url: str) -> str:
             with urllib.request.urlopen(req, timeout=8) as r:
                 text = r.read().decode("utf-8")
             lines = text.splitlines()
-            return lines[0].strip() if lines else ""
+            version      = lines[0].strip() if len(lines) > 0 else ""
+            display_name = lines[1].strip() if len(lines) > 1 else ""
+            return version, display_name
         except urllib.error.HTTPError as e:
             if e.code == 404:
-                return "not_found"
+                return "not_found", ""
             raise  # пробрасываем дальше для повторной попытки
         # OSError, URLError и прочие — пробрасываем
 
     try:
-        result = _try_fetch()
-        if result == "not_found":
-            return "not_found"
-        return result if result else "not_found"  # пустой файл ver = версия не указана
+        ver, dn = _try_fetch()
+        if ver == "not_found":
+            return "not_found", ""
+        return (ver if ver else "not_found"), dn  # пустой файл ver = версия не указана
     except Exception:
         pass  # первая попытка не удалась — пробуем ещё раз
 
     try:
-        result = _try_fetch()
-        if result == "not_found":
-            return "not_found"
-        return result if result else "not_found"  # пустой файл ver = версия не указана
+        ver, dn = _try_fetch()
+        if ver == "not_found":
+            return "not_found", ""
+        return (ver if ver else "not_found"), dn  # пустой файл ver = версия не указана
     except Exception:
-        return "error"
+        return "error", ""
 
 # ── Worker ────────────────────────────────────────────────────────────────────
 
@@ -871,6 +871,10 @@ class MainWindow(QMainWindow):
                                 p["remote_ver"] = p["version"]  # приоритет JSON-версии
                             else:
                                 p["remote_ver"] = None  # None = ещё загружается
+                            # display_name из JSON уже в p["display_name"]
+                            # remote_display_name — из файла ver репозитория (строка 2)
+                            # None = ещё не загружено, "" = загружено но пусто
+                            p["remote_display_name"] = None
                     self._pending = (authors, app_meta, is_offline, None)
                 except Exception as parse_err:
                     self._pending = ([], {}, is_offline, str(parse_err))
@@ -1199,18 +1203,18 @@ class MainWindow(QMainWindow):
                     continue
                 add_author_header(author_name, True)
                 for p in matched:
-                    local_ver, ver_display_name = read_plugin_ver(install_dir, p["name"]) if install_dir else ("", "")
-                    # Приоритет отображаемого имени: 1) JSON "name", 2) файл ver, 3) имя папки
-                    dn = p.get("display_name") or ver_display_name or p["name"]
+                    local_ver, _ = read_plugin_ver(install_dir, p["name"]) if install_dir else ("", "")
+                    # Приоритет отображаемого имени: 1) JSON "name", 2) ver репо, 3) папка
+                    dn = self._get_plugin_display_name(p)
                     # remote_ver берётся из скачанного файла ver репозитория
                     add_row(p["name"], dn, local_ver, p.get("remote_ver", None), p)
             else:
                 add_author_header(author_name, expanded)
                 if expanded:
                     for p in author_entry["plugins"]:
-                        local_ver, ver_display_name = read_plugin_ver(install_dir, p["name"]) if install_dir else ("", "")
-                        # Приоритет отображаемого имени: 1) JSON "name", 2) файл ver, 3) имя папки
-                        dn = p.get("display_name") or ver_display_name or p["name"]
+                        local_ver, _ = read_plugin_ver(install_dir, p["name"]) if install_dir else ("", "")
+                        # Приоритет отображаемого имени: 1) JSON "name", 2) ver репо, 3) папка
+                        dn = self._get_plugin_display_name(p)
                         # remote_ver берётся из скачанного файла ver репозитория
                         add_row(p["name"], dn, local_ver, p.get("remote_ver", None), p)
 
@@ -1254,20 +1258,26 @@ class MainWindow(QMainWindow):
         plugins_to_fetch = []
         for author_entry in self.remote_authors:
             for p in author_entry["plugins"]:
-                if p.get("remote_ver") is None:
+                # Загружаем из репо если: версия ещё не известна ИЛИ имя ещё не загружено
+                # (JSON "version" мог закрыть remote_ver, но remote_display_name всё равно нужен)
+                needs_fetch = (
+                    p.get("remote_ver") is None or
+                    (p.get("remote_display_name") is None and not p.get("display_name"))
+                )
+                if needs_fetch:
                     plugins_to_fetch.append(p)
 
         if not plugins_to_fetch:
             return
 
-        self._ver_fetch_results = []  # список (plugin_ref, ver_string)
+        self._ver_fetch_results = []  # список (plugin_ref, (ver, display_name))
         self._ver_fetch_total = len(plugins_to_fetch)
         self._ver_fetch_done = 0
 
         for p in plugins_to_fetch:
             def _fetch(plugin=p):
-                ver = fetch_remote_ver(plugin.get("raw_ver_url", ""))
-                self._ver_fetch_results.append((plugin, ver))
+                ver, dn = fetch_remote_ver(plugin.get("raw_ver_url", ""))
+                self._ver_fetch_results.append((plugin, ver, dn))
             threading.Thread(target=_fetch, daemon=True).start()
 
         self._poll_ver_fetch()
@@ -1278,8 +1288,12 @@ class MainWindow(QMainWindow):
             return
 
         while self._ver_fetch_results:
-            plugin_ref, ver = self._ver_fetch_results.pop(0)
-            plugin_ref["remote_ver"] = ver
+            plugin_ref, ver, repo_dn = self._ver_fetch_results.pop(0)
+            # Приоритет версии: 1) JSON "version", 2) файл ver из репо
+            if not plugin_ref.get("version"):
+                plugin_ref["remote_ver"] = ver
+            # remote_display_name — имя из файла ver репозитория (строка 2)
+            plugin_ref["remote_display_name"] = repo_dn
             self._ver_fetch_done += 1
             self._update_row_remote_ver(plugin_ref)
 
@@ -1288,6 +1302,19 @@ class MainWindow(QMainWindow):
         else:
             # Все версии загружены — обновляем счётчик статуса
             self._refresh_status_counts()
+
+    def _get_plugin_display_name(self, p: dict) -> str:
+        """
+        Возвращает отображаемое имя плагина по приоритету:
+          1) JSON "name"  (p["display_name"])
+          2) файл ver из репозитория, строка 2  (p["remote_display_name"])
+          3) имя папки в репозитории  (p["name"])
+        """
+        return (
+            p.get("display_name") or
+            p.get("remote_display_name") or
+            p["name"]
+        )
 
     def _update_row_remote_ver(self, p: dict):
         """
@@ -1310,9 +1337,9 @@ class MainWindow(QMainWindow):
                     row_name = labels[0].text()
 
             # Сопоставляем с именем плагина (folder_name или display_name)
-            local_ver, ver_display_name = read_plugin_ver(install_dir, p["name"]) if install_dir else ("", "")
-            # Приоритет отображаемого имени: 1) JSON "name", 2) файл ver, 3) имя папки
-            dn = p.get("display_name") or ver_display_name or p["name"]
+            local_ver, _ = read_plugin_ver(install_dir, p["name"]) if install_dir else ("", "")
+            # Приоритет отображаемого имени: 1) JSON "name", 2) ver репо, 3) папка
+            dn = self._get_plugin_display_name(p)
             if row_name not in (p["name"], dn):
                 continue
 
@@ -1518,16 +1545,14 @@ class MainWindow(QMainWindow):
                     row_name = labels[0].text()
             # Сравниваем по folder_name (name) и по display_name
             install_dir = self.path_edit.text().strip()
-            _, ver_display_name = read_plugin_ver(install_dir, name) if install_dir else ("", "")
-            # Ищем json_display_name из remote_authors
-            json_display_name = ""
+            # Ищем объект плагина в remote_authors для получения display_name
+            plugin_obj = None
             for ae in self.remote_authors:
                 for pp in ae["plugins"]:
                     if pp["name"] == name:
-                        json_display_name = pp.get("display_name", "")
+                        plugin_obj = pp
                         break
-            # Приоритет: 1) JSON "name", 2) файл ver, 3) имя папки
-            dn = json_display_name or ver_display_name or name
+            dn = self._get_plugin_display_name(plugin_obj) if plugin_obj else name
             if row_name not in (name, dn):
                 continue
             if ok:
