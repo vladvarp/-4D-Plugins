@@ -351,23 +351,6 @@ function renderPluginSidebar(meta) {
 function renderMarkdown(markdown) {
     let html = markdown;
 
-    // Экранируем HTML в исходном тексте для безопасности
-    // НО: сохраняем блоки кода отдельно, чтобы не сломать их
-    const codeBlocks = [];
-    html = html.replace(/```([\w]*)\n([\s\S]*?)```/g, (_, lang, code) => {
-        const idx = codeBlocks.length;
-        codeBlocks.push(`<pre><code class="language-${lang}">${escapeHtml(code.trimEnd())}</code></pre>`);
-        return `%%CODEBLOCK_${idx}%%`;
-    });
-
-    // Инлайн код — сохраняем аналогично
-    const inlineCodes = [];
-    html = html.replace(/`([^`]+)`/g, (_, code) => {
-        const idx = inlineCodes.length;
-        inlineCodes.push(`<code>${escapeHtml(code)}</code>`);
-        return `%%INLINE_${idx}%%`;
-    });
-
     // --- Специальные блоки нашего синтаксиса ---
     // Сохраняем их в заглушки, чтобы applyStandardMarkdown не обернул
     // внутренние строки в лишние <p>-теги
@@ -438,6 +421,23 @@ function renderMarkdown(markdown) {
             return `<div class="changelog-entry"><div class="changelog-version">${escapeHtml(version || '')}</div><div><div class="changelog-date">${escapeHtml(date || '')}</div><div class="changelog-items">${items}</div></div></div>`;
         });
         return saveBlock(`<div class="changelog">${entries.join('')}</div>`);
+    });
+
+    // Экранируем HTML в исходном тексте для безопасности
+    // НО: сохраняем блоки кода отдельно, чтобы не сломать их
+    const codeBlocks = [];
+    html = html.replace(/```([\w]*)\n([\s\S]*?)```/g, (_, lang, code) => {
+        const idx = codeBlocks.length;
+        codeBlocks.push(`<pre><code class="language-${lang}">${escapeHtml(code.trimEnd())}</code></pre>`);
+        return `%%CODEBLOCK_${idx}%%`;
+    });
+
+    // Инлайн код — сохраняем аналогично
+    const inlineCodes = [];
+    html = html.replace(/`([^`]+)`/g, (_, code) => {
+        const idx = inlineCodes.length;
+        inlineCodes.push(`<code>${escapeHtml(code)}</code>`);
+        return `%%INLINE_${idx}%%`;
     });
 
     // --- Стандартный Markdown ---

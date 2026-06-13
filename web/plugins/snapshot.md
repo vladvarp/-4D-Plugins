@@ -41,12 +41,13 @@ Snapshot — однокнопочный инструмент для «запек
 ::::
 
 ## Установка
-
-1. Скачай программу `4DPluginInstaller.exe` по кнопке выше
-2. Выбери папку плагинов Cinema 4D
-3. Установи пакет **Snapshot**
-4. Перезапусти Cinema 4D
-5. Плагин появится в меню **Extensions → Snapshot**
+::::steps
+### Скачай программу
+[[button:4DPluginInstaller.exe|https://github.com/vladvarp/-4D-Plugins/releases/download/C4D/4DPluginInstaller.exe]]
+### Выбрать папку плагинов Cinema 4D
+### Установи пакет [[badge:Beta|Snapshot]]
+### Плагин появится в меню [[badge:Beta|Extensions]] → [[badge:Beta|Snapshot]]
+::::
 
 :::info
 Папка плагинов Cinema 4D на Windows: `C:\Users\<имя>\AppData\Roaming\Maxon\Cinema 4D R26\plugins`
