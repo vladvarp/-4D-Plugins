@@ -384,7 +384,7 @@ def fetch_remote_ver(raw_ver_url: str) -> str:
         result = _try_fetch()
         if result == "not_found":
             return "not_found"
-        return result
+        return result if result else "not_found"  # пустой файл ver = версия не указана
     except Exception:
         pass  # первая попытка не удалась — пробуем ещё раз
 
@@ -392,7 +392,7 @@ def fetch_remote_ver(raw_ver_url: str) -> str:
         result = _try_fetch()
         if result == "not_found":
             return "not_found"
-        return result
+        return result if result else "not_found"  # пустой файл ver = версия не указана
     except Exception:
         return "error"
 
