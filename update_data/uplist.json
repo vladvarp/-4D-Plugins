@@ -32,7 +32,7 @@
     },
     {
       "name": "test",
-      "expanded": true,
+      "expanded": false,
       "plugins": [
         {
           "url": "https://github.com/vladvarp/-4D-Plugins/tree/main/test/1",
