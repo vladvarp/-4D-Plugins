@@ -12,7 +12,7 @@ import base64
 # ─── ID ───────────────────────────────────────────────────────────────────────
 PLUGIN_ID   = 1068834
 PLUGIN_NAME = "Resolution Manager"
-PLUGIN_NAME_V = "Resolution Manager v1.4"
+PLUGIN_NAME_V = "Resolution Manager v1.5"
 PLUGIN_HELP = "Управление разрешением рендера для каждой камеры"
 
 ID_BASE           = 10000
@@ -28,27 +28,36 @@ OFFSET_RATIO    = 3
 OFFSET_SWAP     = 4
 OFFSET_H        = 5
 OFFSET_ACTIVATE = 6
+OFFSET_LOCK     = 7
 ROW_STRIDE      = 10
 ID_CAM_ROWS_START = ID_BASE + 100
 
 # ─── Пресеты ──────────────────────────────────────────────────────────────────
-PRESETS = [
-    ("Custom",                           0,    0),
-    ("HD 720p - 1280 x 720",          1280,  720),
-    ("FHD 1080p - 1920 x 1080",       1920, 1080),
-    ("2K - 2048 x 1080",              2048, 1080),
-    ("4K UHD - 3840 x 2160",          3840, 2160),
-    ("4K DCI - 4096 x 2160",          4096, 2160),
-    ("Instagram 1:1 - 1080 x 1080",   1080, 1080),
-    ("Instagram 4:5 - 1080 x 1350",   1080, 1350),
-    ("Instagram Story - 1080 x 1920", 1080, 1920),
-    ("Twitter/X - 1200 x 675",        1200,  675),
-    ("Facebook - 1200 x 630",         1200,  630),
-    ("A4 Portrait - 2480 x 3508",     2480, 3508),
-    ("A4 Landscape - 3508 x 2480",    3508, 2480),
-    ("Square 1:1 - 1000 x 1000",      1000, 1000),
-    ("Cinemascope - 2390 x 1000",     2390, 1000),
+_RAW_PRESETS = [
+    ("Custom",                              0,    0),
+    ("HD 720p - 1280 x 720",             1280,  720),
+    ("FHD 1080p - 1920 x 1080",          1920, 1080),
+    ("2K DCI - 2048 x 1080",             2048, 1080),
+    ("4K UHD - 3840 x 2160",             3840, 2160),
+    ("4K DCI - 4096 x 2160",             4096, 2160),
+    ("1:1 Square - 1080 x 1080",         1080, 1080),
+    ("Instagram 4:5 - 1080 x 1350",      1080, 1350),
+    ("9:16 Vertical - 1080 x 1920",      1080, 1920),
+    ("16:9 Link Preview - 1200 x 675",   1200,  675),
+    ("1.91:1 Link Preview - 1200 x 630", 1200,  630),
+    ("A4 Portrait - 2480 x 3508",        2480, 3508),
+    ("A4 Landscape - 3508 x 2480",       3508, 2480),
+    ("Cinemascope - 2390 x 1000",        2390, 1000),
 ]
+
+PRESETS = []
+_seen_res = set()
+for _pname, _pw, _ph in _RAW_PRESETS:
+    _key = (_pw, _ph)
+    if _key in _seen_res:
+        continue
+    _seen_res.add(_key)
+    PRESETS.append((_pname, _pw, _ph))
 
 # ─── Иконка ───────────────────────────────────────────────────────────────────
 _ICON_B64 = (
@@ -255,9 +264,43 @@ def _apply_to_render(w, h):
 
 def _find_preset_index(w, h):
     for i, (_, pw, ph) in enumerate(PRESETS):
+        if i == 0:
+            continue
         if pw == w and ph == h:
             return i
     return 0
+
+
+def _obj_key(obj):
+    """Хешируемый ключ для отслеживания состояния C4D-объекта."""
+    return id(obj)
+
+
+def _has_lock_tag(obj):
+    """True если на объекте есть тег блокировки (Protection)."""
+    tag = obj.GetFirstTag()
+    while tag:
+        if tag.GetType() == c4d.Tprotection:
+            return True
+        tag = tag.GetNext()
+    return False
+
+
+def _set_lock_tag(obj, locked):
+    """Добавляет или снимает тег блокировки с объекта камеры."""
+    doc = obj.GetDocument()
+    if locked:
+        if not _has_lock_tag(obj):
+            obj.MakeTag(c4d.Tprotection)
+    else:
+        tag = obj.GetFirstTag()
+        while tag:
+            nxt = tag.GetNext()
+            if tag.GetType() == c4d.Tprotection:
+                tag.Remove()
+            tag = nxt
+    if doc:
+        doc.SetChanged()
 
 
 def _diff_cameras(old_list, new_list):
@@ -292,6 +335,7 @@ class CamResDialog(c4d.gui.GeDialog):
         self._last_active_cam     = None
         self._last_active_cam_obj = None
         self._plugin_active_obj = None  # объект камеры, активированной через плагин
+        self._last_lock_states  = {}    # id(obj) -> bool
         self._initialized       = False
 
     # ── CreateLayout ─────────────────────────────────────────────────────────
@@ -329,6 +373,7 @@ class CamResDialog(c4d.gui.GeDialog):
         self._last_active_cam_obj = self._get_active_camera_obj()
         self._last_render_res   = _get_render_resolution()
         self._initialized       = True
+        self._last_lock_states  = {}
         self._rebuild_list()
         return True
 
@@ -362,6 +407,17 @@ class CamResDialog(c4d.gui.GeDialog):
                            "Активная камера не задана  |  Камер в сцене: {}".format(count))
 
         self._update_resolution_label(render_w, render_h)
+        self._update_lock_states()
+
+    def _update_lock_states(self):
+        for _, obj in self._cam_list:
+            self._last_lock_states[_obj_key(obj)] = _has_lock_tag(obj)
+
+    def _lock_states_changed(self):
+        for _, obj in self._cam_list:
+            if self._last_lock_states.get(_obj_key(obj)) != _has_lock_tag(obj):
+                return True
+        return False
 
     def _get_active_camera_name(self):
         try:
@@ -420,7 +476,7 @@ class CamResDialog(c4d.gui.GeDialog):
             and render_w > 0
         )
 
-        self.GroupBegin(base+9, c4d.BFH_SCALEFIT, cols=7, rows=1)
+        self.GroupBegin(base+9, c4d.BFH_SCALEFIT, cols=8, rows=1)
         self.GroupBorderSpace(6, 1, 6, 1)
 
         btn_label = "✓ Активна" if cam_matches else "Активировать"
@@ -431,8 +487,6 @@ class CamResDialog(c4d.gui.GeDialog):
         self.AddStaticText(base+OFFSET_LBL,
                            c4d.BFH_SCALEFIT | c4d.BFV_CENTER,
                            initw=110, name=label)
-
-
 
         self.AddEditNumberArrows(base+OFFSET_W, c4d.BFH_LEFT, initw=60)
         self.SetInt32(base+OFFSET_W, saved_w, min=1, max=99999)
@@ -449,6 +503,9 @@ class CamResDialog(c4d.gui.GeDialog):
         for pi, (pname, _, _) in enumerate(PRESETS):
             self.AddChild(base+OFFSET_PRESET, pi, pname)
         self.SetInt32(base+OFFSET_PRESET, preset_idx)
+
+        self.AddCheckbox(base+OFFSET_LOCK, c4d.BFH_CENTER, initw=0, inith=0, name=f"⊘")
+        self.SetBool(base+OFFSET_LOCK, _has_lock_tag(obj))
 
         self.GroupEnd()
 
@@ -537,6 +594,14 @@ class CamResDialog(c4d.gui.GeDialog):
                     self._activate_camera(idx, name, obj)
                 return True
 
+            # ── Блокировка камеры ──
+            if widget_id == base + OFFSET_LOCK:
+                locked = self.GetBool(base+OFFSET_LOCK)
+                _set_lock_tag(obj, locked)
+                self._last_lock_states[_obj_key(obj)] = locked
+                c4d.EventAdd()
+                return True
+
         return True
 
     # ── Логика ───────────────────────────────────────────────────────────────
@@ -599,6 +664,7 @@ class CamResDialog(c4d.gui.GeDialog):
                 self._last_doc          = current_doc
                 self._last_active_cam   = None
                 self._plugin_active_obj = None
+                self._last_lock_states  = {}
                 self._cam_list          = _collect_cameras()
                 self._rebuild_list()
                 return True
@@ -621,6 +687,12 @@ class CamResDialog(c4d.gui.GeDialog):
             # ── Переименование камеры ──
             if _names_changed(self._cam_list, new_list):
                 self._cam_list = new_list
+                self._rebuild_list()
+                return True
+
+            # ── Тег блокировки добавлен или снят вручную ──
+            if self._lock_states_changed():
+                self._update_lock_states()
                 self._rebuild_list()
                 return True
 
@@ -659,7 +731,7 @@ class CamResCommand(c4d.plugins.CommandData):
             self._dialog.Open(
                 dlgtype=c4d.DLG_TYPE_ASYNC,
                 pluginid=PLUGIN_ID,
-                defaultw=680,
+                defaultw=710,
                 defaulth=280,
             )
         return True

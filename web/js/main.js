@@ -56,7 +56,7 @@ function initIndexPage() {
             description: 'Управление разрешением рендера для каждой камеры в сцене — назначай, активируй и переключай форматы прямо из плавающей панели.',
             icon: '🎥',
             tags: ['Рендер', 'Автоматизация', 'Камера'],
-            version: 'v1.4',
+            version: 'v1.5',
             mdFile: 'plugins/camera-resolution-manager.md'
         },
         {
