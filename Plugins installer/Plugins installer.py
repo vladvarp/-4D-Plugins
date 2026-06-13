@@ -341,6 +341,10 @@ def read_plugin_ver(install_dir: str, folder_name: str) -> tuple[str, str]:
         return version, display_name
     return "", ""
 
+def is_plugin_installed(install_dir: str, folder_name: str) -> bool:
+    """Возвращает True если папка плагина существует (независимо от наличия файла ver)."""
+    return (Path(install_dir) / folder_name).is_dir()
+
 def write_plugin_ver(install_dir: str, name: str, version: str):
     """Записывает версию в файл 'ver' внутри папки плагина."""
     ver_file = Path(install_dir) / name / "ver"
@@ -915,6 +919,10 @@ class MainWindow(QMainWindow):
             """
             nonlocal needs
 
+            # Установлен ли плагин — определяем по наличию папки,
+            # а не по ver, так как файл ver может отсутствовать или быть пустым
+            is_installed = bool(install_dir) and is_plugin_installed(install_dir, name)
+
             # Фильтр поиска по отображаемому имени
             if search_query and search_query not in display_name.lower():
                 return
@@ -999,8 +1007,8 @@ class MainWindow(QMainWindow):
                 st.setForeground(QColor(RED))
                 self.table.setItem(row, 3, st)
             elif remote_ver == "not_found":
-                # Файл ver не существует в репо
-                if local_ver:
+                # Файл ver не существует в репо — ориентируемся на наличие папки
+                if is_installed:
                     st = QTableWidgetItem("Установлен")
                     st.setForeground(QColor(DIM))
                     self.table.setItem(row, 3, st)
@@ -1027,10 +1035,10 @@ class MainWindow(QMainWindow):
             # Не показываем кнопку если: оффлайн, нет плагина в JSON, версия не загружена (None), ошибка сети
             if p is not None and not self.offline_mode and remote_ver not in (None, "error"):
                 if remote_ver == "not_found":
-                    # Файл ver в репо отсутствует: переустановить если установлен, иначе установить
-                    action_label = "Переустановить" if local_ver else "Установить"
+                    # Файл ver в репо отсутствует: переустановить если папка есть, иначе установить
+                    action_label = "Переустановить" if is_installed else "Установить"
                     act_btn = QPushButton(action_label)
-                    act_btn.setObjectName("update" if local_ver else "install")
+                    act_btn.setObjectName("update" if is_installed else "install")
                     act_btn.setFixedHeight(28)
                     captured_plugin = dict(p)
                     act_btn.clicked.connect(lambda _, pl=captured_plugin: self._install_single(pl))
@@ -1054,8 +1062,8 @@ class MainWindow(QMainWindow):
                     al.addWidget(act_btn)
                     self.table.setCellWidget(row, 4, aw)
 
-            # Кнопка «Удалить» (только если установлен)
-            if local_ver:
+            # Кнопка «Удалить» (только если папка плагина существует)
+            if is_installed:
                 del_btn = QPushButton("Удалить")
                 del_btn.setObjectName("danger")
                 del_btn.setFixedHeight(28)
@@ -1239,13 +1247,16 @@ class MainWindow(QMainWindow):
             if row_name not in (p["name"], dn):
                 continue
 
+            # Установлен ли плагин — по наличию папки, а не по ver
+            is_installed = bool(install_dir) and is_plugin_installed(install_dir, p["name"])
+
             # Файл ver не существует в репозитории
             if remote_ver == "not_found":
                 self.table.item(row, 2).setText("Не указан")
                 self.table.item(row, 2).setForeground(QColor(DIM))
                 # Статус и кнопка
-                if local_ver:
-                    # Установлен, но в репо нет ver — предлагаем переустановить
+                if is_installed:
+                    # Папка есть, но в репо нет ver — предлагаем переустановить
                     st = QTableWidgetItem("Установлен")
                     st.setForeground(QColor(DIM))
                     self.table.setItem(row, 3, st)
@@ -1258,7 +1269,7 @@ class MainWindow(QMainWindow):
                     al = QHBoxLayout(aw); al.setContentsMargins(6, 0, 6, 0); al.addWidget(act_btn)
                     self.table.setCellWidget(row, 4, aw)
                 else:
-                    # Не установлен, ver нет в репо — показываем «Установить»
+                    # Папки нет, ver нет в репо — показываем «Установить»
                     st = QTableWidgetItem("")
                     st.setForeground(QColor(ACCENT))
                     self.table.setItem(row, 3, st)
