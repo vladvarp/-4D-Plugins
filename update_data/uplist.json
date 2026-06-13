@@ -29,6 +29,32 @@
           "info_url": "https://vladvarp.github.io/-4D-Plugins/web/plugin.html?md=plugins%2Fsnapshot.md"
         }
       ]
+    },
+    {
+      "name": "test",
+      "expanded": true,
+      "plugins": [
+        {
+          "url": "https://github.com/vladvarp/-4D-Plugins/tree/main/test/1",
+          "info": "тест правильный имя и версия",
+          "info_url": "https://vladvarp.github.io/-4D-Plugins/web/plugin.html?md=plugins%2FVAr_Tools.md"
+        },
+        {
+          "url": "https://github.com/vladvarp/-4D-Plugins/tree/main/test/2",
+          "info": "1",
+          "info_url": ""
+        },
+        {
+          "url": "https://github.com/vladvarp/-4D-Plugins/tree/main/test/3",
+          "info": "2"
+        },
+        {
+          "url": "https://github.com/vladvarp/-4D-Plugins/tree/main/test/4"
+        },
+        {
+          "url": "https://github.com/vladvarp/-4D-Plugins/tree/main/test/5"
+        }
+      ]
     }
   ]
 }

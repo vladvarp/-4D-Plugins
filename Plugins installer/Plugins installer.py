@@ -15,7 +15,7 @@ from urllib.parse import unquote, quote
 import ctypes
 
 PROGRAM_NAME = "4D Plugin Installer"
-PROGRAM_VER  = "v1.4"
+PROGRAM_VER  = "v1.5"
 
 # Скрываем консольное окно для всех дочерних процессов на Windows
 CREATE_NO_WINDOW = 0x08000000
@@ -354,18 +354,43 @@ def remove_plugin_folder(install_dir: str, name: str):
 def fetch_remote_ver(raw_ver_url: str) -> str:
     """
     Скачивает файл ver с GitHub (raw) и возвращает первую строку — версию.
-    При любой ошибке возвращает пустую строку.
+    Возвращает:
+      - строку с версией при успехе
+      - "not_found" если файл ver отсутствует в репозитории (HTTP 404)
+      - "error"     при сетевой ошибке (с одной повторной попыткой)
     """
-    try:
+    import urllib.error
+
+    def _try_fetch() -> str:
         req = urllib.request.Request(
             raw_ver_url, headers={"User-Agent": "C4D-Installer/1.0"}
         )
-        with urllib.request.urlopen(req, timeout=8) as r:
-            text = r.read().decode("utf-8")
-        lines = text.splitlines()
-        return lines[0].strip() if lines else ""
+        try:
+            with urllib.request.urlopen(req, timeout=8) as r:
+                text = r.read().decode("utf-8")
+            lines = text.splitlines()
+            return lines[0].strip() if lines else ""
+        except urllib.error.HTTPError as e:
+            if e.code == 404:
+                return "not_found"
+            raise  # пробрасываем дальше для повторной попытки
+        # OSError, URLError и прочие — пробрасываем
+
+    try:
+        result = _try_fetch()
+        if result == "not_found":
+            return "not_found"
+        return result
     except Exception:
-        return ""
+        pass  # первая попытка не удалась — пробуем ещё раз
+
+    try:
+        result = _try_fetch()
+        if result == "not_found":
+            return "not_found"
+        return result
+    except Exception:
+        return "error"
 
 # ── Worker ────────────────────────────────────────────────────────────────────
 
@@ -806,21 +831,10 @@ class MainWindow(QMainWindow):
             if raw:
                 try:
                     authors, app_meta = parse_list_json(raw)
-                    # Скачиваем актуальную версию с GitHub для каждого плагина (файл ver)
-                    if not is_offline:
-                        threads = []
-                        for author_entry in authors:
-                            for p in author_entry["plugins"]:
-                                p["remote_ver"] = ""  # инициализируем
-                                def _fetch(plugin=p):
-                                    plugin["remote_ver"] = fetch_remote_ver(
-                                        plugin.get("raw_ver_url", "")
-                                    )
-                                t = threading.Thread(target=_fetch, daemon=True)
-                                t.start()
-                                threads.append(t)
-                        for t in threads:
-                            t.join(timeout=10)
+                    # Инициализируем remote_ver как None (ещё не загружено) для каждого плагина
+                    for author_entry in authors:
+                        for p in author_entry["plugins"]:
+                            p["remote_ver"] = None  # None = ещё загружается
                     self._pending = (authors, app_meta, is_offline, None)
                 except Exception as parse_err:
                     self._pending = ([], {}, is_offline, str(parse_err))
@@ -853,6 +867,9 @@ class MainWindow(QMainWindow):
                     about_label = app_meta.get("about_label", "О плагинах")
                     self.readme_btn.setText(about_label)
                     self._populate_table()
+                    # Запускаем постепенную загрузку версий по одному плагину
+                    if not is_offline:
+                        self._start_progressive_ver_fetch()
         QTimer.singleShot(80, poll)
 
     def _populate_table(self):
@@ -943,8 +960,22 @@ class MainWindow(QMainWindow):
             loc.setForeground(QColor(DIM if not local_ver else TEXT))
             self.table.setItem(row, 1, loc)
 
-            # Актуальная версия (из JSON или прочерк для сторонних)
-            self.table.setItem(row, 2, QTableWidgetItem(remote_ver or "—"))
+            # Актуальная версия: None = загружается, "error" = ошибка, "not_found" = нет файла ver
+            if remote_ver is None:
+                remote_cell_text = "…"
+                remote_cell_color = DIM
+            elif remote_ver == "error":
+                remote_cell_text = "ошибка"
+                remote_cell_color = RED
+            elif remote_ver == "not_found":
+                remote_cell_text = "Не указан"
+                remote_cell_color = DIM
+            else:
+                remote_cell_text = remote_ver or "—"
+                remote_cell_color = TEXT
+            remote_item = QTableWidgetItem(remote_cell_text)
+            remote_item.setForeground(QColor(remote_cell_color))
+            self.table.setItem(row, 2, remote_item)
 
             # Статус
             if p is None:
@@ -957,6 +988,26 @@ class MainWindow(QMainWindow):
                 st = QTableWidgetItem("Нет подключения")
                 st.setForeground(QColor(DIM))
                 self.table.setItem(row, 3, st)
+            elif remote_ver is None:
+                # Версия ещё загружается
+                st = QTableWidgetItem("Загрузка…")
+                st.setForeground(QColor(DIM))
+                self.table.setItem(row, 3, st)
+            elif remote_ver == "error":
+                # Ошибка сети — не показываем кнопку
+                st = QTableWidgetItem("Нет данных")
+                st.setForeground(QColor(RED))
+                self.table.setItem(row, 3, st)
+            elif remote_ver == "not_found":
+                # Файл ver не существует в репо
+                if local_ver:
+                    st = QTableWidgetItem("Установлен")
+                    st.setForeground(QColor(DIM))
+                    self.table.setItem(row, 3, st)
+                else:
+                    st = QTableWidgetItem("")
+                    st.setForeground(QColor(ACCENT))
+                    self.table.setItem(row, 3, st)
             elif not local_ver:
                 # Не установлен — не входит в счётчик обновлений
                 st = QTableWidgetItem("")
@@ -972,20 +1023,36 @@ class MainWindow(QMainWindow):
                 st.setForeground(QColor(GREEN))
                 self.table.setItem(row, 3, st)
 
-            # Кнопка «Установить» / «Обновить» (только для плагинов из JSON и при наличии сети)
-            if p is not None and not self.offline_mode and (not local_ver or local_ver != remote_ver):
-                action_label = "Обновить" if local_ver else "Установить"
-                act_btn = QPushButton(action_label)
-                act_btn.setObjectName("update" if local_ver else "install")
-                act_btn.setFixedHeight(28)
-                captured_plugin = dict(p)
-                act_btn.clicked.connect(lambda _, pl=captured_plugin: self._install_single(pl))
-                aw = QWidget()
-                aw.setStyleSheet("background:transparent;")
-                al = QHBoxLayout(aw)
-                al.setContentsMargins(6, 0, 6, 0)
-                al.addWidget(act_btn)
-                self.table.setCellWidget(row, 4, aw)
+            # Кнопка «Установить» / «Обновить» / «Переустановить»
+            # Не показываем кнопку если: оффлайн, нет плагина в JSON, версия не загружена (None), ошибка сети
+            if p is not None and not self.offline_mode and remote_ver not in (None, "error"):
+                if remote_ver == "not_found":
+                    # Файл ver в репо отсутствует: переустановить если установлен, иначе установить
+                    action_label = "Переустановить" if local_ver else "Установить"
+                    act_btn = QPushButton(action_label)
+                    act_btn.setObjectName("update" if local_ver else "install")
+                    act_btn.setFixedHeight(28)
+                    captured_plugin = dict(p)
+                    act_btn.clicked.connect(lambda _, pl=captured_plugin: self._install_single(pl))
+                    aw = QWidget()
+                    aw.setStyleSheet("background:transparent;")
+                    al = QHBoxLayout(aw)
+                    al.setContentsMargins(6, 0, 6, 0)
+                    al.addWidget(act_btn)
+                    self.table.setCellWidget(row, 4, aw)
+                elif not local_ver or local_ver != remote_ver:
+                    action_label = "Обновить" if local_ver else "Установить"
+                    act_btn = QPushButton(action_label)
+                    act_btn.setObjectName("update" if local_ver else "install")
+                    act_btn.setFixedHeight(28)
+                    captured_plugin = dict(p)
+                    act_btn.clicked.connect(lambda _, pl=captured_plugin: self._install_single(pl))
+                    aw = QWidget()
+                    aw.setStyleSheet("background:transparent;")
+                    al = QHBoxLayout(aw)
+                    al.setContentsMargins(6, 0, 6, 0)
+                    al.addWidget(act_btn)
+                    self.table.setCellWidget(row, 4, aw)
 
             # Кнопка «Удалить» (только если установлен)
             if local_ver:
@@ -1073,7 +1140,7 @@ class MainWindow(QMainWindow):
                     local_ver, display_name = read_plugin_ver(install_dir, p["name"]) if install_dir else ("", "")
                     dn = display_name or p["name"]
                     # remote_ver берётся из скачанного файла ver репозитория
-                    add_row(p["name"], dn, local_ver, p.get("remote_ver", ""), p)
+                    add_row(p["name"], dn, local_ver, p.get("remote_ver", None), p)
             else:
                 add_author_header(author_name, expanded)
                 if expanded:
@@ -1081,7 +1148,7 @@ class MainWindow(QMainWindow):
                         local_ver, display_name = read_plugin_ver(install_dir, p["name"]) if install_dir else ("", "")
                         dn = display_name or p["name"]
                         # remote_ver берётся из скачанного файла ver репозитория
-                        add_row(p["name"], dn, local_ver, p.get("remote_ver", ""), p)
+                        add_row(p["name"], dn, local_ver, p.get("remote_ver", None), p)
 
         if needs:
             self.status_lbl.setText(f"Требуют обновления: {needs}")
@@ -1100,6 +1167,175 @@ class MainWindow(QMainWindow):
                     author_entry["expanded"] = not author_entry.get("expanded", True)
                     break
         self._populate_table()
+
+    def _start_progressive_ver_fetch(self):
+        """
+        Запускает последовательную загрузку версий плагинов по одному.
+        Каждый поток по завершении сигнализирует через _ver_fetch_results,
+        опрашиваемый таймером.
+        """
+        # Собираем все плагины у которых remote_ver ещё None
+        plugins_to_fetch = []
+        for author_entry in self.remote_authors:
+            for p in author_entry["plugins"]:
+                if p.get("remote_ver") is None:
+                    plugins_to_fetch.append(p)
+
+        if not plugins_to_fetch:
+            return
+
+        self._ver_fetch_results = []  # список (plugin_ref, ver_string)
+        self._ver_fetch_total = len(plugins_to_fetch)
+        self._ver_fetch_done = 0
+
+        for p in plugins_to_fetch:
+            def _fetch(plugin=p):
+                ver = fetch_remote_ver(plugin.get("raw_ver_url", ""))
+                self._ver_fetch_results.append((plugin, ver))
+            threading.Thread(target=_fetch, daemon=True).start()
+
+        self._poll_ver_fetch()
+
+    def _poll_ver_fetch(self):
+        """Опрашивает результаты загрузки версий и обновляет таблицу по мере готовности."""
+        if not hasattr(self, "_ver_fetch_results"):
+            return
+
+        while self._ver_fetch_results:
+            plugin_ref, ver = self._ver_fetch_results.pop(0)
+            plugin_ref["remote_ver"] = ver
+            self._ver_fetch_done += 1
+            self._update_row_remote_ver(plugin_ref)
+
+        if self._ver_fetch_done < self._ver_fetch_total:
+            QTimer.singleShot(120, self._poll_ver_fetch)
+        else:
+            # Все версии загружены — обновляем счётчик статуса
+            self._refresh_status_counts()
+
+    def _update_row_remote_ver(self, p: dict):
+        """
+        Обновляет ячейки «Актуальная», «Статус» и кнопку действия
+        для строки конкретного плагина после получения remote_ver.
+        """
+        install_dir = self.path_edit.text().strip()
+        remote_ver = p.get("remote_ver", None)
+
+        for row in range(self.table.rowCount()):
+            # Определяем имя плагина в строке
+            item = self.table.item(row, 0)
+            widget = self.table.cellWidget(row, 0)
+            row_name = ""
+            if item:
+                row_name = item.text()
+            elif widget:
+                labels = widget.findChildren(QLabel)
+                if labels:
+                    row_name = labels[0].text()
+
+            # Сопоставляем с именем плагина (folder_name или display_name)
+            local_ver, display_name = read_plugin_ver(install_dir, p["name"]) if install_dir else ("", "")
+            dn = display_name or p["name"]
+            if row_name not in (p["name"], dn):
+                continue
+
+            # Файл ver не существует в репозитории
+            if remote_ver == "not_found":
+                self.table.item(row, 2).setText("Не указан")
+                self.table.item(row, 2).setForeground(QColor(DIM))
+                # Статус и кнопка
+                if local_ver:
+                    # Установлен, но в репо нет ver — предлагаем переустановить
+                    st = QTableWidgetItem("Установлен")
+                    st.setForeground(QColor(DIM))
+                    self.table.setItem(row, 3, st)
+                    act_btn = QPushButton("Переустановить")
+                    act_btn.setObjectName("update")
+                    act_btn.setFixedHeight(28)
+                    captured_plugin = dict(p)
+                    act_btn.clicked.connect(lambda _, pl=captured_plugin: self._install_single(pl))
+                    aw = QWidget(); aw.setStyleSheet("background:transparent;")
+                    al = QHBoxLayout(aw); al.setContentsMargins(6, 0, 6, 0); al.addWidget(act_btn)
+                    self.table.setCellWidget(row, 4, aw)
+                else:
+                    # Не установлен, ver нет в репо — показываем «Установить»
+                    st = QTableWidgetItem("")
+                    st.setForeground(QColor(ACCENT))
+                    self.table.setItem(row, 3, st)
+                    act_btn = QPushButton("Установить")
+                    act_btn.setObjectName("install")
+                    act_btn.setFixedHeight(28)
+                    captured_plugin = dict(p)
+                    act_btn.clicked.connect(lambda _, pl=captured_plugin: self._install_single(pl))
+                    aw = QWidget(); aw.setStyleSheet("background:transparent;")
+                    al = QHBoxLayout(aw); al.setContentsMargins(6, 0, 6, 0); al.addWidget(act_btn)
+                    self.table.setCellWidget(row, 4, aw)
+
+            elif remote_ver == "error":
+                # Ошибка сети — показываем «ошибка», кнопку не показываем
+                self.table.item(row, 2).setText("ошибка")
+                self.table.item(row, 2).setForeground(QColor(RED))
+                st = QTableWidgetItem("Нет данных")
+                st.setForeground(QColor(RED))
+                self.table.setItem(row, 3, st)
+                self.table.removeCellWidget(row, 4)
+
+            else:
+                # Версия успешно получена
+                self.table.item(row, 2).setText(remote_ver or "—")
+                self.table.item(row, 2).setForeground(QColor(TEXT))
+                if not local_ver:
+                    # Не установлен
+                    st = QTableWidgetItem("")
+                    st.setForeground(QColor(ACCENT))
+                    self.table.setItem(row, 3, st)
+                    act_btn = QPushButton("Установить")
+                    act_btn.setObjectName("install")
+                    act_btn.setFixedHeight(28)
+                    captured_plugin = dict(p)
+                    act_btn.clicked.connect(lambda _, pl=captured_plugin: self._install_single(pl))
+                    aw = QWidget(); aw.setStyleSheet("background:transparent;")
+                    al = QHBoxLayout(aw); al.setContentsMargins(6, 0, 6, 0); al.addWidget(act_btn)
+                    self.table.setCellWidget(row, 4, aw)
+                elif local_ver != remote_ver:
+                    # Есть обновление
+                    st = QTableWidgetItem("Есть обновление")
+                    st.setForeground(QColor(YELLOW))
+                    self.table.setItem(row, 3, st)
+                    act_btn = QPushButton("Обновить")
+                    act_btn.setObjectName("update")
+                    act_btn.setFixedHeight(28)
+                    captured_plugin = dict(p)
+                    act_btn.clicked.connect(lambda _, pl=captured_plugin: self._install_single(pl))
+                    aw = QWidget(); aw.setStyleSheet("background:transparent;")
+                    al = QHBoxLayout(aw); al.setContentsMargins(6, 0, 6, 0); al.addWidget(act_btn)
+                    self.table.setCellWidget(row, 4, aw)
+                else:
+                    # Актуально
+                    st = QTableWidgetItem("✓ Актуально")
+                    st.setForeground(QColor(GREEN))
+                    self.table.setItem(row, 3, st)
+                    self.table.removeCellWidget(row, 4)
+            break
+
+    def _refresh_status_counts(self):
+        """Пересчитывает счётчик «Требуют обновления» после загрузки всех версий."""
+        install_dir = self.path_edit.text().strip()
+        needs = 0
+        for author_entry in self.remote_authors:
+            for p in author_entry["plugins"]:
+                remote_ver = p.get("remote_ver")
+                if remote_ver in (None, "error", "not_found", ""):
+                    continue
+                local_ver, _ = read_plugin_ver(install_dir, p["name"]) if install_dir else ("", "")
+                if local_ver and local_ver != remote_ver:
+                    needs += 1
+        if needs:
+            self.status_lbl.setText(f"Требуют обновления: {needs}")
+            self.progress_lbl.setText("Нажмите «Установить» или «Обновить» напротив нужного плагина")
+        else:
+            self.status_lbl.setText("Всё актуально")
+            self.progress_lbl.setText("Все плагины актуальны")
 
     def _ensure_git_installed(self):
         """Вызывается при запуске: если Git не найден — показывает предупреждение."""
