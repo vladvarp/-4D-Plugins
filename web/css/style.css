@@ -1044,6 +1044,433 @@ img {
 }
 
 /* ========================================
+   Раскрывающиеся блоки (details)
+======================================== */
+.md-details {
+    margin: 20px 0;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    overflow: hidden;
+    transition: border-color var(--transition);
+}
+
+.md-details:hover {
+    border-color: var(--color-border-glow);
+}
+
+.md-details-summary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 14px 18px;
+    cursor: pointer;
+    list-style: none;
+    user-select: none;
+    font-family: var(--font-display);
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--color-text);
+    transition: background var(--transition);
+}
+
+.md-details-summary::-webkit-details-marker {
+    display: none;
+}
+
+.md-details-summary::marker {
+    display: none;
+    content: '';
+}
+
+.md-details-summary:hover {
+    background: rgba(77, 159, 255, 0.04);
+}
+
+.md-details-chevron {
+    width: 20px;
+    height: 20px;
+    flex-shrink: 0;
+    border-radius: 4px;
+    background: var(--color-surface-2);
+    border: 1px solid var(--color-border);
+    position: relative;
+    transition: transform var(--transition), background var(--transition);
+}
+
+.md-details-chevron::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 6px;
+    height: 6px;
+    border-right: 1.5px solid var(--color-muted);
+    border-bottom: 1.5px solid var(--color-muted);
+    transform: translate(-60%, -70%) rotate(45deg);
+    transition: border-color var(--transition);
+}
+
+.md-details[open] .md-details-chevron {
+    transform: rotate(180deg);
+    background: rgba(77, 159, 255, 0.1);
+    border-color: rgba(77, 159, 255, 0.3);
+}
+
+.md-details[open] .md-details-chevron::before {
+    border-color: var(--color-accent);
+}
+
+.md-details-content {
+    padding: 0 18px 16px;
+    border-top: 1px solid var(--color-border);
+}
+
+.md-details-content > :first-child {
+    margin-top: 16px;
+}
+
+.md-details-content p {
+    margin-bottom: 12px;
+}
+
+/* Списки внутри раскрывающихся блоков */
+.md-details-content ul,
+.md-details-content ol {
+    margin-bottom: 12px;
+    padding-left: 0;
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.md-details-content ul li,
+.md-details-content ol li {
+    font-size: 14px;
+    color: var(--color-muted);
+    padding-left: 20px;
+    position: relative;
+}
+
+.md-details-content ul li::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 9px;
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: var(--color-accent);
+}
+
+.md-details-content ol {
+    counter-reset: details-list-counter;
+}
+
+.md-details-content ol li {
+    counter-increment: details-list-counter;
+}
+
+.md-details-content ol li::before {
+    content: counter(details-list-counter);
+    position: absolute;
+    left: 0;
+    top: 2px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--color-accent);
+    font-weight: 600;
+}
+
+/* ========================================
+   Вкладки (tabs)
+======================================== */
+.md-tabs {
+    margin: 24px 0;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    overflow: hidden;
+}
+
+.md-tabs-nav {
+    display: flex;
+    gap: 4px;
+    padding: 8px 8px 0;
+    border-bottom: 1px solid var(--color-border);
+    overflow-x: auto;
+    scrollbar-width: none; /* Firefox */
+}
+
+.md-tabs-nav::-webkit-scrollbar {
+    display: none; /* Chrome, Safari, Edge */
+}
+
+.md-tab-btn {
+    font-family: var(--font-body);
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--color-muted);
+    background: none;
+    border: none;
+    padding: 10px 16px;
+    border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: color var(--transition), background var(--transition);
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+}
+
+.md-tab-btn:hover {
+    color: var(--color-text);
+    background: rgba(77, 159, 255, 0.05);
+}
+
+.md-tab-btn.active {
+    color: var(--color-accent);
+    background: rgba(77, 159, 255, 0.08);
+    border-bottom-color: var(--color-accent);
+}
+
+.md-tabs-panels {
+    padding: 20px;
+}
+
+.md-tab-panel {
+    display: none;
+}
+
+.md-tab-panel.active {
+    display: block;
+}
+
+.md-tab-panel > :last-child {
+    margin-bottom: 0;
+}
+
+/* ========================================
+   Пошаговая инструкция (steps)
+   Используем <ul> чтобы избежать конфликта
+   с глобальными стилями .md-content ol
+======================================== */
+.md-steps {
+    margin: 24px 0;
+    padding: 0;
+    list-style: none;
+    counter-reset: step-counter;
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+}
+
+.md-step {
+    position: relative;
+    padding: 0 0 24px 48px;
+    counter-increment: step-counter;
+}
+
+/* Убираем маркер ul который может добавить глобальный стиль */
+.md-content .md-steps > .md-step::before,
+.md-step::before {
+    content: counter(step-counter);
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: rgba(77, 159, 255, 0.12);
+    border: 1px solid rgba(77, 159, 255, 0.35);
+    color: var(--color-accent);
+    font-family: var(--font-mono);
+    font-size: 13px;
+    font-weight: 600;
+    line-height: 32px;
+    text-align: center;
+}
+
+.md-step:not(:last-child)::after {
+    content: '';
+    position: absolute;
+    left: 15px;
+    top: 36px;
+    bottom: 0;
+    width: 2px;
+    background: var(--color-border);
+}
+
+/* Сбрасываем глобальный ul li::before (точка-маркер) */
+.md-content .md-steps > .md-step {
+    padding-left: 48px;
+}
+
+.md-step-title {
+    font-family: var(--font-display);
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--color-text);
+    margin-bottom: 6px;
+    min-height: 32px;
+    display: flex;
+    align-items: center;
+    line-height: 1.3;
+}
+
+.md-step-content {
+    font-size: 14px;
+    color: var(--color-muted);
+}
+
+.md-step-content p {
+    margin-bottom: 8px;
+}
+
+/* ========================================
+   Видео-блок
+======================================== */
+.md-video {
+    margin: 24px 0;
+}
+
+.md-video-wrapper {
+    position: relative;
+    padding-bottom: 56.25%;
+    height: 0;
+    overflow: hidden;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--color-border);
+    background: var(--color-surface);
+}
+
+.md-video-wrapper iframe {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    border: none;
+}
+
+.md-video-caption {
+    margin-top: 10px;
+    font-size: 13px;
+    color: var(--color-muted);
+    text-align: center;
+}
+
+.md-video-error {
+    padding: 16px 20px;
+    background: rgba(255, 70, 70, 0.07);
+    border: 1px solid rgba(255, 70, 70, 0.25);
+    border-radius: var(--radius-md);
+    font-size: 14px;
+}
+
+.md-video-error p {
+    margin-bottom: 8px;
+    color: var(--color-text);
+}
+
+/* ========================================
+   Инлайн-элементы: badge, button, kbd
+======================================== */
+.md-badge {
+    display: inline-flex;
+    align-items: center;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    padding: 2px 8px;
+    border-radius: 100px;
+    vertical-align: middle;
+    margin: 0 2px;
+    border: 1px solid;
+}
+
+.md-badge-default {
+    background: var(--color-surface-2);
+    color: var(--color-muted);
+    border-color: var(--color-border);
+}
+
+.md-badge-new {
+    background: rgba(0, 229, 100, 0.1);
+    color: #00E564;
+    border-color: rgba(0, 229, 100, 0.3);
+}
+
+.md-badge-beta {
+    background: rgba(255, 180, 0, 0.1);
+    color: #FFB400;
+    border-color: rgba(255, 180, 0, 0.3);
+}
+
+.md-badge-deprecated {
+    background: rgba(255, 70, 70, 0.1);
+    color: #FF6B6B;
+    border-color: rgba(255, 70, 70, 0.3);
+}
+
+.md-badge-pro {
+    background: rgba(77, 159, 255, 0.12);
+    color: var(--color-accent);
+    border-color: rgba(77, 159, 255, 0.35);
+}
+
+.md-button {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 18px;
+    margin: 4px 0;
+    border-radius: var(--radius-md);
+    font-size: 14px;
+    font-weight: 600;
+    color: #000 !important;
+    background: var(--color-accent);
+    text-decoration: none !important;
+    transition: background var(--transition), box-shadow var(--transition);
+}
+
+.md-button:hover {
+    background: var(--color-cyan);
+    box-shadow: 0 0 16px rgba(0, 229, 255, 0.25);
+    color: #000 !important;
+}
+
+.md-kbd {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 24px;
+    height: 24px;
+    padding: 0 7px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--color-text);
+    background: var(--color-surface-2);
+    border: 1px solid var(--color-border);
+    border-bottom-width: 2px;
+    border-radius: 5px;
+    box-shadow: 0 1px 0 rgba(0, 0, 0, 0.3);
+    vertical-align: middle;
+}
+
+.md-kbd-sep {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--color-muted-2);
+    margin: 0 3px;
+    vertical-align: middle;
+}
+
+/* ========================================
    Индикатор загрузки
 ======================================== */
 .loading-state {

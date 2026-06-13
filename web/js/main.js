@@ -26,6 +26,7 @@ function initPage() {
     // Инициализируем общие компоненты для всех страниц
     initCopyButtons();
     initTocHighlight();
+    initMdComponents();
 }
 
 /* ========================================
@@ -212,6 +213,7 @@ async function loadAndRenderPlugin(mdFile) {
         if (contentEl) {
             contentEl.innerHTML = renderMarkdown(content);
             contentEl.classList.add('md-content');
+            initMdComponents(contentEl);
         }
 
         // Заполняем боковую панель
@@ -367,36 +369,60 @@ function renderMarkdown(markdown) {
     });
 
     // --- Специальные блоки нашего синтаксиса ---
+    // Сохраняем их в заглушки, чтобы applyStandardMarkdown не обернул
+    // внутренние строки в лишние <p>-теги
+
+    const blockSlots = [];
+    const saveBlock = (html) => {
+        const idx = blockSlots.length;
+        blockSlots.push(html);
+        return `%%BLOCK_${idx}%%`;
+    };
+
+    // Раскрывающийся блок (развёрнут по умолчанию): ::::details-open
+    html = html.replace(/::::details-open\n([\s\S]*?)::::/g, (_, content) => {
+        return saveBlock(renderDetailsBlock(content, true));
+    });
+
+    // Раскрывающийся блок (свёрнут по умолчанию): ::::details
+    html = html.replace(/::::details\n([\s\S]*?)::::/g, (_, content) => {
+        return saveBlock(renderDetailsBlock(content, false));
+    });
+
+    // Вкладки: ::::tabs
+    html = html.replace(/::::tabs\n([\s\S]*?)::::/g, (_, content) => {
+        return saveBlock(renderTabsBlock(content));
+    });
+
+    // Пошаговая инструкция: ::::steps
+    html = html.replace(/::::steps\n([\s\S]*?)::::/g, (_, content) => {
+        return saveBlock(renderStepsBlock(content));
+    });
+
+    // Видео: ::::video
+    html = html.replace(/::::video\n([\s\S]*?)::::/g, (_, content) => {
+        return saveBlock(renderVideoBlock(content));
+    });
 
     // Callout блоки: :::[type] текст :::
     html = html.replace(/:::(info|warning|danger|tip)\n([\s\S]*?):::/g, (_, type, content) => {
         const icons = { info: 'ℹ️', warning: '⚠️', danger: '🚫', tip: '💡' };
         const icon = icons[type] || 'ℹ️';
-        return `<div class="callout callout-${type}">
-            <span class="callout-icon">${icon}</span>
-            <div class="callout-content"><p>${content.trim()}</p></div>
-        </div>`;
+        return saveBlock(`<div class="callout callout-${type}"><span class="callout-icon">${icon}</span><div class="callout-content">${renderInlineContent(content.trim())}</div></div>`);
     });
 
-    // Сетка фич: ::::features ... :::: с пунктами ### Иконка Название / описание
+    // Сетка фич: ::::features ... ::::
     html = html.replace(/::::features\n([\s\S]*?)::::/g, (_, content) => {
         const items = content.trim().split(/\n(?=###)/).map(block => {
             const lines = block.trim().split('\n');
             const header = lines[0].replace(/^###\s*/, '');
-            // Первый символ — иконка, остальное — название
             const iconMatch = header.match(/^(\S+)\s+(.*)/);
             const icon = iconMatch ? iconMatch[1] : '●';
             const title = iconMatch ? iconMatch[2] : header;
             const text = lines.slice(1).join(' ').trim();
-
-            return `<div class="feature-item">
-                <div class="feature-icon">${icon}</div>
-                <div class="feature-title">${escapeHtml(title)}</div>
-                <div class="feature-text">${escapeHtml(text)}</div>
-            </div>`;
+            return `<div class="feature-item"><div class="feature-icon">${icon}</div><div class="feature-title">${escapeHtml(title)}</div><div class="feature-text">${escapeHtml(text)}</div></div>`;
         });
-
-        return `<div class="feature-grid">${items.join('')}</div>`;
+        return saveBlock(`<div class="feature-grid">${items.join('')}</div>`);
     });
 
     // Блок changelog: ::::changelog ... ::::
@@ -409,22 +435,198 @@ function renderMarkdown(markdown) {
                 .filter(l => l.trim().startsWith('-'))
                 .map(l => `<div>• ${escapeHtml(l.replace(/^-\s*/, ''))}</div>`)
                 .join('');
-
-            return `<div class="changelog-entry">
-                <div class="changelog-version">${escapeHtml(version || '')}</div>
-                <div>
-                    <div class="changelog-date">${escapeHtml(date || '')}</div>
-                    <div class="changelog-items">${items}</div>
-                </div>
-            </div>`;
+            return `<div class="changelog-entry"><div class="changelog-version">${escapeHtml(version || '')}</div><div><div class="changelog-date">${escapeHtml(date || '')}</div><div class="changelog-items">${items}</div></div></div>`;
         });
-
-        return `<div class="changelog">${entries.join('')}</div>`;
+        return saveBlock(`<div class="changelog">${entries.join('')}</div>`);
     });
 
     // --- Стандартный Markdown ---
 
-    // Заголовки (от h4 до h1, порядок важен)
+    html = applyStandardMarkdown(html);
+
+    // Восстанавливаем сохранённые блоки кода
+    codeBlocks.forEach((block, idx) => {
+        html = html.replace(`%%CODEBLOCK_${idx}%%`, block);
+    });
+
+    inlineCodes.forEach((code, idx) => {
+        html = html.replace(`%%INLINE_${idx}%%`, code);
+    });
+
+    // Восстанавливаем спецблоки
+    blockSlots.forEach((block, idx) => {
+        html = html.replace(`%%BLOCK_${idx}%%`, block);
+    });
+
+    // Инлайн-элементы: badge, button, kbd
+    html = renderInlineSyntax(html);
+
+    return html;
+}
+
+// Раскрывающийся блок: первая строка — заголовок, остальное — содержимое
+function renderDetailsBlock(content, isOpen) {
+    const lines = content.trim().split('\n');
+    const title = lines[0] || 'Подробнее';
+    const body = lines.slice(1).join('\n').trim();
+    const openAttr = isOpen ? ' open' : '';
+
+    return `<details class="md-details${isOpen ? ' md-details-open' : ''}"${openAttr}>
+        <summary class="md-details-summary">
+            <span class="md-details-title">${escapeHtml(title)}</span>
+            <span class="md-details-chevron" aria-hidden="true"></span>
+        </summary>
+        <div class="md-details-content">${renderInlineContent(body)}</div>
+    </details>`;
+}
+
+// Вкладки: каждая секция начинается с ### Название
+function renderTabsBlock(content) {
+    const tabs = content.trim().split(/\n(?=###)/).filter(Boolean).map((block, index) => {
+        const lines = block.trim().split('\n');
+        const title = lines[0].replace(/^###\s*/, '');
+        const body = lines.slice(1).join('\n').trim();
+        const activeClass = index === 0 ? ' active' : '';
+
+        return {
+            title: escapeHtml(title),
+            nav: `<button type="button" class="md-tab-btn${activeClass}" data-tab="${index}" role="tab" aria-selected="${index === 0}">${escapeHtml(title)}</button>`,
+            panel: `<div class="md-tab-panel${activeClass}" data-tab="${index}" role="tabpanel">${renderInlineContent(body)}</div>`
+        };
+    });
+
+    return `<div class="md-tabs">
+        <div class="md-tabs-nav" role="tablist">${tabs.map(t => t.nav).join('')}</div>
+        <div class="md-tabs-panels">${tabs.map(t => t.panel).join('')}</div>
+    </div>`;
+}
+
+// Пошаговая инструкция
+function renderStepsBlock(content) {
+    const steps = content.trim().split(/\n(?=###)/).filter(Boolean).map(block => {
+        const lines = block.trim().split('\n');
+        const title = lines[0].replace(/^###\s*/, '');
+        const body = lines.slice(1).join('\n').trim();
+
+        return `<li class="md-step">
+            <div class="md-step-title">${escapeHtml(title)}</div>
+            <div class="md-step-content">${renderInlineContent(body)}</div>
+        </li>`;
+    });
+
+    return `<ul class="md-steps">${steps.join('')}</ul>`;
+}
+
+// Видео-блок: первая строка — URL, вторая (опционально) — подпись
+function renderVideoBlock(content) {
+    const lines = content.trim().split('\n').filter(Boolean);
+    const url = lines[0] || '';
+    const caption = lines[1] || '';
+    const embedUrl = getVideoEmbedUrl(url);
+
+    if (!embedUrl) {
+        return `<div class="md-video md-video-error">
+            <p>Не удалось встроить видео. Проверьте URL.</p>
+            <a href="${escapeHtml(url)}" target="_blank" rel="noopener">${escapeHtml(url)}</a>
+        </div>`;
+    }
+
+    const captionHtml = caption
+        ? `<figcaption class="md-video-caption">${escapeHtml(caption)}</figcaption>`
+        : '';
+
+    return `<figure class="md-video">
+        <div class="md-video-wrapper">
+            <iframe src="${escapeHtml(embedUrl)}" title="${escapeHtml(caption || 'Видео')}" loading="lazy" allowfullscreen allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"></iframe>
+        </div>
+        ${captionHtml}
+    </figure>`;
+}
+
+// YouTube / Vimeo → embed URL
+function getVideoEmbedUrl(url) {
+    const youtubeMatch = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([\w-]+)/);
+    if (youtubeMatch) {
+        return `https://www.youtube.com/embed/${youtubeMatch[1]}`;
+    }
+
+    const vimeoMatch = url.match(/vimeo\.com\/(\d+)/);
+    if (vimeoMatch) {
+        return `https://player.vimeo.com/video/${vimeoMatch[1]}`;
+    }
+
+    return null;
+}
+
+// Упрощённый Markdown для содержимого внутри блоков
+function renderInlineContent(text) {
+    if (!text) return '';
+
+    let html = text;
+
+    // Сохраняем блоки кода
+    const codeBlocks = [];
+    html = html.replace(/```([\w]*)\n([\s\S]*?)```/g, (_, lang, code) => {
+        const idx = codeBlocks.length;
+        codeBlocks.push(`<pre><code class="language-${lang}">${escapeHtml(code.trimEnd())}</code></pre>`);
+        return `%%CODEBLOCK_${idx}%%`;
+    });
+    const inlineCodes = [];
+    html = html.replace(/`([^`]+)`/g, (_, code) => {
+        const idx = inlineCodes.length;
+        inlineCodes.push(`<code>${escapeHtml(code)}</code>`);
+        return `%%INLINE_${idx}%%`;
+    });
+
+    // Вложенные спец-блоки
+    html = html.replace(/::::tabs\n([\s\S]*?)::::/g, (_, content) => renderTabsBlock(content));
+    html = html.replace(/::::steps\n([\s\S]*?)::::/g, (_, content) => renderStepsBlock(content));
+    html = html.replace(/::::details-open\n([\s\S]*?)::::/g, (_, content) => renderDetailsBlock(content, true));
+    html = html.replace(/::::details\n([\s\S]*?)::::/g, (_, content) => renderDetailsBlock(content, false));
+    html = html.replace(/:::(info|warning|danger|tip)\n([\s\S]*?):::/g, (_, type, content) => {
+        const icons = { info: 'ℹ️', warning: '⚠️', danger: '🚫', tip: '💡' };
+        return `<div class="callout callout-${type}"><span class="callout-icon">${icons[type]}</span><div class="callout-content">${renderInlineContent(content.trim())}</div></div>`;
+    });
+
+    html = html.replace(/^####\s+(.+)$/gm, '<h4>$1</h4>');
+    html = html.replace(/^###\s+(.+)$/gm, '<h4>$1</h4>');
+    html = html.replace(/^##\s+(.+)$/gm, '<h4>$1</h4>');
+    html = html.replace(/^---$/gm, '<hr>');
+    html = html.replace(/\*\*\*(.+?)\*\*\*/g, '<strong><em>$1</em></strong>');
+    html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+    html = html.replace(/\*(.+?)\*/g, '<em>$1</em>');
+    html = html.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, '<img src="$2" alt="$1" loading="lazy">');
+    html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2">$1</a>');
+    html = html.replace(/^>\s+(.+)$/gm, '<blockquote><p>$1</p></blockquote>');
+    html = html.replace(/^(\s*[-*+]\s+.+\n?)+/gm, match => {
+        const items = match.trim().split('\n')
+            .filter(l => l.trim())
+            .map(l => `<li>${l.replace(/^\s*[-*+]\s+/, '')}</li>`)
+            .join('');
+        return `<ul>${items}</ul>`;
+    });
+    html = html.replace(/^(\s*\d+\.\s+.+\n?)+/gm, match => {
+        const items = match.trim().split('\n')
+            .filter(l => l.trim())
+            .map(l => `<li>${l.replace(/^\s*\d+\.\s+/, '')}</li>`)
+            .join('');
+        return `<ol>${items}</ol>`;
+    });
+    html = html.replace(/^(?!<[a-z\/]|%%)(.*\S.*)$/gm, '<p>$1</p>');
+
+    // Восстанавливаем блоки кода
+    codeBlocks.forEach((block, idx) => {
+        html = html.replace(`%%CODEBLOCK_${idx}%%`, block);
+    });
+    inlineCodes.forEach((code, idx) => {
+        html = html.replace(`%%INLINE_${idx}%%`, code);
+    });
+
+    return renderInlineSyntax(html);
+}
+
+// Стандартный Markdown (заголовки, списки, таблицы и т.д.)
+function applyStandardMarkdown(html) {
     html = html.replace(/^####\s+(.+)$/gm, '<h4>$1</h4>');
     html = html.replace(/^###\s+(.+)$/gm, '<h3>$1</h3>');
     html = html.replace(/^##\s+(.+)$/gm, '<h2>$1</h2>');
@@ -469,13 +671,33 @@ function renderMarkdown(markdown) {
     // Параграфы: оборачиваем строки текста не обёрнутые в теги
     html = html.replace(/^(?!<[a-z\/]|%%)(.*\S.*)$/gm, '<p>$1</p>');
 
-    // Восстанавливаем сохранённые блоки кода
-    codeBlocks.forEach((block, idx) => {
-        html = html.replace(`%%CODEBLOCK_${idx}%%`, block);
+    return html;
+}
+
+// Инлайн-синтаксис: [[badge:...]], [[button:...]], [[kbd:...]]
+function renderInlineSyntax(html) {
+    // Бейдж: [[badge:тип|текст]] или [[badge:текст]]
+    html = html.replace(/\[\[badge:([^\]]+)\]\]/g, (_, raw) => {
+        const parts = raw.split('|');
+        const type = parts.length > 1 ? parts[0].trim() : 'default';
+        const text = parts.length > 1 ? parts.slice(1).join('|').trim() : parts[0].trim();
+        const safeType = escapeHtml(type).toLowerCase().replace(/[^a-z0-9-]/g, '');
+        return `<span class="md-badge md-badge-${safeType || 'default'}">${escapeHtml(text)}</span>`;
     });
 
-    inlineCodes.forEach((code, idx) => {
-        html = html.replace(`%%INLINE_${idx}%%`, code);
+    // Кнопка-ссылка: [[button:Текст|url]]
+    html = html.replace(/\[\[button:([^\]|]+)\|([^\]]+)\]\]/g, (_, label, url) => {
+        return `<a href="${escapeHtml(url.trim())}" class="md-button" target="_blank" rel="noopener">${escapeHtml(label.trim())}</a>`;
+    });
+
+    // Клавиши: [[kbd:Ctrl+Shift+S]]
+    html = html.replace(/\[\[kbd:([^\]]+)\]\]/g, (_, keys) => {
+        const parts = keys.split('+').map(k => k.trim()).filter(Boolean);
+        return parts.map((key, i) => {
+            const kbd = `<kbd class="md-kbd">${escapeHtml(key)}</kbd>`;
+            const sep = i < parts.length - 1 ? '<span class="md-kbd-sep">+</span>' : '';
+            return kbd + sep;
+        }).join('');
     });
 
     return html;
@@ -535,6 +757,47 @@ function initTocHighlight() {
     }, { rootMargin: '-20% 0px -60% 0px' });
 
     sections.forEach(section => observer.observe(section));
+}
+
+/* ========================================
+   Интерактивные MD-компоненты (вкладки и т.д.)
+======================================== */
+
+function initMdComponents(root = document) {
+    initMdTabs(root);
+    // Инициализируем кнопки копирования внутри динамически загруженного контента
+    root.querySelectorAll('.copy-btn').forEach(btn => {
+        if (!btn.dataset.initialized) {
+            btn.dataset.initialized = 'true';
+            btn.addEventListener('click', handleCopyClick);
+        }
+    });
+}
+
+function initMdTabs(root) {
+    root.querySelectorAll('.md-tabs').forEach(tabsEl => {
+        if (tabsEl.dataset.initialized) return;
+        tabsEl.dataset.initialized = 'true';
+
+        const buttons = tabsEl.querySelectorAll('.md-tab-btn');
+        const panels = tabsEl.querySelectorAll('.md-tab-panel');
+
+        buttons.forEach(btn => {
+            btn.addEventListener('click', () => {
+                const tabId = btn.dataset.tab;
+
+                buttons.forEach(b => {
+                    const isActive = b.dataset.tab === tabId;
+                    b.classList.toggle('active', isActive);
+                    b.setAttribute('aria-selected', isActive);
+                });
+
+                panels.forEach(panel => {
+                    panel.classList.toggle('active', panel.dataset.tab === tabId);
+                });
+            });
+        });
+    });
 }
 
 /* ========================================

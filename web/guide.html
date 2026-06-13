@@ -36,7 +36,7 @@
                 </h1>
                 <p class="hero-description">
                     Полное руководство по заполнению Markdown-файлов для страниц плагинов.
-                    Frontmatter, специальные блоки и примеры.
+                    Frontmatter, специальные блоки, раскрывающиеся секции, вкладки и инлайн-элементы.
                 </p>
             </section>
 
@@ -53,6 +53,11 @@
                         <li><a href="#optional-fields">Необязательные поля</a></li>
                         <li><a href="#markdown-basics">Базовый Markdown</a></li>
                         <li><a href="#callouts">Блоки callout</a></li>
+                        <li><a href="#details">Раскрывающиеся блоки</a></li>
+                        <li><a href="#tabs">Вкладки</a></li>
+                        <li><a href="#steps">Пошаговые инструкции</a></li>
+                        <li><a href="#video">Видео</a></li>
+                        <li><a href="#inline-elements">Инлайн-элементы</a></li>
                         <li><a href="#features">Сетка фич</a></li>
                         <li><a href="#changelog">История изменений</a></li>
                         <li><a href="#tables">Таблицы</a></li>
@@ -370,6 +375,224 @@ def main():
 Совет. Используй для лайфхаков и рекомендаций.
 :::</code></pre>
                         </div>
+
+                        <!-- Превью callout -->
+                        <div class="callout callout-info" style="margin-top: 16px;">
+                            <span class="callout-icon">ℹ️</span>
+                            <div class="callout-content"><p>Так выглядит info-блок на странице плагина.</p></div>
+                        </div>
+                    </section>
+
+                    <!-- Раскрывающиеся блоки -->
+                    <section id="details">
+                        <h2>Раскрывающиеся блоки</h2>
+                        <p>
+                            Два типа сворачиваемых секций: <strong>развёрнутый</strong> по умолчанию и <strong>свёрнутый</strong>.
+                            Первая строка — заголовок, остальное — содержимое (поддерживается базовый Markdown).
+                        </p>
+
+                        <h3>Развёрнутый по умолчанию</h3>
+                        <div class="code-example">
+                            <div class="code-example-header">
+                                <span class="code-example-label">Синтаксис ::::details-open</span>
+                                <button class="copy-btn">Копировать</button>
+                            </div>
+                            <pre><code>::::details-open
+Расширенные настройки
+Здесь можно описать продвинутые параметры плагина.
+- Пункт первый
+- Пункт второй
+::::</code></pre>
+                        </div>
+
+                        <details class="md-details md-details-open" open>
+                            <summary class="md-details-summary">
+                                <span class="md-details-title">Расширенные настройки</span>
+                                <span class="md-details-chevron" aria-hidden="true"></span>
+                            </summary>
+                            <div class="md-details-content">
+                                <p>Так выглядит развёрнутый блок. Пользователь может свернуть его кликом по заголовку.</p>
+                            </div>
+                        </details>
+
+                        <h3>Свёрнутый по умолчанию</h3>
+                        <div class="code-example">
+                            <div class="code-example-header">
+                                <span class="code-example-label">Синтаксис ::::details</span>
+                                <button class="copy-btn">Копировать</button>
+                            </div>
+                            <pre><code>::::details
+Часто задаваемые вопросы
+**Работает ли плагин с Redshift?**
+Да, полностью совместим с Redshift и Arnold.
+
+**Нужен ли интернет?**
+Нет, плагин работает офлайн.
+::::</code></pre>
+                        </div>
+
+                        <details class="md-details">
+                            <summary class="md-details-summary">
+                                <span class="md-details-title">Часто задаваемые вопросы</span>
+                                <span class="md-details-chevron" aria-hidden="true"></span>
+                            </summary>
+                            <div class="md-details-content">
+                                <p>Так выглядит свёрнутый блок — по умолчанию содержимое скрыто.</p>
+                            </div>
+                        </details>
+                    </section>
+
+                    <!-- Вкладки -->
+                    <section id="tabs">
+                        <h2>Вкладки</h2>
+                        <p>
+                            Для контента с вариантами (Windows / macOS, разные режимы и т.д.).
+                            Каждая вкладка начинается с <code>###</code> и названия.
+                        </p>
+
+                        <div class="code-example">
+                            <div class="code-example-header">
+                                <span class="code-example-label">Синтаксис ::::tabs</span>
+                                <button class="copy-btn">Копировать</button>
+                            </div>
+                            <pre><code>::::tabs
+### Windows
+1. Скачай архив `.zip`
+2. Распакуй в `%APPDATA%\Maxon\Cinema 4D\plugins`
+
+### macOS
+1. Скачай архив `.dmg`
+2. Скопируй плагин в `~/Library/Preferences/MAXON/Cinema 4D/plugins`
+::::</code></pre>
+                        </div>
+
+                        <div class="md-tabs">
+                            <div class="md-tabs-nav" role="tablist">
+                                <button type="button" class="md-tab-btn active" data-tab="0" role="tab" aria-selected="true">Windows</button>
+                                <button type="button" class="md-tab-btn" data-tab="1" role="tab" aria-selected="false">macOS</button>
+                            </div>
+                            <div class="md-tabs-panels">
+                                <div class="md-tab-panel active" data-tab="0" role="tabpanel">
+                                    <p>Инструкция для Windows — пример отображения вкладок.</p>
+                                </div>
+                                <div class="md-tab-panel" data-tab="1" role="tabpanel">
+                                    <p>Инструкция для macOS — пример отображения вкладок.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- Пошаговые инструкции -->
+                    <section id="steps">
+                        <h2>Пошаговые инструкции</h2>
+                        <p>
+                            Визуальная нумерация шагов для установки, настройки и т.д.
+                            Каждый шаг — <code>###</code> с названием, следующие строки — описание.
+                        </p>
+
+                        <div class="code-example">
+                            <div class="code-example-header">
+                                <span class="code-example-label">Синтаксис ::::steps</span>
+                                <button class="copy-btn">Копировать</button>
+                            </div>
+                            <pre><code>::::steps
+### Скачай плагин
+Нажми кнопку «Скачать» вверху страницы или используй [[button:Скачать|https://example.com/download]].
+
+### Установи в Cinema 4D
+Распакуй архив в папку `plugins` и перезапусти программу.
+
+### Открой плагин
+Перейди в меню **Extensions → My Plugin**.
+::::</code></pre>
+                        </div>
+
+                        <ul class="md-steps"><li class="md-step">
+                            <p>            </p><div class="md-step-title">Скачай плагин</div><p></p>
+                            <p>            </p><div class="md-step-content"><p>Нажми кнопку «Скачать» вверху страницы или используй <a href="https://example.com/download" class="md-button" target="_blank" rel="noopener">Скачать</a>.</p></div><p></p>
+                            <p>        </p></li><li class="md-step"><p></p>
+                            <p>            </p><div class="md-step-title">Установи в Cinema 4D</div><p></p>
+                            <p>            </p><div class="md-step-content"><p>Распакуй архив в папку <code>plugins</code> и перезапусти программу.</p></div><p></p>
+                            <p>        </p></li><li class="md-step"><p></p>
+                            <p>            </p><div class="md-step-title">Открой плагин</div><p></p>
+                            <p>            </p><div class="md-step-content"><p>Перейди в меню <strong>Extensions → My Plugin</strong>.</p></div><p></p>
+                            <p>        </p></li></ul>
+                    </section>
+
+                    <!-- Видео -->
+                    <section id="video">
+                        <h2>Видео</h2>
+                        <p>
+                            Встраивание видео с YouTube или Vimeo. Первая строка — URL,
+                            вторая (необязательно) — подпись под видео.
+                        </p>
+
+                        <div class="code-example">
+                            <div class="code-example-header">
+                                <span class="code-example-label">Синтаксис ::::video</span>
+                                <button class="copy-btn">Копировать</button>
+                            </div>
+                            <pre><code>::::video
+https://www.youtube.com/watch?v=dQw4w9WgXcQ
+Демонстрация работы плагина
+::::</code></pre>
+                        </div>
+
+                        <p>Поддерживаются форматы URL: <code>youtube.com/watch?v=</code>, <code>youtu.be/</code>, <code>vimeo.com/</code>.</p>
+                    </section>
+
+                    <!-- Инлайн-элементы -->
+                    <section id="inline-elements">
+                        <h2>Инлайн-элементы</h2>
+                        <p>Специальные элементы внутри текста — бейджи, кнопки и клавиши.</p>
+
+                        <h3>Бейджи</h3>
+                        <p>Метки статуса: <code>[[badge:текст]]</code> или <code>[[badge:тип|текст]]</code>.</p>
+                        <p>
+                            Типы: <code>new</code>, <code>beta</code>, <code>deprecated</code>, <code>pro</code>, <code>default</code>.
+                        </p>
+                        <div class="code-example">
+                            <div class="code-example-header">
+                                <span class="code-example-label">Синтаксис badge</span>
+                                <button class="copy-btn">Копировать</button>
+                            </div>
+                            <pre><code>Функция доступна [[badge:new|Новое]] в версии 2.0.
+Режим [[badge:beta|Beta]] может содержать ошибки.
+Старый API [[badge:deprecated|Устарело]] — используй новый.</code></pre>
+                        </div>
+                        <p>
+                            Превью:
+                            <span class="md-badge md-badge-new">Новое</span>
+                            <span class="md-badge md-badge-beta">Beta</span>
+                            <span class="md-badge md-badge-deprecated">Устарело</span>
+                            <span class="md-badge md-badge-pro">Pro</span>
+                        </p>
+
+                        <h3>Кнопки-ссылки</h3>
+                        <p>Выделенная кнопка в тексте: <code>[[button:Текст|url]]</code></p>
+                        <div class="code-example">
+                            <div class="code-example-header">
+                                <span class="code-example-label">Синтаксис button</span>
+                                <button class="copy-btn">Копировать</button>
+                            </div>
+                            <pre><code>Скачай документацию: [[button:PDF-руководство|https://example.com/manual.pdf]]</code></pre>
+                        </div>
+                        <p>Превью: <a href="#" class="md-button" onclick="return false">PDF-руководство</a></p>
+
+                        <h3>Клавиши</h3>
+                        <p>Отображение сочетаний клавиш: <code>[[kbd:Ctrl+Shift+S]]</code></p>
+                        <div class="code-example">
+                            <div class="code-example-header">
+                                <span class="code-example-label">Синтаксис kbd</span>
+                                <button class="copy-btn">Копировать</button>
+                            </div>
+                            <pre><code>Быстрый запуск: [[kbd:Ctrl+Shift+P]]
+Сохранить сцену: [[kbd:Ctrl+S]]</code></pre>
+                        </div>
+                        <p>
+                            Превью:
+                            <kbd class="md-kbd">Ctrl</kbd><span class="md-kbd-sep">+</span><kbd class="md-kbd">Shift</kbd><span class="md-kbd-sep">+</span><kbd class="md-kbd">P</kbd>
+                        </p>
                     </section>
 
                     <!-- Сетка фич -->
@@ -499,9 +722,24 @@ github: https://github.com/user/repo
 
 ## Установка
 
-1. Скачай архив с плагином
-2. Распакуй в папку `plugins` Cinema 4D
-3. Перезапусти Cinema 4D
+::::steps
+### Скачай архив
+Нажми кнопку «Скачать» вверху страницы.
+
+### Распакуй в папку plugins
+Путь: `C:\Users\<имя>\AppData\Roaming\Maxon\Cinema 4D\plugins`
+
+### Перезапусти Cinema 4D
+Плагин появится в меню Extensions.
+::::
+
+::::tabs
+### Windows
+Стандартная установка через папку `%APPDATA%\Maxon`.
+
+### macOS
+Установка в `~/Library/Preferences/MAXON/Cinema 4D/plugins`.
+::::
 
 :::info
 Папка plugins обычно находится по адресу: `C:\Users\<имя>\AppData\Roaming\Maxon\Cinema 4D\plugins`
@@ -510,6 +748,19 @@ github: https://github.com/user/repo
 ## Использование
 
 Описание того, как использовать плагин после установки.
+Горячая клавиша: [[kbd:Ctrl+Shift+P]]
+
+::::details
+Дополнительные параметры
+Здесь можно описать редко используемые настройки.
+::::
+
+::::details-open
+Быстрый старт
+1. Выбери объект в сцене
+2. Открой плагин из меню
+3. Нажми **Apply**
+::::
 
 ## Параметры
 
