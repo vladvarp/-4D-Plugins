@@ -9,7 +9,7 @@ from c4d import gui
 import webbrowser
 
 PLUGIN_ID   = 1068833
-VERS = 'v2.28.0'
+VERS = 'v2.28.1'
 LABLE =  'VAr Tools'
 PLUGIN_NAME = "About"
 PLUGIN_HELP = "Информация о наборе плагинов VAr Tools"

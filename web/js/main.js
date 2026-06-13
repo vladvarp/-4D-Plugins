@@ -47,7 +47,7 @@ function initIndexPage() {
             description: 'Набор утилит для Cinema 4D, созданных для ускорения повседневной работы.',
             icon: '✦',
             tags: ['Моделирование', 'Процедурный', 'Автоматизация'],
-            version: 'v2.28.0',
+            version: 'v2.28.1',
             mdFile: 'plugins/VAr_Tools.md'
         },
         {

@@ -14,11 +14,42 @@ PLUGIN_ID_CMD = 1068859   # CommandData — кнопка меню
 PLUGIN_ID_TAG = 1068860   # TagData     — Expression-тег
 
 PLUGIN_NAME_CMD   = "Target Camera"
-PLUGIN_NAME_CMD_V = "Target Camera v1.8"
+PLUGIN_NAME_CMD_V = "Target Camera v1.9"
 PLUGIN_NAME_TAG   = "TargetCam Controller"
 
 # Ключ ссылки на таргет в BaseContainer тега
 TAG_LINK_TARGET = 1000
+
+
+def _has_lock_tag(obj):
+    """True если на объекте есть тег блокировки (Protection)."""
+    if obj is None or not obj.IsAlive():
+        return False
+    tag = obj.GetFirstTag()
+    while tag:
+        if tag.GetType() == c4d.Tprotection:
+            return True
+        tag = tag.GetNext()
+    return False
+
+
+def _set_lock_tag(obj, locked):
+    """Добавляет или снимает тег блокировки (Protection) с объекта."""
+    if obj is None or not obj.IsAlive():
+        return
+    doc = obj.GetDocument()
+    if locked:
+        if not _has_lock_tag(obj):
+            obj.MakeTag(c4d.Tprotection)
+    else:
+        tag = obj.GetFirstTag()
+        while tag:
+            nxt = tag.GetNext()
+            if tag.GetType() == c4d.Tprotection:
+                tag.Remove()
+            tag = nxt
+    if doc:
+        doc.SetChanged()
 
 
 def look_at_matrix(cam_mg, target_pos):
@@ -107,6 +138,7 @@ class TargetCamTag(c4d.plugins.TagData):
             new_target.SetMg(mg)
             tag[TAG_LINK_TARGET] = new_target
             self._prev_dist = None
+            _set_lock_tag(new_target, _has_lock_tag(cam))
             c4d.EventAdd()
             return c4d.EXECUTIONRESULT_OK
 
@@ -115,6 +147,11 @@ class TargetCamTag(c4d.plugins.TagData):
         if target.GetName() != expected:
             target.SetName(expected)
             c4d.EventAdd()
+
+        # ── Синхронизация блокировки: камера → таргет ─────────────────────────
+        cam_locked = _has_lock_tag(cam)
+        if cam_locked != _has_lock_tag(target):
+            _set_lock_tag(target, cam_locked)
 
         # ── LookAt ────────────────────────────────────────────────────────────
         new_mg = look_at_matrix(cam.GetMg(), target.GetMg().off)
