@@ -734,7 +734,7 @@ class MainWindow(QMainWindow):
         self.table.setColumnWidth(1, 90)  # Текущая
         self.table.setColumnWidth(2, 90)  # Актуальная
         self.table.setColumnWidth(3, 125)  # Статус
-        self.table.setColumnWidth(4, 120)  # Установить / Обновить
+        self.table.setColumnWidth(4, 145)  # Установить / Обновить / Переустановить
         self.table.setColumnWidth(5, 115)  # Удалить
         self.table.verticalHeader().setVisible(False)
         self.table.verticalHeader().setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
@@ -1455,10 +1455,45 @@ class MainWindow(QMainWindow):
             if ok:
                 self.table.item(row, 1).setText(info)
                 self.table.item(row, 1).setForeground(QColor(TEXT))
-                self.table.item(row, 3).setText("✓ Актуально")
-                self.table.item(row, 3).setForeground(QColor(GREEN))
-                # Убрать кнопку «Установить»/«Обновить» — плагин теперь актуален
-                self.table.removeCellWidget(row, 4)
+
+                # Определяем remote_ver этого плагина чтобы показать корректный статус
+                plugin_remote_ver = None
+                for ae in self.remote_authors:
+                    for pp in ae["plugins"]:
+                        if pp["name"] == name:
+                            plugin_remote_ver = pp.get("remote_ver")
+                            break
+
+                if plugin_remote_ver == "not_found":
+                    # Версия в репо не указана — показываем «Установлен» и кнопку «Переустановить»
+                    self.table.item(row, 3).setText("Установлен")
+                    self.table.item(row, 3).setForeground(QColor(DIM))
+                    captured_plugin_ref = None
+                    for ae in self.remote_authors:
+                        for pp in ae["plugins"]:
+                            if pp["name"] == name:
+                                captured_plugin_ref = dict(pp)
+                                break
+                    if captured_plugin_ref:
+                        reinstall_btn = QPushButton("Переустановить")
+                        reinstall_btn.setObjectName("update")
+                        reinstall_btn.setFixedHeight(28)
+                        reinstall_btn.clicked.connect(lambda _, pl=captured_plugin_ref: self._install_single(pl))
+                        aw = QWidget()
+                        aw.setStyleSheet("background:transparent;")
+                        al = QHBoxLayout(aw)
+                        al.setContentsMargins(6, 0, 6, 0)
+                        al.addWidget(reinstall_btn)
+                        self.table.setCellWidget(row, 4, aw)
+                    else:
+                        self.table.removeCellWidget(row, 4)
+                else:
+                    # Версия известна — плагин актуален, убираем кнопку действия
+                    self.table.item(row, 3).setText("✓ Актуально")
+                    self.table.item(row, 3).setForeground(QColor(GREEN))
+                    # Убрать кнопку «Установить»/«Обновить» — плагин теперь актуален
+                    self.table.removeCellWidget(row, 4)
+
                 # Поставить кнопку «Удалить» (если её ещё нет)
                 captured_name = name
                 del_btn = QPushButton("Удалить")
