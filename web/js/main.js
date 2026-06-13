@@ -598,6 +598,7 @@ function renderInlineContent(text) {
     html = html.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, '<img src="$2" alt="$1" loading="lazy">');
     html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2">$1</a>');
     html = html.replace(/^>\s+(.+)$/gm, '<blockquote><p>$1</p></blockquote>');
+    html = renderMarkdownTables(html);
     html = html.replace(/^(\s*[-*+]\s+.+\n?)+/gm, match => {
         const items = match.trim().split('\n')
             .filter(l => l.trim())
