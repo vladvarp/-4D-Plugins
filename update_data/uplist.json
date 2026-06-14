@@ -32,6 +32,47 @@
           "info_url": "https://vladvarp.github.io/-4D-Plugins/web/plugin.html?md=plugins%2Fsnapshot.md"
         }
       ]
+    },
+    {
+      "name": "test",
+      "expanded": true,
+      "plugins": [
+        {
+          "name": "",
+          "url": "https://github.com/vladvarp/-4D-Plugins/tree/main/Plugins/1",
+          "info": "ver_NV",
+          "info_url": "",
+          "version": ""
+        },
+        {
+          "name": "json",
+          "url": "https://github.com/vladvarp/-4D-Plugins/tree/main/Plugins/2",
+          "info": "ver_V-json_N",
+          "info_url": "",
+          "version": ""
+        },
+        {
+          "name": "json",
+          "url": "https://github.com/vladvarp/-4D-Plugins/tree/main/Plugins/3",
+          "info": "ver_0-json_N",
+          "info_url": "",
+          "version": ""
+        },
+        {
+          "name": "json",
+          "url": "https://github.com/vladvarp/-4D-Plugins/tree/main/Plugins/4",
+          "info": "ver_NV-json_NV",
+          "info_url": "",
+          "version": "json"
+        },
+        {
+          "name": "",
+          "url": "https://github.com/vladvarp/-4D-Plugins/tree/main/Plugins/5",
+          "info": "нет",
+          "info_url": "",
+          "version": ""
+        }
+      ]
     }
   ]
 }
