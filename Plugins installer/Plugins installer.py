@@ -15,7 +15,7 @@ from urllib.parse import unquote, quote
 import ctypes
 
 PROGRAM_NAME = "4D Plugin Installer"
-PROGRAM_VER  = "v1.6.2"
+PROGRAM_VER  = "v1.7"
 
 # Скрываем консольное окно для всех дочерних процессов на Windows
 CREATE_NO_WINDOW = 0x08000000
@@ -204,8 +204,10 @@ def parse_list_json(raw: str) -> tuple[list[dict], dict]:
 
             info_text = p.get("info", "")
             info_url  = p.get("info_url", "")
-            # Версия из JSON (если указана — приоритет над файлом ver)
+            # Версия из JSON — запасной вариант если файл ver в репо отсутствует/пуст
             json_version = p.get("version", "").strip()
+            # Имя из JSON — запасной вариант если строка 2 файла ver пуста
+            json_display_name = p.get("name", "").strip()
 
             # Разбираем github-url: https://github.com/user/repo/tree/branch/path
             parts = url.split("/tree/", 1)
@@ -217,7 +219,7 @@ def parse_list_json(raw: str) -> tuple[list[dict], dict]:
             repo_path = unquote(after_branch[1]) if len(after_branch) > 1 else unquote(after_branch[0])
 
             # Имя папки — последний сегмент repo_path
-            name = repo_path.rstrip("/").split("/")[-1]
+            folder_name = repo_path.rstrip("/").split("/")[-1]
 
             # Raw URL для файла ver (читается как обычный текст без авторизации)
             # Пример: https://raw.githubusercontent.com/user/repo/main/Plugins/Name/ver
@@ -227,15 +229,17 @@ def parse_list_json(raw: str) -> tuple[list[dict], dict]:
             raw_ver_url = f"{raw_base}/{branch}/{quote(repo_path, safe='/')}/ver"
 
             plugins_out.append({
-                "name":        name,
+                "name":             folder_name,       # имя папки в репо (технический ключ)
+                "json_display_name": json_display_name, # имя из JSON (запасное)
+                "json_version":      json_version,      # версия из JSON (запасная)
                 "url":         url,
                 "repo_url":    repo_url,
-                "repo_path":   repo_path,  # декодированный путь, напр. «Plugins/VAr Tools»
+                "repo_path":   repo_path,
                 "info":        info_text,
                 "info_url":    info_url,
                 "author":      author_name,
-                "raw_ver_url": raw_ver_url,  # URL для чтения актуальной версии с GitHub
-                "version":     json_version,  # версия из JSON (приоритет над файлом ver)
+                "raw_ver_url": raw_ver_url,
+                # remote_ver и remote_display_name заполняются после загрузки файла ver
             })
 
         authors_out.append({
@@ -867,13 +871,9 @@ class MainWindow(QMainWindow):
                     # иначе None (будет загружена из файла ver репозитория)
                     for author_entry in authors:
                         for p in author_entry["plugins"]:
-                            if p.get("version"):
-                                p["remote_ver"] = p["version"]  # приоритет JSON-версии
-                            else:
-                                p["remote_ver"] = None  # None = ещё загружается
-                            # display_name из JSON уже в p["display_name"]
-                            # remote_display_name — из файла ver репозитория (строка 2)
-                            # None = ещё не загружено, "" = загружено но пусто
+                            # remote_ver: None = ещё не загружено из репо
+                            p["remote_ver"] = None
+                            # remote_display_name: None = ещё не загружено из репо
                             p["remote_display_name"] = None
                     self._pending = (authors, app_meta, is_offline, None)
                 except Exception as parse_err:
@@ -979,6 +979,10 @@ class MainWindow(QMainWindow):
             row = self.table.rowCount()
             self.table.insertRow(row)
             self.table.setRowHeight(row, 46)
+
+            # Сохраняем индекс строки в объект плагина для быстрого обновления
+            if p is not None:
+                p["_table_row"] = row
 
             # Имя + info/ссылка
             if p and (p.get("info") or p.get("info_url")):
@@ -1196,7 +1200,7 @@ class MainWindow(QMainWindow):
                 matched = [
                     p for p in author_entry["plugins"]
                     if search_query in (
-                        (p.get("display_name") or p["name"]).lower()
+                        self._get_plugin_display_name(p).lower()
                     ) or search_query in p["name"].lower()
                 ]
                 if not matched:
@@ -1258,13 +1262,9 @@ class MainWindow(QMainWindow):
         plugins_to_fetch = []
         for author_entry in self.remote_authors:
             for p in author_entry["plugins"]:
-                # Загружаем из репо если: версия ещё не известна ИЛИ имя ещё не загружено
-                # (JSON "version" мог закрыть remote_ver, но remote_display_name всё равно нужен)
-                needs_fetch = (
-                    p.get("remote_ver") is None or
-                    (p.get("remote_display_name") is None and not p.get("display_name"))
-                )
-                if needs_fetch:
+                # Загружаем файл ver из репо всегда — он приоритетнее JSON
+                # (даже если JSON содержит version/name, ver может их перекрыть)
+                if p.get("remote_ver") is None:
                     plugins_to_fetch.append(p)
 
         if not plugins_to_fetch:
@@ -1289,30 +1289,78 @@ class MainWindow(QMainWindow):
 
         while self._ver_fetch_results:
             plugin_ref, ver, repo_dn = self._ver_fetch_results.pop(0)
-            # Приоритет версии: 1) JSON "version", 2) файл ver из репо
-            if not plugin_ref.get("version"):
+            # Приоритет версии: 1) строка 1 файла ver из репо, 2) JSON "json_version"
+            if ver and ver not in ("not_found", "error"):
                 plugin_ref["remote_ver"] = ver
-            # remote_display_name — имя из файла ver репозитория (строка 2)
-            plugin_ref["remote_display_name"] = repo_dn
+            elif plugin_ref.get("json_version"):
+                plugin_ref["remote_ver"] = plugin_ref["json_version"]
+            else:
+                plugin_ref["remote_ver"] = ver  # "not_found" или "error"
+            # Приоритет имени: 1) строка 2 файла ver из репо, 2) JSON "json_display_name"
+            # Работают независимо: если ver есть только версия — имя берётся из JSON
+            plugin_ref["remote_display_name"] = repo_dn if repo_dn else plugin_ref.get("json_display_name", "")
             self._ver_fetch_done += 1
             self._update_row_remote_ver(plugin_ref)
 
         if self._ver_fetch_done < self._ver_fetch_total:
             QTimer.singleShot(120, self._poll_ver_fetch)
         else:
-            # Все версии загружены — обновляем счётчик статуса
+            # Все версии загружены — обновляем счётчик статуса и сохраняем кэш с приоритетными данными
             self._refresh_status_counts()
+            self._save_cache_with_resolved_data()
+
+    def _save_cache_with_resolved_data(self):
+        """
+        Сохраняет кэш list.json с уже разрешёнными приоритетными данными:
+        в поле version и display_name записывается то, что реально использовалось
+        (приоритет: ver из репо > JSON).
+        """
+        try:
+            if not LIST_JSON_CACHE.exists():
+                return
+            raw = LIST_JSON_CACHE.read_text(encoding="utf-8")
+            data = json.loads(raw)
+            # Строим индекс плагинов по имени папки для быстрого поиска
+            resolved: dict[str, dict] = {}
+            for author_entry in self.remote_authors:
+                for p in author_entry["plugins"]:
+                    resolved[p["name"]] = p
+
+            for author_entry in data.get("authors", []):
+                for p in author_entry.get("plugins", []):
+                    url = p.get("url", "").strip().rstrip("/")
+                    folder_name = url.split("/")[-1]
+                    if folder_name in resolved:
+                        rp = resolved[folder_name]
+                        # Записываем приоритетную версию (ver > JSON)
+                        resolved_ver = rp.get("remote_ver", "")
+                        if resolved_ver and resolved_ver not in ("not_found", "error"):
+                            p["version"] = resolved_ver
+                        elif rp.get("json_version"):
+                            p["version"] = rp["json_version"]
+                        # Записываем приоритетное имя (ver строка 2 > JSON "name")
+                        resolved_dn = rp.get("remote_display_name", "") or rp.get("json_display_name", "")
+                        if resolved_dn:
+                            p["name"] = resolved_dn
+
+            LIST_JSON_CACHE.write_text(
+                json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8"
+            )
+        except Exception:
+            pass  # кэш не критичен, ошибку игнорируем
 
     def _get_plugin_display_name(self, p: dict) -> str:
         """
         Возвращает отображаемое имя плагина по приоритету:
-          1) JSON "name"  (p["display_name"])
-          2) файл ver из репозитория, строка 2  (p["remote_display_name"])
-          3) имя папки в репозитории  (p["name"])
+          1) строка 2 файла ver из репозитория  (p["remote_display_name"])
+          2) JSON поле "name"                   (p["json_display_name"])
+          3) имя папки в репозитории             (p["name"])
+        Версия и имя работают независимо: если ver содержит только версию,
+        имя берётся из JSON.
         """
         return (
-            p.get("display_name") or
             p.get("remote_display_name") or
+            p.get("json_display_name") or
             p["name"]
         )
 
@@ -1320,110 +1368,108 @@ class MainWindow(QMainWindow):
         """
         Обновляет ячейки «Актуальная», «Статус» и кнопку действия
         для строки конкретного плагина после получения remote_ver.
+        Использует p["_table_row"] для прямого доступа к строке без поиска по тексту.
         """
         install_dir = self.path_edit.text().strip()
         remote_ver = p.get("remote_ver", None)
 
-        for row in range(self.table.rowCount()):
-            # Определяем имя плагина в строке
-            item = self.table.item(row, 0)
-            widget = self.table.cellWidget(row, 0)
-            row_name = ""
-            if item:
-                row_name = item.text()
-            elif widget:
-                labels = widget.findChildren(QLabel)
-                if labels:
-                    row_name = labels[0].text()
+        row = p.get("_table_row", -1)
+        if row < 0 or row >= self.table.rowCount():
+            return  # строка не в таблице (свёрнута или не отрисована)
 
-            # Сопоставляем с именем плагина (folder_name или display_name)
-            local_ver, _ = read_plugin_ver(install_dir, p["name"]) if install_dir else ("", "")
-            # Приоритет отображаемого имени: 1) JSON "name", 2) ver репо, 3) папка
-            dn = self._get_plugin_display_name(p)
-            if row_name not in (p["name"], dn):
-                continue
+        local_ver, _ = read_plugin_ver(install_dir, p["name"]) if install_dir else ("", "")
+        dn = self._get_plugin_display_name(p)
 
-            # Установлен ли плагин — по наличию папки, а не по ver
-            is_installed = bool(install_dir) and is_plugin_installed(install_dir, p["name"])
+        # Обновляем имя в ячейке — сразу без сворачивания/разворачивания
+        item_name = self.table.item(row, 0)
+        widget_name = self.table.cellWidget(row, 0)
+        if item_name:
+            item_name.setText(dn)
+        elif widget_name:
+            labels = widget_name.findChildren(QLabel)
+            if labels:
+                labels[0].setText(dn)
 
-            # Файл ver не существует в репозитории
-            if remote_ver == "not_found":
-                self.table.item(row, 2).setText("Не указан")
-                self.table.item(row, 2).setForeground(QColor(DIM))
-                # Статус и кнопка
-                if is_installed:
-                    # Папка есть, но в репо нет ver — предлагаем переустановить
-                    st = QTableWidgetItem("Установлен")
-                    st.setForeground(QColor(DIM))
-                    self.table.setItem(row, 3, st)
-                    act_btn = QPushButton("Переустановить")
-                    act_btn.setObjectName("update")
-                    act_btn.setFixedHeight(28)
-                    captured_plugin = dict(p)
-                    act_btn.clicked.connect(lambda _, pl=captured_plugin: self._install_single(pl))
-                    aw = QWidget(); aw.setStyleSheet("background:transparent;")
-                    al = QHBoxLayout(aw); al.setContentsMargins(6, 0, 6, 0); al.addWidget(act_btn)
-                    self.table.setCellWidget(row, 4, aw)
-                else:
-                    # Папки нет, ver нет в репо — показываем «Установить»
-                    st = QTableWidgetItem("")
-                    st.setForeground(QColor(ACCENT))
-                    self.table.setItem(row, 3, st)
-                    act_btn = QPushButton("Установить")
-                    act_btn.setObjectName("install")
-                    act_btn.setFixedHeight(28)
-                    captured_plugin = dict(p)
-                    act_btn.clicked.connect(lambda _, pl=captured_plugin: self._install_single(pl))
-                    aw = QWidget(); aw.setStyleSheet("background:transparent;")
-                    al = QHBoxLayout(aw); al.setContentsMargins(6, 0, 6, 0); al.addWidget(act_btn)
-                    self.table.setCellWidget(row, 4, aw)
+        # Установлен ли плагин — по наличию папки, а не по ver
+        is_installed = bool(install_dir) and is_plugin_installed(install_dir, p["name"])
 
-            elif remote_ver == "error":
-                # Ошибка сети — показываем «ошибка», кнопку не показываем
-                self.table.item(row, 2).setText("ошибка")
-                self.table.item(row, 2).setForeground(QColor(RED))
-                st = QTableWidgetItem("Нет данных")
-                st.setForeground(QColor(RED))
+        # Файл ver не существует в репозитории
+        if remote_ver == "not_found":
+            self.table.item(row, 2).setText("Не указан")
+            self.table.item(row, 2).setForeground(QColor(DIM))
+            # Статус и кнопка
+            if is_installed:
+                # Папка есть, но в репо нет ver — предлагаем переустановить
+                st = QTableWidgetItem("Установлен")
+                st.setForeground(QColor(DIM))
+                self.table.setItem(row, 3, st)
+                act_btn = QPushButton("Переустановить")
+                act_btn.setObjectName("update")
+                act_btn.setFixedHeight(28)
+                captured_plugin = dict(p)
+                act_btn.clicked.connect(lambda _, pl=captured_plugin: self._install_single(pl))
+                aw = QWidget(); aw.setStyleSheet("background:transparent;")
+                al = QHBoxLayout(aw); al.setContentsMargins(6, 0, 6, 0); al.addWidget(act_btn)
+                self.table.setCellWidget(row, 4, aw)
+            else:
+                # Папки нет, ver нет в репо — показываем «Установить»
+                st = QTableWidgetItem("")
+                st.setForeground(QColor(ACCENT))
+                self.table.setItem(row, 3, st)
+                act_btn = QPushButton("Установить")
+                act_btn.setObjectName("install")
+                act_btn.setFixedHeight(28)
+                captured_plugin = dict(p)
+                act_btn.clicked.connect(lambda _, pl=captured_plugin: self._install_single(pl))
+                aw = QWidget(); aw.setStyleSheet("background:transparent;")
+                al = QHBoxLayout(aw); al.setContentsMargins(6, 0, 6, 0); al.addWidget(act_btn)
+                self.table.setCellWidget(row, 4, aw)
+
+        elif remote_ver == "error":
+            # Ошибка сети — показываем «ошибка», кнопку не показываем
+            self.table.item(row, 2).setText("ошибка")
+            self.table.item(row, 2).setForeground(QColor(RED))
+            st = QTableWidgetItem("Нет данных")
+            st.setForeground(QColor(RED))
+            self.table.setItem(row, 3, st)
+            self.table.removeCellWidget(row, 4)
+
+        else:
+            # Версия успешно получена
+            self.table.item(row, 2).setText(remote_ver or "—")
+            self.table.item(row, 2).setForeground(QColor(TEXT))
+            if not local_ver:
+                # Не установлен
+                st = QTableWidgetItem("")
+                st.setForeground(QColor(ACCENT))
+                self.table.setItem(row, 3, st)
+                act_btn = QPushButton("Установить")
+                act_btn.setObjectName("install")
+                act_btn.setFixedHeight(28)
+                captured_plugin = dict(p)
+                act_btn.clicked.connect(lambda _, pl=captured_plugin: self._install_single(pl))
+                aw = QWidget(); aw.setStyleSheet("background:transparent;")
+                al = QHBoxLayout(aw); al.setContentsMargins(6, 0, 6, 0); al.addWidget(act_btn)
+                self.table.setCellWidget(row, 4, aw)
+            elif local_ver != remote_ver:
+                # Есть обновление
+                st = QTableWidgetItem("Есть обновление")
+                st.setForeground(QColor(YELLOW))
+                self.table.setItem(row, 3, st)
+                act_btn = QPushButton("Обновить")
+                act_btn.setObjectName("update")
+                act_btn.setFixedHeight(28)
+                captured_plugin = dict(p)
+                act_btn.clicked.connect(lambda _, pl=captured_plugin: self._install_single(pl))
+                aw = QWidget(); aw.setStyleSheet("background:transparent;")
+                al = QHBoxLayout(aw); al.setContentsMargins(6, 0, 6, 0); al.addWidget(act_btn)
+                self.table.setCellWidget(row, 4, aw)
+            else:
+                # Актуально
+                st = QTableWidgetItem("✓ Актуально")
+                st.setForeground(QColor(GREEN))
                 self.table.setItem(row, 3, st)
                 self.table.removeCellWidget(row, 4)
-
-            else:
-                # Версия успешно получена
-                self.table.item(row, 2).setText(remote_ver or "—")
-                self.table.item(row, 2).setForeground(QColor(TEXT))
-                if not local_ver:
-                    # Не установлен
-                    st = QTableWidgetItem("")
-                    st.setForeground(QColor(ACCENT))
-                    self.table.setItem(row, 3, st)
-                    act_btn = QPushButton("Установить")
-                    act_btn.setObjectName("install")
-                    act_btn.setFixedHeight(28)
-                    captured_plugin = dict(p)
-                    act_btn.clicked.connect(lambda _, pl=captured_plugin: self._install_single(pl))
-                    aw = QWidget(); aw.setStyleSheet("background:transparent;")
-                    al = QHBoxLayout(aw); al.setContentsMargins(6, 0, 6, 0); al.addWidget(act_btn)
-                    self.table.setCellWidget(row, 4, aw)
-                elif local_ver != remote_ver:
-                    # Есть обновление
-                    st = QTableWidgetItem("Есть обновление")
-                    st.setForeground(QColor(YELLOW))
-                    self.table.setItem(row, 3, st)
-                    act_btn = QPushButton("Обновить")
-                    act_btn.setObjectName("update")
-                    act_btn.setFixedHeight(28)
-                    captured_plugin = dict(p)
-                    act_btn.clicked.connect(lambda _, pl=captured_plugin: self._install_single(pl))
-                    aw = QWidget(); aw.setStyleSheet("background:transparent;")
-                    al = QHBoxLayout(aw); al.setContentsMargins(6, 0, 6, 0); al.addWidget(act_btn)
-                    self.table.setCellWidget(row, 4, aw)
-                else:
-                    # Актуально
-                    st = QTableWidgetItem("✓ Актуально")
-                    st.setForeground(QColor(GREEN))
-                    self.table.setItem(row, 3, st)
-                    self.table.removeCellWidget(row, 4)
-            break
 
     def _refresh_status_counts(self):
         """Пересчитывает счётчик «Требуют обновления» после загрузки всех версий."""
@@ -1532,51 +1578,32 @@ class MainWindow(QMainWindow):
         self.worker.start()
 
     def _on_plugin_done(self, name: str, ok: bool, info: str):
-        for row in range(self.table.rowCount()):
-            # Имя может быть QTableWidgetItem или виджетом (когда есть info-текст)
-            item = self.table.item(row, 0)
-            widget = self.table.cellWidget(row, 0)
-            row_name = ""
-            if item:
-                row_name = item.text()
-            elif widget:
-                labels = widget.findChildren(QLabel)
-                if labels:
-                    row_name = labels[0].text()
-            # Сравниваем по folder_name (name) и по display_name
-            install_dir = self.path_edit.text().strip()
-            # Ищем объект плагина в remote_authors для получения display_name
-            plugin_obj = None
-            for ae in self.remote_authors:
-                for pp in ae["plugins"]:
-                    if pp["name"] == name:
-                        plugin_obj = pp
-                        break
-            dn = self._get_plugin_display_name(plugin_obj) if plugin_obj else name
-            if row_name not in (name, dn):
-                continue
-            if ok:
+        install_dir = self.path_edit.text().strip()
+        # Ищем объект плагина по имени папки
+        plugin_obj = None
+        for ae in self.remote_authors:
+            for pp in ae["plugins"]:
+                if pp["name"] == name:
+                    plugin_obj = pp
+                    break
+
+        # Берём индекс строки из _table_row (сохранён при построении таблицы)
+        row = plugin_obj.get("_table_row", -1) if plugin_obj else -1
+        if row < 0 or row >= self.table.rowCount():
+            return
+
+        if ok:
                 self.table.item(row, 1).setText(info)
                 self.table.item(row, 1).setForeground(QColor(TEXT))
 
-                # Определяем remote_ver этого плагина чтобы показать корректный статус
-                plugin_remote_ver = None
-                for ae in self.remote_authors:
-                    for pp in ae["plugins"]:
-                        if pp["name"] == name:
-                            plugin_remote_ver = pp.get("remote_ver")
-                            break
+                # Определяем remote_ver через уже найденный plugin_obj
+                plugin_remote_ver = plugin_obj.get("remote_ver") if plugin_obj else None
 
                 if plugin_remote_ver == "not_found":
                     # Версия в репо не указана — показываем «Установлен» и кнопку «Переустановить»
                     self.table.item(row, 3).setText("Установлен")
                     self.table.item(row, 3).setForeground(QColor(DIM))
-                    captured_plugin_ref = None
-                    for ae in self.remote_authors:
-                        for pp in ae["plugins"]:
-                            if pp["name"] == name:
-                                captured_plugin_ref = dict(pp)
-                                break
+                    captured_plugin_ref = dict(plugin_obj) if plugin_obj else None
                     if captured_plugin_ref:
                         reinstall_btn = QPushButton("Переустановить")
                         reinstall_btn.setObjectName("update")
@@ -1609,11 +1636,10 @@ class MainWindow(QMainWindow):
                 dl.setContentsMargins(6, 0, 6, 0)
                 dl.addWidget(del_btn)
                 self.table.setCellWidget(row, 5, dw)
-            else:
-                self.table.item(row, 3).setText("✗ Ошибка")
-                self.table.item(row, 3).setForeground(QColor(RED))
-                self.table.item(row, 3).setToolTip(info)
-            break
+        else:
+            self.table.item(row, 3).setText("✗ Ошибка")
+            self.table.item(row, 3).setForeground(QColor(RED))
+            self.table.item(row, 3).setToolTip(info)
 
     def _on_finished(self):
         self.progress_bar.setRange(0, 1)
