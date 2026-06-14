@@ -2,7 +2,7 @@
   "app": {
     "about_label": "C4D Plugins",
     "about_url": "https://vladvarp.github.io/-4D-Plugins/web/index.html",
-    "actual_version": "v1.6.2"
+    "actual_version": "v1.7"
   },
   "authors": [
     {
@@ -66,11 +66,11 @@
           "version": "json"
         },
         {
-          "name": "",
+          "name": "json",
           "url": "https://github.com/vladvarp/-4D-Plugins/tree/main/Plugins/5",
-          "info": "нет",
+          "info": "json_NV",
           "info_url": "",
-          "version": ""
+          "version": "json"
         }
       ]
     }
