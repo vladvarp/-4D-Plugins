@@ -4,7 +4,7 @@ tagline: Мгновенно превращает анимацию объекта
 version: v1.6
 author: V.Ar Production
 updated: Июнь 2026
-icon: 📷
+icon: ico/Snapshot.png
 tags: [Анимация, Утилиты, Автоматизация]
 license: GPL v3
 cinema4d: R26+

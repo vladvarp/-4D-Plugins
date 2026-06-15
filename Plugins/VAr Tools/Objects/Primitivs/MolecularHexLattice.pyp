@@ -1075,18 +1075,6 @@ class MolecularHexLatticeObject(c4d.plugins.ObjectData):
 #  Иконка (32×32, молекула из гексагональных шаров)
 # ══════════════════════════════════════════════════════════════════════════════
 
-_ICON_ML = (
-    "iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAC8ElEQVR4nL2X"
-    "TUhUURTHf+/NeKOjo6OOOuqoo4466qijjjrqqKOOOuqoo4466qijjjrq"
-    "qKOOOuqoo4466qijFhERERERERERERERERERERERERERERERERERERERERER"
-    "ERERERERERERERERERERERERQ6urq6urq6urq6urq6urq6urq6urq6urq6urq6"
-    "urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6ur"
-    "q6urq6uo7d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3"
-    "d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3"
-    "d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d"
-    "3d3d3d3d3d3d3d3AAAAAAAA"
-)
-
 # Генерируем настоящую иконку программно — 32×32 PNG молекулы
 def _generate_icon_png():
     """Генерирует PNG-иконку 32×32 в виде молекулярной сетки."""

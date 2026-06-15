@@ -58,6 +58,7 @@
                         <li><a href="#steps">Пошаговые инструкции</a></li>
                         <li><a href="#video">Видео</a></li>
                         <li><a href="#inline-elements">Инлайн-элементы</a></li>
+                        <li><a href="#images-ico">Изображения и значки</a></li>
                         <li><a href="#features">Сетка фич</a></li>
                         <li><a href="#changelog">История изменений</a></li>
                         <li><a href="#tables">Таблицы</a></li>
@@ -191,9 +192,9 @@ updated: 15 мая 2025
                             <tbody>
                                 <tr>
                                     <td><code>icon</code></td>
-                                    <td>символ</td>
-                                    <td>Emoji или Unicode символ иконки</td>
-                                    <td><code>✦</code></td>
+                                    <td>символ или путь</td>
+                                    <td>Emoji/Unicode символ иконки, либо путь к PNG/SVG/JPG-файлу</td>
+                                    <td><code>✦</code> или <code>plugins/icon.png</code></td>
                                 </tr>
                                 <tr>
                                     <td><code>tags</code></td>
@@ -595,6 +596,90 @@ https://www.youtube.com/watch?v=dQw4w9WgXcQ
                         </p>
                     </section>
 
+                    <!-- Изображения и значки (ico) -->
+                    <section id="images-ico">
+                        <h2>Изображения и значки</h2>
+                        <p>
+                            Инлайн-изображения и иконки вставляются прямо в текст или в любой блок с помощью синтаксиса
+                            <code>[[ico:'путь'|ШxВ]]</code>. Путь указывается в одинарных кавычках, размер — через
+                            <code>x</code> или <code>*</code>.
+                        </p>
+
+                        <h3>Синтаксис</h3>
+                        <div class="code-example">
+                            <div class="code-example-header">
+                                <span class="code-example-label">Форматы [[ico:...]]</span>
+                                <button class="copy-btn">Копировать</button>
+                            </div>
+                            <pre><code>[[ico:'plugins/object-renamer-pro.png'|32x32]]
+[[ico:'plugins/object-renamer-pro.png'|32*32]]
+[[ico:'plugins/icon.svg'|64x64]]
+[[ico:'img/screenshot.jpg'|120x80]]
+[[ico:'img/logo.png']]</code></pre>
+                        </div>
+                        <p>
+                            Последний вариант без размера отображается как <strong>24×24 px</strong> (иконка по умолчанию).
+                        </p>
+
+                        <div class="callout callout-info">
+                            <span class="callout-icon">ℹ️</span>
+                            <div>
+                                Поле <code>icon</code> во frontmatter тоже поддерживает PNG/SVG/JPG: достаточно указать
+                                путь к файлу (например, <code>icon: plugins/my-icon.png</code>) — он автоматически
+                                отрисуется как изображение в карточке плагина и в шапке страницы плагина. Если значение
+                                не похоже на путь к файлу, оно отображается как emoji/символ, как и раньше.
+                            </div>
+                        </div>
+
+                        <h3>Использование в тексте</h3>
+                        <p>Иконку можно вставить прямо в строку — она выровняется по базовой линии текста:</p>
+                        <div class="code-example">
+                            <div class="code-example-header">
+                                <span class="code-example-label">Иконка внутри текста</span>
+                                <button class="copy-btn">Копировать</button>
+                            </div>
+                            <pre><code>Плагин [[ico:'plugins/object-renamer-pro.png'|20x20]] Object Renamer PRO доступен для Cinema 4D R21+.</code></pre>
+                        </div>
+
+                        <h3>Использование в заголовках и блоках</h3>
+                        <p>Работает внутри любых блоков — callout, steps, tabs, details, features и т.д.:</p>
+                        <div class="code-example">
+                            <div class="code-example-header">
+                                <span class="code-example-label">Иконка в callout и steps</span>
+                                <button class="copy-btn">Копировать</button>
+                            </div>
+                            <pre><code>:::tip
+[[ico:'plugins/icon.png'|24x24]] Используй квадратные иконки — они выглядят аккуратнее.
+:::
+
+::::steps
+### [[ico:'img/step1.png'|28x28]] Скачай архив
+Нажми кнопку «Скачать» вверху страницы.
+
+### [[ico:'img/step2.png'|28x28]] Распакуй в папку plugins
+Путь: `C:\Users\...\Cinema 4D\plugins`
+::::</code></pre>
+                        </div>
+
+                        <h3>Соотношение сторон</h3>
+                        <p>
+                            Размер задаётся явно — оба значения обязательны (ширина и высота).
+                            Изображение масштабируется с <code>object-fit: contain</code>,
+                            поэтому пропорции оригинала сохраняются без обрезки.
+                            Можно использовать любое соотношение — квадрат, прямоугольник, баннер:
+                        </p>
+                        <div class="code-example">
+                            <div class="code-example-header">
+                                <span class="code-example-label">Разные соотношения сторон</span>
+                                <button class="copy-btn">Копировать</button>
+                            </div>
+                            <pre><code>[[ico:'img/icon.png'|32x32]]      — квадрат 1:1
+[[ico:'img/logo.png'|120x40]]     — горизонтальный баннер 3:1
+[[ico:'img/screen.jpg'|160x90]]   — скриншот 16:9
+[[ico:'img/photo.jpg'|80x120]]    — вертикальное фото 2:3</code></pre>
+                        </div>
+                    </section>
+
                     <!-- Сетка фич -->
                     <section id="features">
                         <h2>Сетка фич</h2>
@@ -749,6 +834,7 @@ github: https://github.com/user/repo
 
 Описание того, как использовать плагин после установки.
 Горячая клавиша: [[kbd:Ctrl+Shift+P]]
+Иконка плагина: [[ico:'plugins/my-plugin.png'|24x24]]
 
 ::::details
 Дополнительные параметры

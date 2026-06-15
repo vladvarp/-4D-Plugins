@@ -46,7 +46,7 @@ function initIndexPage() {
             id: '1',
             title: 'VAr Tools',
             description: 'Набор утилит для Cinema 4D, созданных для ускорения повседневной работы.',
-            icon: '✦',
+            icon: 'ico/Var_tools/varp_tools.png',
             tags: ['Моделирование', 'Процедурный', 'Автоматизация'],
             version: 'v2.29.2',
             mdFile: 'plugins/VAr_Tools.md'
@@ -55,7 +55,7 @@ function initIndexPage() {
             id: '2',
             title: 'Camera Resolution Manager',
             description: 'Управление разрешением рендера для каждой камеры в сцене — назначай, активируй и переключай форматы прямо из плавающей панели.',
-            icon: '🎥',
+            icon: 'ico/CameraResolution.png',
             tags: ['Рендер', 'Автоматизация', 'Камера'],
             version: 'v1.5',
             mdFile: 'plugins/camera-resolution-manager.md'
@@ -64,7 +64,7 @@ function initIndexPage() {
             id: '3',
             title: 'Object Renamer PRO',
             description: 'Инструмент для наведения порядка в сцене. Плагин решает одну из самых рутинных задач 3D-художника: быстрое и массовое переименование объектов с полным контролем над результатом.',
-            icon: '🔬',
+            icon: 'ico/ObjectRenamerPRO.png',
             tags: ['Автоматизация', 'Утилиты'],
             version: 'v2.4',
             mdFile: 'plugins/object-renamer-pro.md'
@@ -73,7 +73,7 @@ function initIndexPage() {
             id: '4',
             title: 'Snapshot',
             description: 'Мгновенно превращает анимацию объекта в набор статичных мешей — по одному на каждый кадр — и объединяет их в единый полигональный снепшот.',
-            icon: '📷',
+            icon: 'ico/Snapshot.png',
             tags: ['Анимация', 'Автоматизация', 'Утилиты'],
             version: 'v1.6',
             mdFile: 'plugins/snapshot.md'
@@ -119,7 +119,7 @@ function createPluginCard(plugin) {
 
     a.innerHTML = `
         <div class="card-header">
-            <div class="card-icon">${plugin.icon}</div>
+            <div class="card-icon">${isImagePath(plugin.icon) ? `<img src="${escapeHtml(plugin.icon.trim())}" alt="" loading="lazy" class="card-icon-img">` : plugin.icon}</div>
             <div class="card-tags">${tagsHTML}</div>
         </div>
         <div class="card-body">
@@ -276,8 +276,8 @@ function parseFrontmatter(markdown) {
 
 // Заполняем hero секцию на странице плагина
 function renderPluginHero(meta) {
-    // Иконка
-    setElement('plugin-icon', meta.icon || '⬡');
+    // Иконка: либо emoji/символ, либо путь к PNG/SVG/JPG (рендерится как <img>)
+    setPluginIcon('plugin-icon', meta.icon);
 
     // Теги
     const tagsEl = document.getElementById('plugin-tags');
@@ -701,6 +701,16 @@ function renderInlineSyntax(html) {
         }).join('');
     });
 
+    // Иконка/изображение: [[ico:'path/to/img.png'|WxH]] или [[ico:'path'|W*H]]
+    // Примеры: [[ico:'plugins/icon.png'|32x32]]  [[ico:'img/logo.svg'|64*64]]  [[ico:'img/pic.jpg'|120x80]]
+    html = html.replace(/\[\[ico:'([^']+)'\|(\d+)[x*](\d+)\]\]/g, (_, src, w, h) => {
+        return `<img class="md-ico" src="${escapeHtml(src)}" width="${parseInt(w)}" height="${parseInt(h)}" alt="" loading="lazy" style="width:${parseInt(w)}px;height:${parseInt(h)}px;object-fit:contain;vertical-align:middle;display:inline-block;border-radius:0;">`;
+    });
+    // Вариант без размеров: [[ico:'path/to/img.png']] — отображается как 32x32
+    html = html.replace(/\[\[ico:'([^']+)'\]\]/g, (_, src) => {
+        return `<img class="md-ico" src="${escapeHtml(src)}" width="24" height="24" alt="" loading="lazy" style="width:24px;height:24px;object-fit:contain;vertical-align:middle;display:inline-block;border-radius:0;">`;
+    });
+
     return html;
 }
 
@@ -838,6 +848,29 @@ async function handleCopyClick(e) {
 function setElement(id, text) {
     const el = document.getElementById(id);
     if (el) el.textContent = text;
+}
+
+// Проверяем, похожа ли строка на путь к изображению (png/svg/jpg/jpeg/webp/gif)
+function isImagePath(value) {
+    return typeof value === 'string' && /\.(png|svg|jpe?g|webp|gif)(\?.*)?$/i.test(value.trim());
+}
+
+// Заполняем иконку: путь к изображению -> <img>, иначе emoji/символ -> текст
+function setPluginIcon(id, value, fallback = '⬡') {
+    const el = document.getElementById(id);
+    if (!el) return;
+
+    if (isImagePath(value)) {
+        el.innerHTML = '';
+        const img = document.createElement('img');
+        img.src = value.trim();
+        img.alt = '';
+        img.loading = 'lazy';
+        img.className = 'plugin-icon-img';
+        el.appendChild(img);
+    } else {
+        el.textContent = value || fallback;
+    }
 }
 
 // Экранирование HTML-спецсимволов
