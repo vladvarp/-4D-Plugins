@@ -5,7 +5,7 @@ version: v2.29.2
 author: V.Ar Production
 updated: Июнь 2026
 icon: ico/Var_tools/varp_tools.png
-tags: [Моделирование, Процедурный, Автоматизация]
+tags: [Моделирование, Процедурный, Анимация, Автоматизация]
 license: GPL v3
 cinema4d: R26+
 os: Windows
