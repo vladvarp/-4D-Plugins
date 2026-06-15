@@ -8,6 +8,10 @@ from c4d import gui
 
 MENU_NAME = "VAr Tools"
 MENU_ITEMS = [
+        {"name": "Animation", "items": [
+            1068937,    # ShiftAnim2Zero
+        ]},
+
         {"name": "Tools", "items": [
             {"name": "Axis", "items": [
                 1068828,   # Axis2Center
