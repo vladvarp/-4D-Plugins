@@ -6,11 +6,11 @@
 
 ## Установка
 
-1. [4DPluginInstaller.exe](https://github.com/vladvarp/-4D-Plugins/releases/tag/C4D)
+[4DPluginInstaller.exe](https://github.com/vladvarp/-4D-Plugins/releases/tag/C4D) поддерживает обновления.
 
 или
 
-1. Скопировать содержимое папки `VAr Tools` в директорию плагинов Cinema 4D:
+Вручную скопировать папку с плагином в директорию плагинов Cinema 4D:
   - **Windows**: `%APPDATA%\MAXON\Cinema 4D <версия>\plugins\`
 
 ## Требования
