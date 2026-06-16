@@ -15,19 +15,13 @@ import c4d
 import base64
 
 PLUGIN_ID     = 1068838
-PLUGIN_NAME = "Center2Parent XZ v1.1"
+PLUGIN_NAME = "Center2Parent XZ v1.1.1"
 PLUGIN_HELP   = "Центрировать по X и Z в позицию родителя (мировое пространство, Y не меняется)"
 
 
 # ─── Встроенная иконка (base64 PNG 32×32) ────────────────────────────────────
 _ICON_B64 = (
-    "iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAABFUlEQVR4nO2W0Q2D"
-    "IBCGf5uOYAhxBBfoS+NDZ3CODuAADNA5OkMfjC8uwAzEOIPtkwWUWq4YTRPuxUC4"
-    "+z+BuyPJsuyJHe2wp/gqAJzzIP9jKMDU6rr2WlcUhRtACkaUHABon94I/slMSOcO"
-    "5FXnLc85h1LKCO7tCmCDSygFazcDmIqN4yUIMoAUzLonj+tgiaVN+RbLq+5kfoMB"
-    "TGEpWGuOR5H+fLfElsRJAI7smAX+JvYzAD01/W31QgT4FyNvgLEuTM58NgcAaVOS"
-    "6gjpEroCX25hmUw+AsrfkQB0VxvIHc5e7++vlNIAup4zq7b7iNvraf7OI6Clnd0N"
-    "qZaEPsnmO0Cz/3+SRYAIEAEiQAQI6QMA8AIz5GBXU61fCgAAAABJRU5ErkJggg=="
+    "iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAA9UlEQVR4nGNgGAUDDBgxRC7daYKz9VTqaMLXU6nD7SRkDbQAaOYzUWre////Kyg1AxWQEAL/ezT+wzB1HUGk5QwMiBAg2hEEo4CIEIBb+v9/BUOvZjsKn0RAVhpgZGTswEdTBoZKGoA74v//CpIcQI00gAwoDXaKywFKAQtOGVKK2F0+pKmnNhjQREipIwZxGsAFLt3B7lNIOsAfCnoqGNU/6Q6AAAEsYh9wiCPLY4ABjwKqOYDRbYvA/10+HwbMAeSC4eUARrctAgPqAHLAqAPwOmBB1P8tOKQ+kIFJA3gspyrA7JoRYXnCMkYf2jiHBEdQCwAAlxCX1RyWIy4AAAAASUVORK5CYII="
 )
 
 

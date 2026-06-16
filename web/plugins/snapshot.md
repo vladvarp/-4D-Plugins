@@ -1,7 +1,7 @@
 ---
 title: Snapshot
 tagline: Мгновенно превращает анимацию объекта в набор статичных мешей — по одному на каждый кадр — и объединяет их в единый полигональный снепшот.
-version: v1.6
+version: v1.7
 author: V.Ar Production
 updated: Июнь 2026
 icon: ico/Snapshot.png

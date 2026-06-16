@@ -8,11 +8,12 @@ Plugin ID : 1068834
 import c4d
 import os
 import base64
+import tempfile
 
 # ─── ID ───────────────────────────────────────────────────────────────────────
 PLUGIN_ID   = 1068834
 PLUGIN_NAME = "Resolution Manager"
-PLUGIN_NAME_V = "Resolution Manager v1.5"
+PLUGIN_NAME_V = "Resolution Manager v1.6"
 PLUGIN_HELP = "Управление разрешением рендера для каждой камеры"
 
 ID_BASE           = 10000
@@ -58,60 +59,6 @@ for _pname, _pw, _ph in _RAW_PRESETS:
         continue
     _seen_res.add(_key)
     PRESETS.append((_pname, _pw, _ph))
-
-# ─── Иконка ───────────────────────────────────────────────────────────────────
-_ICON_B64 = (
-    "iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAAxElEQVR4nGM0MjL6"
-    "zzCAgGkgLR91wKgDBoUDWGhl8JYtWwiq8fHxoZ0DYBbgAjAHYjhAJE8Eq4Y3k95Q"
-    "yVmoYMDTwKgDUNIArvgnJEc1BxACN+puoPA1mjTwqicmKzIiV8e4fIluMTrA5RBi"
-    "cg7BNACzfNq+aQTVkAOISoQwy/E5giYOgPksyykLhcanlqoOQAb4LKcEDHg5MLgd"
-    "QCifk6uWaAfQAxB0ADE+I9f3DAxEFsUwC0gtiokBjKM9o1EHjHgHAACzpjMj5tOp"
-    "3AAAAABJRU5ErkJggg=="
-)
-
-
-def _make_icon():
-    SIZE = 32
-    try:
-        import tempfile
-        raw = base64.b64decode(_ICON_B64)
-        tmp = tempfile.mktemp(suffix=".png")
-        with open(tmp, "wb") as f:
-            f.write(raw)
-        try:
-            bmp = c4d.bitmaps.BaseBitmap()
-        except AttributeError:
-            bmp = c4d.BaseBitmap()
-        result = bmp.InitWith(tmp)
-        try:
-            os.remove(tmp)
-        except Exception:
-            pass
-        ok = result[0] if isinstance(result, tuple) else result
-        if ok == c4d.IMAGERESULT_OK:
-            return bmp
-    except Exception:
-        pass
-    try:
-        bmp = c4d.bitmaps.BaseBitmap()
-    except AttributeError:
-        bmp = c4d.BaseBitmap()
-    bmp.Init(SIZE, SIZE, 32)
-    cx, cy, r = SIZE//2, SIZE//2, SIZE//2-1
-    for y in range(SIZE):
-        for x in range(SIZE):
-            dx, dy = x-cx, y-cy
-            if dx*dx+dy*dy <= r*r:
-                bmp.SetPixel(x, y, 60, 130, 220)
-            else:
-                bmp.SetPixel(x, y, 40, 40, 40)
-    for dy in range(-1, 2):
-        for dx in range(-1, 2):
-            bmp.SetPixel(cx+dx, cy-7+dy, 255, 255, 255)
-    for dy in range(0, 9):
-        for dx in range(-1, 1):
-            bmp.SetPixel(cx+dx, cy-2+dy, 255, 255, 255)
-    return bmp
 
 
 # ─── Работа с данными камеры через UserData ───────────────────────────────────
@@ -779,6 +726,27 @@ class CamResCommand(c4d.plugins.CommandData):
 
         return True
 
+_ICON_B64 = (
+    "iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAABmJLR0QA/wD/AP+gvaeTAAACTUlEQVRYhe2WP2hTURTGf+em1ppIVYooLVWktUmh1SCddHJQqJu4uDgUulhQSlVaBF10MJB2V4S62sGiS8XNQXHoYBOkpEkqWA2I+KeYvqLJe8fhxZTa0OaFRAfzTfdx7ne/H5d7z31QV111/e+Sai+okWAQI4OFzxaEXOmJZGkOjJlqAwAg0g2EEQZQ8W8MFz/CCN+ye0vvQDzVDkBv51Il+RoNXQGagZvY2iajicy6eiTYik8+YGtb6R1QHqBMek6ezfh5ubTDi6WhOIovnsJxLiDSBLqKiBJLT5W2qQU6yZHDz93g9C4a9RJYwzTyCEh4A0gmm1l1niC8AL6AWOimvoMgD3nzNoydvwh6GcgBy6CBcsPXAFbMfow24cgQ4Y6FLV2v010YTWDbSZAs6C3Uuov473kJXwPwKmMfAAOq91lpus7x9lUAYknvS1UE4DS4PvXNFMMLGpjZ15v6fPZ0bQGqqMoATN4BQOz+P6/dZP/HeGfL9LPaAji+dy6ADLLzxyKx5Ahzc55O/2+5h9DJZTENijghYgv5LV1CFwqIOYHa50BuIIEx4DvoK+8Ax0IZ5lJTiDwu631SBXhKz6E4IjFm0xNuI2IYZMU7AMDRzvPEU9dQZ9uWLjE5ejreI+K2q76OZeA2s5kJftoKDHkHgIofn6L6Wi0AoqGyLZU1ok2kkWAQ5CSq2xHAmIhGQ9b6SeKn0OurDuAG6Lw7EEXU2lAXtRCZZnfgU9X/iNZxjHd/xeFOyaIwJlfn9/zzTlhT6Xj3mUpqdf1V/QJ38cVO7PVX7AAAAABJRU5ErkJggg=="
+)
+
+def _make_icon():
+    png_data = base64.b64decode(_ICON_B64)
+    try:
+        bmp = c4d.bitmaps.BaseBitmap()
+    except AttributeError:
+        bmp = c4d.BaseBitmap()
+    tmp = tempfile.NamedTemporaryFile(suffix=".png", delete=False)
+    try:
+        tmp.write(png_data)
+        tmp.close()
+        bmp.InitWith(tmp.name)
+    finally:
+        os.unlink(tmp.name)
+    return bmp
+
+
+ICON_B64 = _make_icon()
 
 # ─── Регистрация ──────────────────────────────────────────────────────────────
 
@@ -787,7 +755,7 @@ if __name__ == "__main__":
         id   = PLUGIN_ID,
         str  = PLUGIN_NAME_V,
         info = 0,
-        icon = _make_icon(),
+        icon = ICON_B64,
         help = PLUGIN_HELP,
         dat  = CamResCommand(),
     )

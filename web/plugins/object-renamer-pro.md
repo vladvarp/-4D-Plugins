@@ -1,7 +1,7 @@
 ---
 title: Object Renamer PRO
 tagline: Плавающая немодальная панель для пакетного переименования, выделения и сортировки объектов сцены — каждое действие создаёт один шаг отмены.
-version: v2.4
+version: v2.5
 author: V.Ar Production
 updated: Июнь 2026
 icon: ico/ObjectRenamerPRO.png'

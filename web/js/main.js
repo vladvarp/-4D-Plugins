@@ -48,7 +48,7 @@ function initIndexPage() {
             description: 'Набор утилит для Cinema 4D, созданных для ускорения повседневной работы.',
             icon: 'ico/Var_tools/varp_tools.png',
             tags: ['Моделирование', 'Процедурный', 'Анимация', 'Автоматизация'],
-            version: 'v2.29.2',
+            version: 'v2.30.28',
             mdFile: 'plugins/VAr_Tools.md'
         },
         {
@@ -57,7 +57,7 @@ function initIndexPage() {
             description: 'Управление разрешением рендера для каждой камеры в сцене — назначай, активируй и переключай форматы прямо из плавающей панели.',
             icon: 'ico/CameraResolution.png',
             tags: ['Рендер', 'Автоматизация', 'Камера'],
-            version: 'v1.5',
+            version: 'v1.6',
             mdFile: 'plugins/camera-resolution-manager.md'
         },
         {
@@ -66,7 +66,7 @@ function initIndexPage() {
             description: 'Инструмент для наведения порядка в сцене. Плагин решает одну из самых рутинных задач 3D-художника: быстрое и массовое переименование объектов с полным контролем над результатом.',
             icon: 'ico/ObjectRenamerPRO.png',
             tags: ['Автоматизация', 'Утилиты'],
-            version: 'v2.4',
+            version: 'v2.5',
             mdFile: 'plugins/object-renamer-pro.md'
         },
         {
@@ -75,7 +75,7 @@ function initIndexPage() {
             description: 'Мгновенно превращает анимацию объекта в набор статичных мешей — по одному на каждый кадр — и объединяет их в единый полигональный снепшот.',
             icon: 'ico/Snapshot.png',
             tags: ['Анимация', 'Автоматизация', 'Утилиты'],
-            version: 'v1.6',
+            version: 'v1.7',
             mdFile: 'plugins/snapshot.md'
         }
     ];
@@ -706,9 +706,9 @@ function renderInlineSyntax(html) {
     html = html.replace(/\[\[ico:'([^']+)'\|(\d+)[x*](\d+)\]\]/g, (_, src, w, h) => {
         return `<img class="md-ico" src="${escapeHtml(src)}" width="${parseInt(w)}" height="${parseInt(h)}" alt="" loading="lazy" style="width:${parseInt(w)}px;height:${parseInt(h)}px;object-fit:contain;vertical-align:middle;display:inline-block;border-radius:0;">`;
     });
-    // Вариант без размеров: [[ico:'path/to/img.png']] — отображается как 32x32
+    // Вариант без размеров: [[ico:'path/to/img.png']] — отображается как 36x36
     html = html.replace(/\[\[ico:'([^']+)'\]\]/g, (_, src) => {
-        return `<img class="md-ico" src="${escapeHtml(src)}" width="24" height="24" alt="" loading="lazy" style="width:24px;height:24px;object-fit:contain;vertical-align:middle;display:inline-block;border-radius:0;">`;
+        return `<img class="md-ico" src="${escapeHtml(src)}" width="24" height="24" alt="" loading="lazy" style="width:36px;height:36px;object-fit:contain;vertical-align:middle;display:inline-block;border-radius:0;">`;
     });
 
     return html;

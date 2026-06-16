@@ -56,7 +56,7 @@ import zlib
 # ══════════════════════════════════════════════════════════════════════════════
 
 ID_MOLHEXLATTICE  = 1068899
-NAME_MOLHEXLATTICE = "Molecular Hex Lattice v1.9"
+NAME_MOLHEXLATTICE = "Molecular Hex Lattice v1.9.1"
 
 # ══════════════════════════════════════════════════════════════════════════════
 #  UserData SubID — СТРОГО совпадают с порядком вызовов AddUserData
@@ -1071,124 +1071,12 @@ class MolecularHexLatticeObject(c4d.plugins.ObjectData):
     def Draw(self, op, drawpass, bd, bh):
         return c4d.DRAWRESULT_OK
 
-# ══════════════════════════════════════════════════════════════════════════════
-#  Иконка (32×32, молекула из гексагональных шаров)
-# ══════════════════════════════════════════════════════════════════════════════
+_ICON_B64 = (
+    "iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAACXBIWXMAAAsTAAALEwEAmpwYAAAE7mlUWHRYTUw6Y29tLmFkb2JlLnhtcAAAAAAAPD94cGFja2V0IGJlZ2luPSLvu78iIGlkPSJXNU0wTXBDZWhpSHpyZVN6TlRjemtjOWQiPz4gPHg6eG1wbWV0YSB4bWxuczp4PSJhZG9iZTpuczptZXRhLyIgeDp4bXB0az0iQWRvYmUgWE1QIENvcmUgOS4xLWMwMDIgNzkuNzhiNzYzOCwgMjAyNS8wMi8xMS0xOToxMDowOCAgICAgICAgIj4gPHJkZjpSREYgeG1sbnM6cmRmPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5LzAyLzIyLXJkZi1zeW50YXgtbnMjIj4gPHJkZjpEZXNjcmlwdGlvbiByZGY6YWJvdXQ9IiIgeG1sbnM6eG1wPSJodHRwOi8vbnMuYWRvYmUuY29tL3hhcC8xLjAvIiB4bWxuczpkYz0iaHR0cDovL3B1cmwub3JnL2RjL2VsZW1lbnRzLzEuMS8iIHhtbG5zOnBob3Rvc2hvcD0iaHR0cDovL25zLmFkb2JlLmNvbS9waG90b3Nob3AvMS4wLyIgeG1sbnM6eG1wTU09Imh0dHA6Ly9ucy5hZG9iZS5jb20veGFwLzEuMC9tbS8iIHhtbG5zOnN0RXZ0PSJodHRwOi8vbnMuYWRvYmUuY29tL3hhcC8xLjAvc1R5cGUvUmVzb3VyY2VFdmVudCMiIHhtcDpDcmVhdG9yVG9vbD0iQWRvYmUgUGhvdG9zaG9wIDI2LjUgKFdpbmRvd3MpIiB4bXA6Q3JlYXRlRGF0ZT0iMjAyNi0wNi0xNlQxNjozMzowOSswMzowMCIgeG1wOk1vZGlmeURhdGU9IjIwMjYtMDYtMTZUMTY6MzU6MTkrMDM6MDAiIHhtcDpNZXRhZGF0YURhdGU9IjIwMjYtMDYtMTZUMTY6MzU6MTkrMDM6MDAiIGRjOmZvcm1hdD0iaW1hZ2UvcG5nIiBwaG90b3Nob3A6Q29sb3JNb2RlPSIzIiB4bXBNTTpJbnN0YW5jZUlEPSJ4bXAuaWlkOmY4Y2Y1MGViLTc0NzctNWQ0MC04MjU1LThiNGU0NTY4ZTA4NCIgeG1wTU06RG9jdW1lbnRJRD0ieG1wLmRpZDpmOGNmNTBlYi03NDc3LTVkNDAtODI1NS04YjRlNDU2OGUwODQiIHhtcE1NOk9yaWdpbmFsRG9jdW1lbnRJRD0ieG1wLmRpZDpmOGNmNTBlYi03NDc3LTVkNDAtODI1NS04YjRlNDU2OGUwODQiPiA8eG1wTU06SGlzdG9yeT4gPHJkZjpTZXE+IDxyZGY6bGkgc3RFdnQ6YWN0aW9uPSJjcmVhdGVkIiBzdEV2dDppbnN0YW5jZUlEPSJ4bXAuaWlkOmY4Y2Y1MGViLTc0NzctNWQ0MC04MjU1LThiNGU0NTY4ZTA4NCIgc3RFdnQ6d2hlbj0iMjAyNi0wNi0xNlQxNjozMzowOSswMzowMCIgc3RFdnQ6c29mdHdhcmVBZ2VudD0iQWRvYmUgUGhvdG9zaG9wIDI2LjUgKFdpbmRvd3MpIi8+IDwvcmRmOlNlcT4gPC94bXBNTTpIaXN0b3J5PiA8L3JkZjpEZXNjcmlwdGlvbj4gPC9yZGY6UkRGPiA8L3g6eG1wbWV0YT4gPD94cGFja2V0IGVuZD0iciI/PnsS39sAAALqSURBVFiF7VdfSFNRHP5+95h/t6kRhCQlOCkwBtKb4EMYvkRBL8GmD1K+VfagRI8+mhulZk+hLEwRIgJ7K98iyyxpdyjB7rYwihg1QueG5T2/HuZ0rrnt3iB78IPB7mG/7zs7v+985x5iZuwllD1V/x8mANMt8AXdUDUdqqbDF3Sb1SZmBhGBb5/oBnMndDFKN5bu5a1WtQ0AYvNJh8NelFcwQ4OZky3gYbsNEkNgapICIzxst+UiGnNyjzUhUuKwJoQYc3JPTvFhu01KGgJTExR5N6WR7gEGgLhSjIqW6Tkshh2ZJOMd3PrAxZ8Ugufs66oIgSSBZNvbymWF4PG6+PtYO5/7Q30x7LC2PHkTFyXbY9ESuTUB6tZWIJVrABbGa04/jIuSGui6D6r2Baqmk0/TL4xEl3WJGQbKJeH81PXqw+yoF+yoF4+vHDwmFJwhIK4wpi8O/oiQb9MfajAEXX8fKyqtHT3S9gjAAiCvUt9iLPm3dzOhPzgAVePUxzoXZm879+ZaZgDwtnOvdS7M6bXwBweytiXdhFmhajq221SQ0Tbr0g0q4bCLbD/bMuGuILjL1wXK1wVA8BQknqzzpNXl3qL5csDr4iWvi5cKFjdQl38F/gH2J5DbA76gu2w+xGXzITaU9wXWFbINDee9kTpDJrQmhCg4iNLOiXzIlwMeAHoq78Fwb+V9OFwFv9YPv9aPQMCWOifAcKfOCQB6vvzI3YIMjHdwq5Twrh/g2ptdyzJauaEAQPVKkbx1/6hS/IuiktB5aYKeFsLHzOZeSJonvs7syHpV45aJyDOjPKaDaPbk6qvMsReO1VkzXOZyYK30DoBE2kgcFmXQDJUhD+xAIGBDAiEAgPhZh8bGmFGKvzsLGhpWAIoAFDEjnoLpFeC+U4dGjzd/ZCJ0fXhZR33vvhnmYEZhyZYNltjU5c/PK5LfMQmgzQyN+RYQtvcvw/T9zvwKrFqcsKxNAgBEzGmWhvYvp3s9gd83v5eCf3My/wAAAABJRU5ErkJggg=="
+)
 
-# Генерируем настоящую иконку программно — 32×32 PNG молекулы
-def _generate_icon_png():
-    """Генерирует PNG-иконку 32×32 в виде молекулярной сетки."""
-    # Используем встроенный модуль для создания простого PNG
-    import struct
-    import zlib
-
-    width, height = 32, 32
-
-    def put_pixel(pixels, x, y, r, g, b, a=255):
-        if 0 <= x < width and 0 <= y < height:
-            idx = (y * width + x) * 4
-            pixels[idx]   = r
-            pixels[idx+1] = g
-            pixels[idx+2] = b
-            pixels[idx+3] = a
-
-    def draw_circle(pixels, cx, cy, radius, r, g, b, fill=True):
-        for dy in range(-radius, radius+1):
-            for dx in range(-radius, radius+1):
-                dist = math.sqrt(dx*dx + dy*dy)
-                if fill:
-                    if dist <= radius:
-                        put_pixel(pixels, int(cx+dx), int(cy+dy), r, g, b)
-                else:
-                    if radius-1 <= dist <= radius:
-                        put_pixel(pixels, int(cx+dx), int(cy+dy), r, g, b)
-
-    def draw_line(pixels, x0, y0, x1, y1, r, g, b, thick=1):
-        dx = x1 - x0
-        dy = y1 - y0
-        length = math.sqrt(dx*dx + dy*dy)
-        if length < 0.001:
-            return
-        steps = int(length * 2) + 1
-        for i in range(steps):
-            t = i / steps
-            px = int(x0 + dx * t)
-            py = int(y0 + dy * t)
-            for tx in range(-thick+1, thick):
-                for ty in range(-thick+1, thick):
-                    put_pixel(pixels, px+tx, py+ty, r, g, b)
-
-    # Прозрачный фон
-    pixels = bytearray([0] * (width * height * 4))
-
-    # Тёмный фон
-    for i in range(width * height):
-        pixels[i*4]   = 18
-        pixels[i*4+1] = 20
-        pixels[i*4+2] = 35
-        pixels[i*4+3] = 255
-
-    # Молекулярные узлы (позиции)
-    nodes = [
-        (8, 8), (24, 8),
-        (16, 16),
-        (4, 22), (28, 22),
-        (10, 28), (22, 28),
-    ]
-
-    # Связи между узлами
-    bonds = [
-        (0,1), (0,2), (1,2),
-        (0,3), (1,4),
-        (2,5), (2,6),
-        (3,5), (4,6),
-        (5,6),
-    ]
-
-    # Рисуем трубки (связи) — сначала, чтобы шары перекрывали их
-    for a_idx, b_idx in bonds:
-        ax, ay = nodes[a_idx]
-        bx, by = nodes[b_idx]
-        draw_line(pixels, ax, ay, bx, by, 80, 160, 220, thick=1)
-
-    # Рисуем шары поверх трубок
-    for i, (nx, ny) in enumerate(nodes):
-        # Градиентный шар — внешний обод
-        draw_circle(pixels, nx, ny, 4, 30, 100, 200)
-        # Светлый верх (имитация объёма)
-        draw_circle(pixels, nx-1, ny-1, 2, 120, 200, 255)
-        # Гексагональная решётка на шаре (маленькая)
-        put_pixel(pixels, nx, ny, 200, 240, 255)
-
-    # PNG encode
-    def make_png(pixels, w, h):
-        raw_rows = []
-        for y in range(h):
-            row = bytearray([0])  # filter type None
-            for x in range(w):
-                idx = (y * w + x) * 4
-                row += pixels[idx:idx+4]
-            raw_rows.append(bytes(row))
-        raw_data = b''.join(raw_rows)
-        compressed = zlib.compress(raw_data, 9)
-
-        def chunk(name, data):
-            length = struct.pack('>I', len(data))
-            crc    = struct.pack('>I', zlib.crc32(name + data) & 0xFFFFFFFF)
-            return length + name + data + crc
-
-        ihdr_data = struct.pack('>IIBBBBB', w, h, 8, 6, 0, 0, 0)
-        png = (b'\x89PNG\r\n\x1a\n'
-               + chunk(b'IHDR', ihdr_data)
-               + chunk(b'IDAT', compressed)
-               + chunk(b'IEND', b''))
-        return png
-
-    return make_png(pixels, width, height)
-
-
-def _make_icon_ml():
-    png_data = _generate_icon_png()
+def _make_icon():
+    png_data = base64.b64decode(_ICON_B64)
     try:
         bmp = c4d.bitmaps.BaseBitmap()
     except AttributeError:
@@ -1199,24 +1087,22 @@ def _make_icon_ml():
         tmp.close()
         bmp.InitWith(tmp.name)
     finally:
-        try:
-            os.unlink(tmp.name)
-        except Exception:
-            pass
+        os.unlink(tmp.name)
     return bmp
+
+
+ICON_B64 = _make_icon()
 
 # ══════════════════════════════════════════════════════════════════════════════
 #  Точка входа — регистрация плагина
 # ══════════════════════════════════════════════════════════════════════════════
 
 if __name__ == "__main__":
-    ICO_ML = _make_icon_ml()
-
     c4d.plugins.RegisterObjectPlugin(
         id          = ID_MOLHEXLATTICE,
         str         = NAME_MOLHEXLATTICE,
         g           = MolecularHexLatticeObject,
         description = "",
-        icon        = ICO_ML,
+        icon        = ICON_B64,
         info        = c4d.OBJECT_GENERATOR,
     )

@@ -39,7 +39,7 @@ import tempfile
 # ─── Идентификатор плагина ────────────────────────────────────────────────────
 PLUGIN_ID = 1068825
 PLUGIN_NAME = "Object Renamer PRO"
-PLUGIN_NAME_V = "Object Renamer PRO v2.4"
+PLUGIN_NAME_V = "Object Renamer PRO v2.5"
 
 # ─── Размеры окна ─────────────────────────────────────────────────────────────
 DIALOG_DEFAULT_W = 100   # ширина окна по умолчанию (px)
@@ -1574,42 +1574,7 @@ class RenamerPlugin(c4d.plugins.CommandData):
 
 # ─── Встроенная иконка (base64 PNG 32×32) ────────────────────────────────────
 _ICON_B64 = (
-    "iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAGd0lEQVR4nL2XfYxc"
-    "ZRXGf+e9X3NnZ3Zn292lLH5AKYvdgG0NsRZtamOtGqwaUdREiTFYDCBNJJoIlPQP"
-    "EyWhxSqVEhOJpAZME0y0akrEkC2pqNlKpNW2aYXKdrftfm93dmfm3vse/7jzsdv9"
-    "iOLqSWZyk3vvec45z3POeS80zPD/M7nywgD2qs4btwF3KNoBoDMe/C/RNL2QMYRf"
-    "Xuo79bMattTA26/uesxxnAdAUWWJoGeYggiAIbHxs4P9a74EB1UArrrmhttE3EPW"
-    "xnE15qWGr0WhgHUcz4+T+J7B/tNPugBquVMctYiAMe5b9m91Bs58JgCJtdaK8kWg"
-    "GgAsVxFDomouT/LvcXDFM6poGKDGgLOongUwKhQAXAAxJpEoxvouxc99BNvc1Mhm"
-    "Xmyt4ssMGQuZnr8gxSnMxOTi76dm6wGoWlHXZWzndqJNt8B0iSodVTnUnEkKHnjg"
-    "OFCqgLXpLc9lesv7cC4MEfz5BLmf/gq7vAXiZLFK4CJgLk8RbVhDdOtauDQCuTB9"
-    "ZKIIaqmnaS3kQrIHDpF5qZfxh79K0t4KUapdu7wF27GMaE0X7j8vEPT0oi05SOyC"
-    "ZWiQ5TipI88l+9xhcj9+Pk3edVNOHQO+h0xOEx7+A97pNwiO9EIum1bJdVKgcgUS"
-    "y/i3v0LUvRKZLoNZWE+NAKyFMIN/4gwtjx8g/8RzBEeOQVOYOrYWmkL8V17D5psY"
-    "23k34Yt/glK5IboabZUIbcoy/uBdaOAvqodGACJQqRC/fQXl9TdRWfcuohuvTTOq"
-    "ZaBK2NOLe66f8IWjuGf78I6fhUzQ0EKtgxxDePgoUq4sOlYaPe84YBWbzzHy3R1I"
-    "kqDZMA2AlApz/hLuG+e5fO/nSbqvAxGyLx9j8pZuEqsg1XFXyBEefIHcM4ewzdlF"
-    "5gK4KNggwDk3gExMooU8RDEqkmaVCeoVssuaGd73ILqsBXyPie/chx0chtFRyOUh"
-    "ipBiCe/VUzT/8FlsPptWg8UCAMh4OANDtOx6kuJdn0YDL+VtZp8DxkkFaUYmKBWn"
-    "sFGZbRs2sjrXyuO9PYS/PYoZGMQ724cYSalTXQS+FoBVNBsQvHoK//5HkcCrl63a"
-    "YSBQKk5gbUKiwurrr2fXrkfYuqyLvXv3E/5oH34C6hoSY0gcH6K0hT03zWM+LTY0"
-    "oIrNBDgClchibRpDR6sDKEaE7Tu/T1tbK1HpMlu3fpi+fxxn2+2f5OTJv7GirVDN"
-    "mPqkVBxEYGgswSpkfJkTxKzF44oyVlQ23hRwwzUum9YEbFmfgYoiIhRWT0C+BQq3"
-    "w9DTdBT38JuHmhGnmziJZ3tWiC04nvD3cxHbd4/QP5zge7M7oh6AEShXlPYWw74d"
-    "Bd7Z7uKFAolCKCAu9uT3iN+xg/PlLRzZ/xTTpYD1qx3WrlZIrlxAkr43pdy6IeQH"
-    "9xb4xCPDBN5sSZran7UwXVZ+8kArq1b5OAZsSdGY6i9B/avxmyJ+//wevrV/gOGi"
-    "YfM3L/DysRLqCXEFbJxObxsrR/84zdS0xU5ZrlvhkgtlzlQ2kIp9uqI88fVWPrQx"
-    "SzxuZ+2itBkUFR8GD8Kbz5AJs1wcqrA879DZ5iA2fV4VJCM8/PQ477/vEl/bO4px"
-    "hSiefxzMqlt7s6nzN//sUnDyqJMjH8JnPpqjkBN6/loGX9K9VbXRSQuRMnJ54UUE"
-    "tXUMBJ7w5cdG+F2Hy7qbfZJJrWdfZbSagaVcSegbSnjltTJ9Q+m6rR0RHAHKyu67"
-    "C2x+d8AH12awieI4qa8rq+BC2p+em07dOx8d5sXdHXS0GHAFKo03XAcoKR97b4am"
-    "jFCcVn7+0HI2rQugaNP7aYxkQ+GOj+egaMEXhicsU2UlGyzQBYmFXCic7ou5f+8o"
-    "3dd6bF4T8IH3ZNCKYmrVqCgr3+axcpWfEhgpTM3lTBOIxyzGg9fPRHxj/xiGuYNZ"
-    "ADo6uw6LMVvV2sQITpSkpfJcWNnpztGE1eryq07qhY6ACoiBNy8mjBUtTYFgFSti"
-    "jFV7fLD/9M3VI1njyGCVeilV4cTr0fze/wPzPaEpI/WNXTUDNQpEJ4Hq8JW6UATm"
-    "cPZWTGEmuFaxivUARM1BwXxKSWIgqWLXx/oSW2yMCbDJL6DxaUZ7Z9cBx3G/oNYy"
-    "58y/JJb6FGOwcfySQ/62gYHeksxA0vbOrnsEPgu0zWBhSUxAERkX5NcXw3gPZ86U"
-    "F/P/v/g2vNKnAPwL3KXD6/9c9r4AAAAASUVORK5CYII="
+    "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"
 )
 
 

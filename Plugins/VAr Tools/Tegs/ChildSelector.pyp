@@ -18,7 +18,7 @@ import tempfile
 PLUGIN_ID_CMD = 1068900   # CommandData — кнопка в меню
 PLUGIN_ID_TAG = 1068901   # TagData     — тег
 
-PLUGIN_NAME_V = "Child Selector Tag v1.1"
+PLUGIN_NAME_V = "Child Selector Tag v1.1.1"
 TEG_NAME      = "Child Selector Tag"
 PLUGIN_HELP   = "Добавить тег выбора дочернего объекта"
 
@@ -185,46 +185,8 @@ class ChildSelectorCmd(c4d.plugins.CommandData):
 # ── Иконки (b64, 32×32 PNG) ───────────────────────────────────────────────────
 # Иконка кнопки — синий квадрат с буквой C
 _ICON_PLG_B64 = (
-    "iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAIAAAD8GO2jAAABoElEQVR4nGPU0NBgoCVgoqnpDAwMLJhC"
-    "169fp8RETU1NZC66Dyg0HdMERuQ4gMgxVt6gxIL/7RoMSP5A+IAqpsNNgPuDibqmY9oxEKkICjo0cUpB"
-    "QAUsMjFVViDiGbcFDAz////HJcXIyIii8kQKQspiDrIUFYLoxAmc7mDA7wPCRgcQLmbI9MGJE/8hplts"
-    "uGFhwYhHJUU+gAO0cKeCBRYWjIigr8BXupAfyRYbbjAQEQ34fICWFskDuC3A63EIsNhw40SAxokADfR4"
-    "JjKjEQ9omNEgMXGSYTYuBVTIyRYWjOYMqTS0AD8YrBkNBdAooxEJhr4FiGYLvN4X5mKudxbxUueR4Wd5"
-    "/fXvrFMfmve9YWBgyLEULLYVkuZj+fb7/+03v0ynPsBlKHLLBRHJmpqa169f/9+ucevNLwVB1rhVz7fd"
-    "/KInwe6sws3AwKAmwjbZT3zemY+5m16qirDWOokQYzoDWsOLgRotOwbU1iN6HEyYMIGKpjNg5oNnz54x"
-    "MDCsXbu2pqYGUzM7O7uOjk5OTo6FhUVtbe2aNWsI2gcAbDeLOb51KUEAAAAASUVORK5CYII="
+    "iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAACXBIWXMAAAsTAAALEwEAmpwYAAAE7mlUWHRYTUw6Y29tLmFkb2JlLnhtcAAAAAAAPD94cGFja2V0IGJlZ2luPSLvu78iIGlkPSJXNU0wTXBDZWhpSHpyZVN6TlRjemtjOWQiPz4gPHg6eG1wbWV0YSB4bWxuczp4PSJhZG9iZTpuczptZXRhLyIgeDp4bXB0az0iQWRvYmUgWE1QIENvcmUgOS4xLWMwMDIgNzkuNzhiNzYzOCwgMjAyNS8wMi8xMS0xOToxMDowOCAgICAgICAgIj4gPHJkZjpSREYgeG1sbnM6cmRmPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5LzAyLzIyLXJkZi1zeW50YXgtbnMjIj4gPHJkZjpEZXNjcmlwdGlvbiByZGY6YWJvdXQ9IiIgeG1sbnM6eG1wPSJodHRwOi8vbnMuYWRvYmUuY29tL3hhcC8xLjAvIiB4bWxuczpkYz0iaHR0cDovL3B1cmwub3JnL2RjL2VsZW1lbnRzLzEuMS8iIHhtbG5zOnBob3Rvc2hvcD0iaHR0cDovL25zLmFkb2JlLmNvbS9waG90b3Nob3AvMS4wLyIgeG1sbnM6eG1wTU09Imh0dHA6Ly9ucy5hZG9iZS5jb20veGFwLzEuMC9tbS8iIHhtbG5zOnN0RXZ0PSJodHRwOi8vbnMuYWRvYmUuY29tL3hhcC8xLjAvc1R5cGUvUmVzb3VyY2VFdmVudCMiIHhtcDpDcmVhdG9yVG9vbD0iQWRvYmUgUGhvdG9zaG9wIDI2LjUgKFdpbmRvd3MpIiB4bXA6Q3JlYXRlRGF0ZT0iMjAyNi0wNi0xNlQxNjozMzowOSswMzowMCIgeG1wOk1vZGlmeURhdGU9IjIwMjYtMDYtMTZUMTY6MzY6MDMrMDM6MDAiIHhtcDpNZXRhZGF0YURhdGU9IjIwMjYtMDYtMTZUMTY6MzY6MDMrMDM6MDAiIGRjOmZvcm1hdD0iaW1hZ2UvcG5nIiBwaG90b3Nob3A6Q29sb3JNb2RlPSIzIiB4bXBNTTpJbnN0YW5jZUlEPSJ4bXAuaWlkOjk0YWMwMDAxLTkwMjUtMDQ0MC04YjFjLWU5ODg2YWIxZTRmNiIgeG1wTU06RG9jdW1lbnRJRD0ieG1wLmRpZDo5NGFjMDAwMS05MDI1LTA0NDAtOGIxYy1lOTg4NmFiMWU0ZjYiIHhtcE1NOk9yaWdpbmFsRG9jdW1lbnRJRD0ieG1wLmRpZDo5NGFjMDAwMS05MDI1LTA0NDAtOGIxYy1lOTg4NmFiMWU0ZjYiPiA8eG1wTU06SGlzdG9yeT4gPHJkZjpTZXE+IDxyZGY6bGkgc3RFdnQ6YWN0aW9uPSJjcmVhdGVkIiBzdEV2dDppbnN0YW5jZUlEPSJ4bXAuaWlkOjk0YWMwMDAxLTkwMjUtMDQ0MC04YjFjLWU5ODg2YWIxZTRmNiIgc3RFdnQ6d2hlbj0iMjAyNi0wNi0xNlQxNjozMzowOSswMzowMCIgc3RFdnQ6c29mdHdhcmVBZ2VudD0iQWRvYmUgUGhvdG9zaG9wIDI2LjUgKFdpbmRvd3MpIi8+IDwvcmRmOlNlcT4gPC94bXBNTTpIaXN0b3J5PiA8L3JkZjpEZXNjcmlwdGlvbj4gPC9yZGY6UkRGPiA8L3g6eG1wbWV0YT4gPD94cGFja2V0IGVuZD0iciI/PvE1qIYAAAKlSURBVFiF7ZfPS1RRFMc/5840OqRBRNRC+jUaScyIrbRNrTL6AyJbRD9AoTZaRi3FhRCWuWnRIpU2RS1cSAot27YYeEpkMyolSqShixl19L13WsxM+XPU8YlBfVfv3vPO+36457z73hVVZTdldtX9bwBAVVm3DIMjTVjxSaz4JIMjTTvhK1lzEVlt7rptgJOZ8eFzH3L65COvACBXCRy3CXA6W0Ptna2hdsDBNo1emC+VP3dYMMK17DV4/8asD2BMG+o+vn/726H0hKbnvFbOJrSGGyt7JpzKngkHa9jT5d+4CTPqrtXvANdfyWGvAWDDHgCFg+uweaKcG1FXrdYZwQiYrlqt2wmAdUvw4qaW+eYZQnFJh4wGqLjRLQNeGOfcBxT1+eexgAWFKaNMAfOywMfmZg14AZDVmgAvrzKiUJBa5IwALuAUUgEEjsX4snMA0dFwee/4zLvq6SPR0GxL/Vv5lA3d6pRYNDTb0lc1fbS8d3yG6GjYC4DlPWDFF/fO+YwAiaDj6vtLd1wNPgcwMlcvF/qeFc35jALJoOMSKd2Tr/HqHnijQcCfLJaaRLHUAH5bAw1GUhhJkdLCBsCfKJaaZCaeydmW/gBcljnAxrb7se1+wPbLQgfpD4AWyHzHyngmZ1taXoLoaBi/8xoA23eFyuPLX7nfcQ2gphjYt3VL9weJwrNaXTKxGmCzGoiPoZRAPiugQVQsjZyogE1sxWs/Q/cDSSKlRVvOtWIJREPZYX4Am5S2n2rElScAGL0ndz8/XXlPfiWwYgkAImVFWHEXWJn8gUjpOQBtK/+JuEjT0IGluRpOr972VyBSmvvP2nWrcoV3tAQA8mAo5j2AmhFEw1jDs3kkB4Gx7Ci/g0kycBHVr3nlwhi+1PnsQP6fDf95gF/eBy9OJpogYgAAAABJRU5ErkJggg=="
 )
-
-# Иконка тега — оранжевый квадрат с буквой T
-_ICON_TAG_B64 = (
-    "iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAIAAAD8GO2jAAABh0lEQVR4nNVWv0uFUBg99xFIUFBEUy0t"
-    "8R48gqDwBkLQ2F9Qe9HiZltKQ2uBUDRUY0ugY2uThG9tcXhTDS4t0fCWhtvgS++74lX0SnU2/a7neL4f"
-    "+pFut4s20WmVHcBU/lYURU0Ye70efyk6aMieZyB8DcaxC9JIwWLgfGQO1LD/MKQ+OorZcxq/0UUJyHHJ"
-    "k+y88GQakgkAYIwVypOJZLLwIAvROz6kIEVhWPgekDsoxcCQUSeo6SAMWcKuB4RSWe81cpBCyLsCAUpJ"
-    "mnq+Z/KoX2Q9IKhQBpkDoRfroVBAbjyBHpCBwQYGE+pcddCqo8VBG1cCt0UHFEwypUTHYYsCcvzVQePR"
-    "1qBVxP8XyNaW7L8/vYCtU6zsYnYZo3e83CA8A4B1ExsWZpbwNcLHEPebhazc5pI5GG8yFsP+M9aOEJzg"
-    "ehGPe0i+SPOr2LnE2xOu5vCwjc/XKuwQFi+o2OwwuT2KNXBdVyE78nMQxzEA3/dt284/rGlav983TZNS"
-    "6jiO53mlet/UC3rDfQqS2gAAAABJRU5ErkJggg=="
-)
-
-def _make_icon_teg():
-    """Декодирует встроенный base64 PNG во временный файл и возвращает BaseBitmap."""
-    bmp = c4d.bitmaps.BaseBitmap()
-    try:
-        data = base64.b64decode(_ICON_TAG_B64.replace(" ", ""))
-        fd, tmp = tempfile.mkstemp(suffix=".png")
-        try:
-            os.write(fd, data)
-            os.close(fd)
-            bmp.InitWith(tmp)
-        finally:
-            try:
-                os.unlink(tmp)
-            except OSError:
-                pass
-    except Exception:
-        return None
-    return bmp
 
 def _make_icon_plg():
     """Декодирует встроенный base64 PNG во временный файл и возвращает BaseBitmap."""
@@ -245,7 +207,6 @@ def _make_icon_plg():
         return None
     return bmp    
 
-ICON_TEG = _make_icon_teg()
 ICON_PLG = _make_icon_plg()
 
 # ── Регистрация ───────────────────────────────────────────────────────────────
@@ -258,7 +219,7 @@ if __name__ == "__main__":
         info=c4d.TAG_EXPRESSION | c4d.TAG_VISIBLE,
         g=ChildSelectorTag,
         description="",
-        icon=ICON_TEG
+        icon=ICON_PLG
     )
 
     # Регистрация кнопки

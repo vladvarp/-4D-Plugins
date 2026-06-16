@@ -7,9 +7,12 @@ AboutVArTools - Cinema 4D Command Plugin
 import c4d
 from c4d import gui
 import webbrowser
+import os
+import base64
+import tempfile
 
 PLUGIN_ID   = 1068833
-VERS = 'v2.29.2'
+VERS = 'v2.30.28'
 LABLE =  'VAr Tools'
 PLUGIN_NAME = "About"
 PLUGIN_HELP = "Информация о наборе плагинов VAr Tools"
@@ -106,43 +109,23 @@ class AboutCommand(c4d.plugins.CommandData):
 
 # --- Иконка: рисуем программно 32x32 -----------------------------------------
 
+_ICON_B64 = (
+    "iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAEuklEQVR4nMWXX4hUdRTHP+femV11V3Ptj7qmIYKKaf7BCGQhth6MKCQogx4iMowefOtZX6IiCCwS8iGSoCVmQSLIp+IGSqDN6sydcWfdmdk/s62rrtbKro7OzL2nhzv37szOzM6uIh0YmPu7v98533PO93fOufA/izzwSdXqsyL6sGCay7FjBpYVIqJmHUAGloZQNRajcmER8Lw1EHGCNcsKsW5LBwAFM8/21TNz9gsi7sMDUDUDw7GBjYRb38Mw9+E4axCW4boCFBC5hWFGMeVHtmy4UHO2gYTmNW5ZIURK9KU6WbHia0R2UigkMY0eigUbd2YMd5nSIo9hhnfhOK9gtnxP+uo094sfI3IOVaPMj0VyRMt5vjx0gFRuguy1r+gfWdv0XDLZQnr8CFfGJujPHS3rMmpIuyDjdvoIA7kJEunuqndal4TV6319naRG+7CzPYAXzUUZT2RfJ56eIhp9orweCrxQNTgz2Eoi8yX9Iz8TyzyFqgTkU501Fs/8iZ09vjAQfqj6R9ZiZ/4hlu0CIBoN1wBMZl7ixowy7SrxzKcByOqIGFwaXomdvUEi+1rV+bLMvbOCiFIsnQT5iV2bzhGNhtm7t1ixx0VVaHET3Jg8y9XxMYTTwbtAkziAsHvjFOp+gOq3DA8vCc7X8d5bTGY3YGfGuTj4ZEPy+GuRiIlltdeN5tyI2Zko8ew7c6NQmRMTKOFwCLjAns2T5XtcW0xEFFUpezlTvmqNio7HjcTQKdDDQE/ly8oUePdU3C7E/SUgVCPxa//Jk+EmFc9BRHHNX4GniU20IeL4UfQAeA8usVgbKmuR0MWygfqK/bpvZ3rp2m9jZ1dX3IJaoKrC3avXEO5h3NkaRKYqAiIK7W0IS5HQWFVUqo17Nf7x3HLgVVat2orq9jLgRo1I2Lcvj8g0wjMA9M4FMGsA7sw0r1qOqyh3yOddxC013e+D12qnqgHodAGRAstCKxek0OuQBiLNACvRaBilFdF/awF4eTLYvXsKuAnmLrwcLaq31zetXm1p6ViFsAJtiQPwlsevSgP+/xiq+/Hy/+ATU6VeVQH3RWCKHRtuV3TIKgAe40VOAS8zONhKw6oViKLq/eYTEUWMd8HtLV/ZwG7lLXBRNdix6S9Up7knh8ubazsfgGkISBjTFNBw3T2epw7JwW0oXZT4ruxQMKTUy7EgfATyCXZ2NeDWzICqwnI3D/o39/IObigXRKRyjw/eMXrA+Zw9myfxiDtPxPw6HRs8ip1O1KzPKoe+VCfnLz9bteZ77ndGO3OCeMaq0TGvWP7hdA8Do39w1u4IFFtWqKbq+c+qZlXPvzz8DXYmiT3asbipyFPmpad/+DipXI7M+Bu1QK1Q1Qzgy5WhnQyMnic1+huXhlcG4OtIY0SVo3V86ABtS79AdZJCsZdW4wy/Xx/hw4o5ITXaSbHUzZLWNzHM53FKJ9iy/rPAeIOG1TwklhWiu7uEdSzEmkNvo/o+hqyjVCqi3EVdEAljGMsxjJsYcpr7xR94btP1stc6H+kWlpNIxOTgwdn5Pplsx2jfjBFeDyUoure5m0/wwrZbwZ4FfBMsTnySRSKNmVxJ0kcqPkn9UTwSMR+90Uck/wGFl23zKpoE/wAAAABJRU5ErkJggg=="
+)
+
 def _make_icon():
-    """
-    Рисует иконку 'i' (информация) на синем круге.
-    Без внешних файлов - совместимо с R26+.
-    """
-    SIZE = 32
+    png_data = base64.b64decode(_ICON_B64)
     try:
         bmp = c4d.bitmaps.BaseBitmap()
     except AttributeError:
         bmp = c4d.BaseBitmap()
-
-    bmp.Init(SIZE, SIZE, 32)
-
-    BG     = (40,  40,  40)
-    CIRCLE = (60, 130, 220)
-    TEXT   = (255, 255, 255)
-
-    cx, cy, r = SIZE // 2, SIZE // 2, SIZE // 2 - 1
-
-    for y in range(SIZE):
-        for x in range(SIZE):
-            dx, dy = x - cx, y - cy
-            if dx * dx + dy * dy <= r * r:
-                bmp.SetPixel(x, y, CIRCLE[0], CIRCLE[1], CIRCLE[2])
-            else:
-                bmp.SetPixel(x, y, BG[0], BG[1], BG[2])
-
-    # Точка над буквой 'i'
-    for dy in range(-1, 2):
-        for dx in range(-1, 2):
-            bmp.SetPixel(cx + dx, cy - 7 + dy, TEXT[0], TEXT[1], TEXT[2])
-
-    # Палочка буквы 'i'
-    for dy in range(0, 9):
-        for dx in range(-1, 1):
-            bmp.SetPixel(cx + dx, cy - 2 + dy, TEXT[0], TEXT[1], TEXT[2])
-
+    tmp = tempfile.NamedTemporaryFile(suffix=".png", delete=False)
+    try:
+        tmp.write(png_data)
+        tmp.close()
+        bmp.InitWith(tmp.name)
+    finally:
+        os.unlink(tmp.name)
     return bmp
 
 

@@ -1,7 +1,7 @@
 ---
 title: Camera Resolution Manager
 tagline: Управление разрешением рендера для каждой камеры в сцене — назначай, активируй и переключай форматы прямо из плавающей панели.
-version: v1.5
+version: v1.6
 author: V.Ar Production
 updated: Июнь 2026
 icon: ico/CameraResolution.png

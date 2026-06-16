@@ -8,19 +8,13 @@ import c4d
 import base64
 
 PLUGIN_ID   = 1068839
-PLUGIN_NAME = "Center2World XZ v1.1"
+PLUGIN_NAME = "Center2World XZ v1.1.1"
 PLUGIN_HELP = "Центрировать выделенные объекты по X и Z в мировом пространстве (Y не меняется)"
 
 
 # ─── Встроенная иконка (base64 PNG 32×32) ────────────────────────────────────
 _ICON_B64 = (
-    "iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAABAElEQVR4nO2VvQ2D"
-    "MBCFj5ApoGQES6ZjgVQ07IHEGEjZgyZVFqDDEiOkZIwoKSJHlmWb81+cgtcgg87v"
-    "k8/cy4qieEFCnVKaBwGglKYF8NVZfjHPM6qwaZo4AJjNsZAYJW/BLgAZtyUZADeP"
-    "CWEEWIeyFp8/B4htjgKQFbodVgDcvGdVMIhMDqO9f7xn1XKlj5rPCjJuAACwDmUY"
-    "ABtxcywAGbe7uF6H8uI8iERz1Rqr7yi2SbVnd9NC5VOrrzMBMMbQAKTTfzPto6pT"
-    "htGeeL9t74BKXpdQhHAFcDoBUfnUWrVP1v/H8QFwAMSW8xyQgwXgEy62+yQ/gQPA"
-    "Owt89QYo71DJJS4D5wAAAABJRU5ErkJggg=="
+    "iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAABAElEQVR4nGNgGAWjgFJw6Y4NJdqZqOUOcgEjxSZcurOFaLV6Kj7oQiwUOwACIohQswKbIE2i4L+uMjEOop0DSAHUigIGBgZUn8PYjJfvYg16mjiA8fLdFf93+XxmKL6eSshiGKA4Cv7v8vFGYn9mdNvCS4p+qqUBZMuJ9T0DA4XlwP8ejf9YDXXbshWrBizlAMWW/+/R+A/DeDVcumODrdjGTITElu27fCBqd/kwMLptsf2/y+cwUXov3bFh0FM5QpQd+ADcx1BLyQ0BqqUBxpIbuM2ilq9xGk4BGPCieNQBow4g3wHoqZ/M3EBZmxDZUjLz+YBHAeWAwoJoFAw4AADhhWKXKyybDQAAAABJRU5ErkJggg=="
 )
 
 
