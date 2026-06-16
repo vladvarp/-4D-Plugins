@@ -39,7 +39,7 @@ import tempfile
 # ─── Идентификатор плагина ────────────────────────────────────────────────────
 PLUGIN_ID = 1068825
 PLUGIN_NAME = "Object Renamer PRO"
-PLUGIN_NAME_V = "Object Renamer PRO v2.5"
+PLUGIN_NAME_V = "Object Renamer PRO v2.6"
 
 # ─── Размеры окна ─────────────────────────────────────────────────────────────
 DIALOG_DEFAULT_W = 100   # ширина окна по умолчанию (px)
@@ -179,7 +179,7 @@ class RenamerDialog(gui.GeDialog):
         # ── ПОИСК ПО ИМЕНИ ────────────────────────────────────────────────────
         self.GroupBegin(0, c4d.BFH_SCALEFIT, 3, 0)
         self.GroupBorderSpace(0, 0, 0, 2)
-        self.AddStaticText(0, c4d.BFH_LEFT, 0, 0, "Поиск по имени::")
+        self.AddStaticText(0, c4d.BFH_LEFT, 0, 0, "Поиск по имени:")
         self.AddEditText(ID_SEL_NAME_TEXT, c4d.BFH_SCALEFIT)
         self.AddCheckbox(BTN_SEL_NAME_CASE, c4d.BFH_LEFT, 0, 0, "Учитывать регистр")
         self.GroupEnd()
@@ -463,7 +463,6 @@ class RenamerDialog(gui.GeDialog):
         c4d.Obackground:     "BG",
         c4d.Ostage:          "STAGE",
         c4d.Ofloor:          "FLOOR",
-        c4d.Osphere:         "HEMI",   # hemisphere/dome, если отдельный тип
 
         # ── ПЕРСОНАЖ / РИГ ───────────────────────────────────────────────────────────
         c4d.Ojoint:          "JNT",
@@ -1587,8 +1586,14 @@ def _make_icon():
         try:
             os.write(fd, data)
             os.close(fd)
+            fd = -1
             bmp.InitWith(tmp)
         finally:
+            if fd >= 0:
+                try:
+                    os.close(fd)
+                except OSError:
+                    pass
             try:
                 os.unlink(tmp)
             except OSError:

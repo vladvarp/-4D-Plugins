@@ -66,7 +66,7 @@ function initIndexPage() {
             description: 'Инструмент для наведения порядка в сцене. Плагин решает одну из самых рутинных задач 3D-художника: быстрое и массовое переименование объектов с полным контролем над результатом.',
             icon: 'ico/ObjectRenamerPRO.png',
             tags: ['Автоматизация', 'Утилиты'],
-            version: 'v2.5',
+            version: 'v2.6',
             mdFile: 'plugins/object-renamer-pro.md'
         },
         {
