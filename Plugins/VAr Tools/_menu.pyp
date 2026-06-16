@@ -10,6 +10,7 @@ MENU_NAME = "VAr Tools"
 MENU_ITEMS = [
         {"name": "Animation", "items": [
             1068937,    # ShiftAnim2Zero
+            1068954,    # ScaleAnimTimeline
         ]},
 
         {"name": "Tools", "items": [
