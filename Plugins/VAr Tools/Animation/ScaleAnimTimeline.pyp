@@ -33,7 +33,7 @@ import tempfile
 # Уникальный ID плагина (получен из диапазона для частных плагинов)
 PLUGIN_ID = 1068954
 PLUGIN_NAME = "Scale Animation Timeline"
-PLUGIN_VER  = "v1.0"
+PLUGIN_VER  = "v1.1"
 
 # ---------------------------------------------------------------------------
 # Вспомогательные функции
@@ -141,8 +141,8 @@ def scale_all_keyframes(doc, factor):
             try:
                 lt = key.GetTimeLeft()
                 rt = key.GetTimeRight()
-                key.SetTimeLeft(c4d.BaseTime(lt.Get() * factor))
-                key.SetTimeRight(c4d.BaseTime(rt.Get() * factor))
+                key.SetTimeLeft(curve, c4d.BaseTime(lt.Get() * factor))
+                key.SetTimeRight(curve, c4d.BaseTime(rt.Get() * factor))
             except AttributeError:
                 # Некоторые версии API не поддерживают эти методы — пропускаем безопасно
                 pass
