@@ -1,6 +1,6 @@
 # VAr Plugins
 
-Набор утилит для [Cinema 4D](https://www.maxon.net/), созданных для ускорения повседневной работы. Все плагины находятся в меню **VAr Tools** в разделе **Расширения** (Extensions).
+Набор утилит для [Cinema 4D](https://www.maxon.net/), созданных для ускорения повседневной работы.
 
 ## [WEB Страница](https://vladvarp.github.io/-4D-Plugins/web/)
 
