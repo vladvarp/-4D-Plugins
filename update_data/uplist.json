@@ -12,31 +12,38 @@
         {
           "name": "VAr Tools",
           "url": "https://github.com/vladvarp/-4D-Plugins/tree/main/Plugins/VAr Tools",
-          "info": "Пакет плагинов VAr Tools",
+          "info": "Пакет плагинов VAr Tools.",
           "info_url": "https://vladvarp.github.io/-4D-Plugins/web/plugin.html?md=plugins%2FVAr_Tools.md",
           "version": ""
         },
         {
           "name": "Resolution Manager",
           "url": "https://github.com/vladvarp/-4D-Plugins/tree/main/Plugins/Camera Resolution",
-          "info": "Управление разрешением рендера для каждой камеры в сцене",
+          "info": "Управление разрешением рендера для каждой камеры в сцене.",
           "info_url": "https://vladvarp.github.io/-4D-Plugins/web/plugin.html?md=plugins%2Fcamera-resolution-manager.md",
           "version": ""
         },
         {
           "name": "Object Renamer PRO",
           "url": "https://github.com/vladvarp/-4D-Plugins/tree/main/Plugins/Object Renamer PRO",
-          "info": "Плавающая немодальная панель для пакетного переименования, выделения и сортировки объектов сцены",
+          "info": "Плавающая немодальная панель для пакетного переименования, выделения и сортировки объектов сцены.",
           "info_url": "https://vladvarp.github.io/-4D-Plugins/web/plugin.html?md=plugins%2Fobject-renamer-pro.md",
           "version": ""
         },
         {
           "name": "Snapshot",
           "url": "https://github.com/vladvarp/-4D-Plugins/tree/main/Plugins/Snapshot",
-          "info": "Мгновенно превращает анимацию единый полигональный снепшот",
+          "info": "Мгновенно превращает анимацию единый полигональный снепшот.",
           "info_url": "https://vladvarp.github.io/-4D-Plugins/web/plugin.html?md=plugins%2Fsnapshot.md",
           "version": ""
-        }
+        },
+        {
+          "name": "Selection Sets",
+          "url": "https://github.com/vladvarp/-4D-Plugins/tree/main/Plugins/Selection Sets",
+          "info": "Сохранение и восстановление наборов выделения объектов.",
+          "info_url": "https://vladvarp.github.io/-4D-Plugins/web/plugin.html?md=plugins%2FSelectionSet.md",
+          "version": ""
+        }        
       ]
     }
   ]

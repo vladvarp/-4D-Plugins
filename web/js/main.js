@@ -77,6 +77,15 @@ function initIndexPage() {
             tags: ['Анимация', 'Автоматизация', 'Утилиты'],
             version: 'v1.7',
             mdFile: 'plugins/snapshot.md'
+        },
+        {
+            id: '5',
+            title: 'Selection Sets',
+            description: 'Сохранение и восстановление наборов выделения объектов. Каждый набор — это тег (Selection Set Tag) на нулевом объекте внутри контейнера "Selection Sets". Тег хранит имя набора и ссылки на объекты в пользовательских данных (UserData).диный полигональный снепшот.',
+            icon: 'ico/SelectionSet/icon_plugin.png',
+            tags: [`Выделение`, `Утилиты`, `Организация`],
+            version: 'v1.3',
+            mdFile: 'plugins/SelectionSet.md'
         }
     ];
 
@@ -403,7 +412,7 @@ function renderMarkdown(markdown) {
             const icon = iconMatch ? iconMatch[1] : '●';
             const title = iconMatch ? iconMatch[2] : header;
             const text = lines.slice(1).join(' ').trim();
-            return `<div class="feature-item"><div class="feature-icon">${icon}</div><div class="feature-title">${escapeHtml(title)}</div><div class="feature-text">${escapeHtml(text)}</div></div>`;
+            return `<div class="feature-item"><div class="feature-icon">${icon}</div><div class="feature-title">${renderInlineContent(title)}</div><div class="feature-text">${renderInlineContent(text)}</div></div>`;
         });
         return saveBlock(`<div class="feature-grid">${items.join('')}</div>`);
     });
@@ -701,11 +710,23 @@ function renderInlineSyntax(html) {
         }).join('');
     });
 
-    // Иконка/изображение: [[ico:'path/to/img.png'|WxH]] или [[ico:'path'|W*H]]
-    // Примеры: [[ico:'plugins/icon.png'|32x32]]  [[ico:'img/logo.svg'|64*64]]  [[ico:'img/pic.jpg'|120x80]]
-    html = html.replace(/\[\[ico:'([^']+)'\|(\d+)[x*](\d+)\]\]/g, (_, src, w, h) => {
+    // Иконка/изображение: [[ico:'path/to/img.png'|WxH]] или [[ico:'path':WxH]]
+    // Примеры: [[ico:'plugins/icon.png'|32x32]]  [[ico:'img/logo.svg':64*64]]  [[ico:'img/pic.jpg'|120x80]]
+
+    // Вариант -x / -H: [[ico:'path'-x]] исходный размер, [[ico:'path'-100]] высота 100px, ширина пропорционально
+    html = html.replace(/\[\[ico:'([^']+)'-(x|\d+)\]\]/g, (_, src, size) => {
+        if (size === 'x') {
+            return `<img class="md-ico" src="${escapeHtml(src)}" alt="" loading="lazy" style="object-fit:contain;vertical-align:middle;display:inline-block;border-radius:0;">`;
+        }
+        const h = parseInt(size);
+        return `<img class="md-ico" src="${escapeHtml(src)}" height="${h}" alt="" loading="lazy" style="height:${h}px;width:auto;object-fit:contain;vertical-align:middle;display:inline-block;border-radius:0;">`;
+    });
+
+    // Вариант с размером: [[ico:'path'|WxH]] или [[ico:'path':WxH]]
+    html = html.replace(/\[\[ico:'([^']+)'\[|:](\d+)[x*](\d+)\]\]/g, (_, src, w, h) => {
         return `<img class="md-ico" src="${escapeHtml(src)}" width="${parseInt(w)}" height="${parseInt(h)}" alt="" loading="lazy" style="width:${parseInt(w)}px;height:${parseInt(h)}px;object-fit:contain;vertical-align:middle;display:inline-block;border-radius:0;">`;
     });
+
     // Вариант без размеров: [[ico:'path/to/img.png']] — отображается как 36x36
     html = html.replace(/\[\[ico:'([^']+)'\]\]/g, (_, src) => {
         return `<img class="md-ico" src="${escapeHtml(src)}" width="24" height="24" alt="" loading="lazy" style="width:36px;height:36px;object-fit:contain;vertical-align:middle;display:inline-block;border-radius:0;">`;
@@ -716,15 +737,19 @@ function renderInlineSyntax(html) {
 
 // Конвертируем таблицы Markdown
 function renderMarkdownTables(html) {
+    const renderCell = (c) => {
+        const v = c.trim();
+        return v === '-' ? '' : v;
+    };
     return html.replace(/(\|.+\|\n\|[-| :]+\|\n(?:\|.+\|\n?)+)/g, tableBlock => {
         const rows = tableBlock.trim().split('\n');
         const headerCells = rows[0].split('|').filter(c => c.trim());
         const bodyRows = rows.slice(2); // пропускаем строку с ---
 
-        const thead = `<thead><tr>${headerCells.map(c => `<th>${c.trim()}</th>`).join('')}</tr></thead>`;
+        const thead = `<thead><tr>${headerCells.map(c => `<th>${renderCell(c)}</th>`).join('')}</tr></thead>`;
         const tbody = `<tbody>${bodyRows.map(row => {
             const cells = row.split('|').filter(c => c.trim());
-            return `<tr>${cells.map(c => `<td>${c.trim()}</td>`).join('')}</tr>`;
+            return `<tr>${cells.map(c => `<td>${renderCell(c)}</td>`).join('')}</tr>`;
         }).join('')}</tbody>`;
 
         return `<table>${thead}${tbody}</table>`;
