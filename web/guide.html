@@ -611,15 +611,34 @@ https://www.youtube.com/watch?v=dQw4w9WgXcQ
                                 <span class="code-example-label">Форматы [[ico:...]]</span>
                                 <button class="copy-btn">Копировать</button>
                             </div>
-                            <pre><code>[[ico:'plugins/object-renamer-pro.png'|32x32]]
-[[ico:'plugins/object-renamer-pro.png'|32*32]]
-[[ico:'plugins/icon.svg'|64x64]]
-[[ico:'img/screenshot.jpg'|120x80]]
-[[ico:'img/logo.png']]</code></pre>
+                            <pre><code>
+[[ico:'plugins/photo.png'-200]]      — высота 200px, ширина пропорционально
+[[ico:'plugins/photo.png'-x]]        — автоподгонка
+[[ico:'plugins/icon.png']]           — по умолчанию 36x36</code></pre>
                         </div>
-                        <p>
-                            Последний вариант без размера отображается как <strong>24×24 px</strong> (иконка по умолчанию).
-                        </p>
+
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Формат</th>
+                                    <th>Описание</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td><code>[[ico:'path'-H]]</code></td>
+                                    <td>Только высота H — ширина вычисляется пропорционально</td>
+                                </tr>
+                                <tr>
+                                    <td><code>[[ico:'path'-x]]</code></td>
+                                    <td>Автоподгонка</td>
+                                </tr>
+                                <tr>
+                                    <td><code>[[ico:'path']]</code></td>
+                                    <td>Размер по умолчанию — 36×36 px</td>
+                                </tr>
+                            </tbody>
+                        </table>
 
                         <div class="callout callout-info">
                             <span class="callout-icon">ℹ️</span>
@@ -638,7 +657,8 @@ https://www.youtube.com/watch?v=dQw4w9WgXcQ
                                 <span class="code-example-label">Иконка внутри текста</span>
                                 <button class="copy-btn">Копировать</button>
                             </div>
-                            <pre><code>Плагин [[ico:'plugins/object-renamer-pro.png'|20x20]] Object Renamer PRO доступен для Cinema 4D R21+.</code></pre>
+                            <pre><code>Плагин [[ico:'plugins/object-renamer-pro.png'-20]] Object Renamer PRO доступен для Cinema 4D R21+.
+Фото [[ico:'plugins/photo.png'-120]] вписано пропорционально.</code></pre>
                         </div>
 
                         <h3>Использование в заголовках и блоках</h3>
@@ -649,35 +669,17 @@ https://www.youtube.com/watch?v=dQw4w9WgXcQ
                                 <button class="copy-btn">Копировать</button>
                             </div>
                             <pre><code>:::tip
-[[ico:'plugins/icon.png'|24x24]] Используй квадратные иконки — они выглядят аккуратнее.
+[[ico:'plugins/icon.png'-24]] Используй квадратные иконки — они выглядят аккуратнее.
 :::
 
 ::::steps
-### [[ico:'img/step1.png'|28x28]] Скачай архив
+### [[ico:'img/step1.png'-20]] Скачай архив
 Нажми кнопку «Скачать» вверху страницы.
 
-### [[ico:'img/step2.png'|28x28]] Распакуй в папку plugins
+### [[ico:'img/step2.png'-28]] Распакуй в папку plugins
 Путь: `C:\Users\...\Cinema 4D\plugins`
 ::::</code></pre>
-                        </div>
-
-                        <h3>Соотношение сторон</h3>
-                        <p>
-                            Размер задаётся явно — оба значения обязательны (ширина и высота).
-                            Изображение масштабируется с <code>object-fit: contain</code>,
-                            поэтому пропорции оригинала сохраняются без обрезки.
-                            Можно использовать любое соотношение — квадрат, прямоугольник, баннер:
-                        </p>
-                        <div class="code-example">
-                            <div class="code-example-header">
-                                <span class="code-example-label">Разные соотношения сторон</span>
-                                <button class="copy-btn">Копировать</button>
-                            </div>
-                            <pre><code>[[ico:'img/icon.png'|32x32]]      — квадрат 1:1
-[[ico:'img/logo.png'|120x40]]     — горизонтальный баннер 3:1
-[[ico:'img/screen.jpg'|160x90]]   — скриншот 16:9
-[[ico:'img/photo.jpg'|80x120]]    — вертикальное фото 2:3</code></pre>
-                        </div>
+                        </div>                       
                     </section>
 
                     <!-- Сетка фич -->
@@ -749,13 +751,33 @@ https://www.youtube.com/watch?v=dQw4w9WgXcQ
                                 <span class="code-example-label">Синтаксис таблицы</span>
                                 <button class="copy-btn">Копировать</button>
                             </div>
-                            <pre><code>| Параметр       | Тип     | По умолчанию | Описание                        |
-|----------------|---------|-------------|----------------------------------|
+                            <pre><code>
+| Параметр       | Тип     | По умолчанию | Описание                         |
+|----------------|---------|--------------|----------------------------------|
 | density        | float   | 1.0          | Плотность распределения          |
 | seed           | integer | 42           | Случайное зерно для генерации    |
 | align_normal   | boolean | true         | Выравнивание по нормалям         |
 | min_scale      | float   | 0.8          | Минимальный масштаб объекта      |</code></pre>
                         </div>
+
+                        <h3>Пустые ячейки</h3>
+                        <p>
+                            Если в ячейке стоит только символ <code>-</code>, она отображается как пустая.
+                            Удобно для ячеек без значения:
+                        </p>
+                        <div class="code-example">
+                            <div class="code-example-header">
+                                <span class="code-example-label">Синтаксис пустых ячеек</span>
+                                <button class="copy-btn">Копировать</button>
+                            </div>
+                            <pre><code>
+| Параметр | Тип    | По умолчанию |
+|----------|--------|--------------|
+| density  | float  | 1.0          |
+| name     | string | -            |
+| hidden   | -      | -            |</code></pre>
+                        </div>
+                        <p>Ячейки с <code>-</code> будут отображены пустыми — без текста и без дефиса.</p>
                     </section>
 
                     <!-- Полный пример -->
