@@ -86,6 +86,15 @@ function initIndexPage() {
             tags: [`Выделение`, `Утилиты`, `Организация`],
             version: 'v1.3',
             mdFile: 'plugins/SelectionSet.md'
+        },
+        {
+            id: '6',
+            title: 'Floor Generator',
+            description: 'Процедурный генератор напольных покрытий — ёлочка, паркет, шеврон, соты — с фаской, швами и рандомизированными UV.',
+            icon: 'ico/FloorGenerator.png',
+            tags: [`Моделирование`, `Процедурный`],
+            version: 'v2.2',
+            mdFile: 'plugins/floor-generator.md'
         }
     ];
 
