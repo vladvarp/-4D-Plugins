@@ -48,7 +48,7 @@ function initIndexPage() {
             description: 'Набор утилит для Cinema 4D, созданных для ускорения повседневной работы.',
             icon: 'ico/Var_tools/varp_tools.png',
             tags: ['Моделирование', 'Процедурный', 'Анимация', 'Автоматизация'],
-            version: 'v2.31',
+            version: 'v2.32.2',
             mdFile: 'plugins/VAr_Tools.md'
         },
         {

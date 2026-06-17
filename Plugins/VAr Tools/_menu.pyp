@@ -32,6 +32,7 @@ MENU_ITEMS = [
                 1068832,   # CleanEmptyNulls
                 1068908,   # CleanObjects
                 1068909,   # CleanEmptyObjects
+                1068961,   # CleanEmptyPolys
                 1068910,   # CleanAllTags
                 1068911,   # CleanSelectTags
                 1068912,   # CleanEmptyMatTags
