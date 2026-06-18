@@ -24,7 +24,7 @@ FloorGenerator — Cinema 4D ObjectData Plugin v1.0
 ID плагина: 1068969
 """
 
-import c4d
+import c4d # type: ignore
 import math
 import random
 import os
@@ -37,7 +37,7 @@ import tempfile
 # ══════════════════════════════════════════════════════════════════════════════
 
 ID_FLOORGEN   = 1068969
-NAME_FLOORGEN = "Floor Generator v2.6"
+NAME_FLOORGEN = "Floor Generator v2.7"
 
 # ══════════════════════════════════════════════════════════════════════════════
 #  Паттерны
@@ -346,6 +346,65 @@ def _triangulate_polygon(poly):
             a = pts[indices[0]]
             for i in range(1, len(indices) - 1):
                 triangles.append((a, pts[indices[i]], pts[indices[i + 1]]))
+            break
+
+    return triangles
+
+
+def _triangulate_indices(pts_2d):
+    """Ear clipping для плоского контура, возвращает треугольники как
+    кортежи ЛОКАЛЬНЫХ индексов (0..n-1) в pts_2d, а не координат.
+    Нужна там, где помимо верхней грани по тем же индексам строятся
+    другие грани (низ, фаска) — чтобы их связка не потерялась, как при
+    обычной _triangulate_polygon, отдающей только координаты.
+    В отличие от «веерной» нарезки (i0, i, i+1) от одной фиксированной
+    вершины, корректно обрабатывает невыпуклые контуры (например, плитку,
+    срезанную проёмом окна), не создавая перекрученных треугольников."""
+    n = len(pts_2d)
+    if n < 3:
+        return []
+    if n == 3:
+        return [(0, 1, 2)]
+
+    ccw = _poly_area_2d(pts_2d) >= 0
+    indices = list(range(n)) if ccw else list(range(n - 1, -1, -1))
+    triangles = []
+
+    max_iter = n * 3
+    while len(indices) > 2 and max_iter > 0:
+        max_iter -= 1
+        m = len(indices)
+        ear_found = False
+
+        for i in range(m):
+            i0 = indices[(i - 1) % m]
+            i1 = indices[i]
+            i2 = indices[(i + 1) % m]
+            a, b, c = pts_2d[i0], pts_2d[i1], pts_2d[i2]
+
+            cross = (b[0] - a[0]) * (c[1] - b[1]) - (b[1] - a[1]) * (c[0] - b[0])
+            if cross <= 1e-12:
+                continue
+
+            is_ear = True
+            for j in range(m):
+                jdx = indices[j]
+                if jdx == i0 or jdx == i1 or jdx == i2:
+                    continue
+                if _point_in_triangle(pts_2d[jdx], a, b, c):
+                    is_ear = False
+                    break
+
+            if is_ear:
+                triangles.append((i0, i1, i2))
+                indices.pop(i)
+                ear_found = True
+                break
+
+        if not ear_found:
+            a0 = indices[0]
+            for i in range(1, len(indices) - 1):
+                triangles.append((a0, indices[i], indices[i + 1]))
             break
 
     return triangles
@@ -1236,11 +1295,16 @@ def _build_tile_3d(tile_2d, thickness, bevel_size, seam_on, seam_w,
         verts.append(_to_3d(top_pts[i][0], top_pts[i][1],
                             origin, u_axis, v_axis, normal, t))
 
-    if n == 4:
+    if n == 4 and _is_convex(top_pts):
         top_polys.append(tuple(idx_top))
     else:
-        for i in range(1, n - 1):
-            top_polys.append((idx_top[0], idx_top[i], idx_top[i + 1], idx_top[i + 1]))
+        # Невыпуклый контур (плитка, обрезанная проёмом окна) — веерная
+        # нарезка от одной вершины давала перекрученные треугольники,
+        # визуально выглядящие как разрез плитки пополам; ear-clipping
+        # строит треугольники корректно для любой формы контура.
+        for tri in _triangulate_indices(top_pts):
+            i0, i1, i2 = tri
+            top_polys.append((idx_top[i0], idx_top[i1], idx_top[i2], idx_top[i2]))
 
     for i in range(n):
         j = (i + 1) % n
@@ -1250,12 +1314,15 @@ def _build_tile_3d(tile_2d, thickness, bevel_size, seam_on, seam_w,
         j = (i + 1) % n
         side_polys.append((idx_bevel[i], idx_bevel[j], idx_top[j], idx_top[i]))
 
-    if n == 4:
+    if n == 4 and _is_convex(inset_pts):
         bot_order = list(reversed(idx_bottom))
         side_polys.append(tuple(bot_order))
     else:
-        for i in range(1, n - 1):
-            side_polys.append((idx_bottom[0], idx_bottom[i + 1], idx_bottom[i], idx_bottom[i]))
+        # Та же причина, что и для верхней грани — ear-clipping вместо
+        # веерной нарезки от вершины 0 для невыпуклых контуров.
+        for tri in _triangulate_indices(inset_pts):
+            i0, i1, i2 = tri
+            side_polys.append((idx_bottom[i0], idx_bottom[i2], idx_bottom[i1], idx_bottom[i1]))
 
     return verts, top_polys, side_polys, center_3d
 
@@ -1338,7 +1405,7 @@ def _build_floor(op):
 
     if not src.CheckType(c4d.Opolygon):
         try:
-            import c4d.utils as utils
+            import c4d.utils as utils # type: ignore
             res = utils.SendModelingCommand(
                 command=c4d.MCOMMAND_CURRENTSTATETOOBJECT,
                 list=[src.Clone()],

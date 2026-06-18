@@ -1,7 +1,7 @@
 ---
 title: Floor Generator
 tagline: Процедурный генератор напольных покрытий — ёлочка, паркет, шеврон, соты — с фаской, швами и рандомизированными UV.
-version: v2.6
+version: v2.7
 author: V.Ar Production
 updated: Июнь 2026
 icon: ico/FloorGenerator.png
