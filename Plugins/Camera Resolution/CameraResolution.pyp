@@ -5,7 +5,7 @@ Plugin ID : 1068834
 Файл: plugins/VAr Tools/CameraResolution.pyp
 """
 
-import c4d
+import c4d # type: ignore
 import os
 import base64
 import tempfile

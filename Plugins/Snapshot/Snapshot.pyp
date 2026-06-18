@@ -1,6 +1,6 @@
 from typing import Optional
-import c4d
-from c4d import plugins
+import c4d # type: ignore
+from c4d import plugins # type: ignore
 import os
 import base64
 import tempfile

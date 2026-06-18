@@ -4,7 +4,7 @@ Center2World XZ — Cinema 4D Command Plugin
 Центрирует выделенные объекты по мировым осям X и Z (без изменения Y).
 Центр bounding box объекта помещается в точку X=0, Z=0 мирового пространства.
 """
-import c4d
+import c4d # type: ignore
 import base64
 
 PLUGIN_ID   = 1068839

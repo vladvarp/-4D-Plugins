@@ -4,7 +4,7 @@ HierarchyFilter — Cinema 4D ObjectData Plugin
 ID: 1068852
 """
 
-import c4d
+import c4d # type: ignore
 import os
 import base64
 import tempfile

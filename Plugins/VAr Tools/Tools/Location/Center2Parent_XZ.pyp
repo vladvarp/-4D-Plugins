@@ -11,7 +11,7 @@ Center2Parent XZ — Cinema 4D Command Plugin
 
 Если у объекта нет родителя — поведение идентично Center2World XZ (X=0, Z=0).
 """
-import c4d
+import c4d # type: ignore
 import base64
 
 PLUGIN_ID     = 1068838

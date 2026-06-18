@@ -6,7 +6,7 @@ CleanEmptyPolys — Cinema 4D Command Plugin
   • удалить объект, сохранив детей (переместить на место удалённого)
   • не трогать такие объекты
 """
-import c4d
+import c4d # type: ignore
 import base64
 
 PLUGIN_ID   = 1068961

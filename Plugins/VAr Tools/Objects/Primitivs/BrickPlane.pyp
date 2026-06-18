@@ -5,7 +5,7 @@ BrickPlane — Cinema 4D ObjectData Plugin
 ёлочка, гексагональные, корзинка). Поддерживает швы и displacement по Y.
 """
 
-import c4d
+import c4d # type: ignore
 import math
 import os
 import base64

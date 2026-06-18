@@ -5,7 +5,7 @@ AxisDrop — Cinema 4D Command Plugin
 сохраняя X и Z позицию оси нетронутыми.
 Сами объекты визуально не двигаются.
 """
-import c4d
+import c4d # type: ignore
 import base64
 
 PLUGIN_ID   = 1068830

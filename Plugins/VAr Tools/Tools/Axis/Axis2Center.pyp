@@ -4,7 +4,7 @@ AxisToCenter — Cinema 4D Command Plugin
 Смещает ось (pivot) выделенных объектов в геометрический центр их bounding box.
 Сами объекты визуально не двигаются.
 """
-import c4d
+import c4d # type: ignore
 import base64
 
 PLUGIN_ID   = 1068828

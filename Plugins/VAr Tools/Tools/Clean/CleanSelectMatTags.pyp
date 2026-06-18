@@ -5,7 +5,7 @@ CleanSelectMatTags — Cinema 4D Command Plugin
 что и у выделенного тега материала.
 Кнопка активна только если выделен тег материала (TextureTag).
 """
-import c4d
+import c4d # type: ignore
 import base64
 
 PLUGIN_ID   = 1068913

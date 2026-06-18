@@ -4,7 +4,7 @@ TriCube — Cinema 4D ObjectData Plugin
  Генератор куба с 5 типами сетки (треугольники, квады, ёлочка, кирпич, гексагоны), раздельными размерами и подразделениями по XYZ, смещением вершин по нормали и зашивкой швов.
 """
 
-import c4d
+import c4d # type: ignore
 import math
 import os
 import base64

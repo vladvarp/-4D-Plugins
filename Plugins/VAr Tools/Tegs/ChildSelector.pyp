@@ -9,7 +9,7 @@ ChildSelector.pyp
   - Связь             — ссылка на выбранный дочерний объект (авто)
 """
 
-import c4d
+import c4d # type: ignore
 import base64
 import os
 import tempfile

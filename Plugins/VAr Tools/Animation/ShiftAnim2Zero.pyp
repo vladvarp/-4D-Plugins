@@ -12,8 +12,8 @@ Cinema 4D R26 Plugin — Shift Animation Start to Zero
   Перезапустите Cinema 4D. Плагин появится в меню Plugins.
 """
 
-import c4d
-from c4d import gui
+import c4d # type: ignore
+from c4d import gui # type: ignore
 import os
 import base64
 import tempfile

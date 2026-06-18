@@ -4,7 +4,7 @@ TargetCamera.pyp — Cinema 4D R26
 Создаёт камеру с целевой точкой (Null-объектом), на которую камера всегда смотрит. Таргет следует за камерой при переименовании.
 """
 
-import c4d
+import c4d # type: ignore
 import os
 import base64
 import tempfile

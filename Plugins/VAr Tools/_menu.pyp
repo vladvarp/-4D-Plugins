@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
-import c4d
-from c4d import gui
+import c4d # type: ignore
+from c4d import  # type: ignore
 
 # ─── НАСТРОЙКА ───────────────────────────────────────────────────────────────
 

@@ -4,7 +4,7 @@ CleanAllTags — Cinema 4D Command Plugin
 Удаляет все теги с выделенных объектов.
 Кнопка активна только если выделен(ы) объект(ы).
 """
-import c4d
+import c4d # type: ignore
 import base64
 
 PLUGIN_ID   = 1068910

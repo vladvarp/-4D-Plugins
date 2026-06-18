@@ -5,7 +5,7 @@ CleanSelectTags — Cinema 4D Command Plugin
 Поиск ведётся по всей сцене (по всем объектам).
 Кнопка активна только если выделен ровно 1 тег.
 """
-import c4d
+import c4d # type: ignore
 import base64
 
 PLUGIN_ID   = 1068911

@@ -23,8 +23,8 @@ Cinema 4D R26 Plugin — Scale Animation Timeline
     Ввод 200 -> k = 2.0  -> анимация 40..160, таймлайн 0..200
 """
 
-import c4d
-from c4d import gui
+import c4d # type: ignore
+from c4d import gui # type: ignore
 import os
 import base64
 import tempfile

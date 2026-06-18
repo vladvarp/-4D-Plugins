@@ -10,8 +10,8 @@
 #  ID плагина: 1068837
 # ============================================================
 
-import c4d
-from c4d import plugins, utils
+import c4d # type: ignore
+from c4d import plugins, utils # type: ignore
 import math
 import random
 import os

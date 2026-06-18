@@ -41,7 +41,7 @@ UserData SubID MAP (строго фиксировано):
   SubID=24 : ML_SPHERE_PHONG
 """
 
-import c4d
+import c4d # type: ignore
 import math
 import random
 import os

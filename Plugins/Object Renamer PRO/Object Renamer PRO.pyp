@@ -29,8 +29,8 @@
   Рекурсивно   – текущий уровень иерархии и все дочерние
 """
 
-import c4d
-from c4d import gui
+import c4d # type: ignore
+from c4d import gui # type: ignore
 import re
 import os
 import base64

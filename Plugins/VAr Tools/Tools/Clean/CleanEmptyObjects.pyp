@@ -5,7 +5,7 @@ CleanEmptyObjects — Cinema 4D Command Plugin
 НО только если у них нет дочерних объектов.
 Кнопка активна только если выделен ровно 1 объект.
 """
-import c4d
+import c4d # type: ignore
 import base64
 
 PLUGIN_ID   = 1068909

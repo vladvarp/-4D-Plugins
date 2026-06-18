@@ -4,8 +4,8 @@ AboutVArTools - Cinema 4D Command Plugin
 Отображает окно «О плагине» с описанием набора VAr Tools
 и кнопкой-ссылкой на сайт автора.
 """
-import c4d
-from c4d import gui
+import c4d # type: ignore
+from c4d import gui # type: ignore
 import webbrowser
 import os
 import base64

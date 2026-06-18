@@ -5,7 +5,7 @@ RemoveEmptyNulls — Cinema 4D Command Plugin
 Работает в несколько проходов — пока есть что удалять, чтобы корректно
 обрабатывать цепочки вложенных пустых Null-ов любой глубины.
 """
-import c4d
+import c4d # type: ignore
 import base64
 
 PLUGIN_ID   = 1068832

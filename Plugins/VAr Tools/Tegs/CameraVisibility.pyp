@@ -17,7 +17,7 @@ CameraVisibility.pyp
   - Одна и та же камера в обоих списках    → запрещено (валидация при добавлении)
 """
 
-import c4d
+import c4d # type: ignore
 import base64
 import os
 import tempfile

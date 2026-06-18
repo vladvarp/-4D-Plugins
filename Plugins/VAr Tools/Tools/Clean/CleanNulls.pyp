@@ -5,7 +5,7 @@ FlattenNulls — Cinema 4D Command Plugin
 Дочерние объекты удаляемого Null-а перемещаются на его место в иерархии
 (к его родителю), сохраняя мировые координаты.
 """
-import c4d
+import c4d # type: ignore
 import base64
 
 PLUGIN_ID   = 1068831

@@ -4,7 +4,7 @@ TriTorus — Cinema 4D ObjectData Plugin
 Тор с треугольной сеткой.
 """
 
-import c4d
+import c4d # type: ignore
 import math
 import os
 import base64

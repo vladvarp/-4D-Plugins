@@ -4,7 +4,7 @@ Drop2Floor 0(XZ) — Cinema 4D Command Plugin
 Опускает выделенные объекты на уровень пола (Y = 0)
 и центрирует их по X и Z (в центр сцены).
 """
-import c4d
+import c4d # type: ignore
 import base64
 
 PLUGIN_ID   = 1068827

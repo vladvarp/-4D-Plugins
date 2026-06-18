@@ -3,7 +3,7 @@
 Drop2Floor — Cinema 4D Command Plugin
 Опускает выделенные объекты (и их иерархии) на уровень пола (Y = 0).
 """
-import c4d
+import c4d # type: ignore
 import base64
 
 PLUGIN_ID   = 1068826

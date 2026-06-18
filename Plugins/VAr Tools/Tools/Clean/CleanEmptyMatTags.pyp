@@ -5,7 +5,7 @@ CleanEmptyMatTags — Cinema 4D Command Plugin
 Поиск ведётся по всей сцене (по всем объектам).
 Кнопка всегда активна (нет ограничений по выделению).
 """
-import c4d
+import c4d # type: ignore
 import base64
 
 PLUGIN_ID   = 1068912

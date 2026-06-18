@@ -5,7 +5,7 @@ AxisToBottomCenter — Cinema 4D Command Plugin
 По X и Z — центр, по Y — нижняя грань.
 Сами объекты визуально не двигаются.
 """
-import c4d
+import c4d # type: ignore
 import base64
 
 PLUGIN_ID   = 1068829

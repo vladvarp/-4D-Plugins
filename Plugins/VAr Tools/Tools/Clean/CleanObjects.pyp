@@ -5,7 +5,7 @@ CleanObjects — Cinema 4D Command Plugin
 сохраняя дочерние объекты (перемещая их на место удалённого).
 Кнопка активна только если выделен ровно 1 объект.
 """
-import c4d
+import c4d # type: ignore
 import base64
 
 PLUGIN_ID   = 1068908
