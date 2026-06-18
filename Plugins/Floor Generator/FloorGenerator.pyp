@@ -37,7 +37,7 @@ import tempfile
 # ══════════════════════════════════════════════════════════════════════════════
 
 ID_FLOORGEN   = 1068969
-NAME_FLOORGEN = "Floor Generator v2.3"
+NAME_FLOORGEN = "Floor Generator v2.4"
 
 # ══════════════════════════════════════════════════════════════════════════════
 #  Паттерны
@@ -457,11 +457,8 @@ def _find_boundary_loop(mesh):
 #  Генераторы паттернов — возвращают список 2D-полигонов (списков (u, v))
 # ══════════════════════════════════════════════════════════════════════════════
 
-def _gen_herringbone(tw, th, angle_rad, boundary_2d, seed):
-    """Шеврон: горизонтальные и вертикальные плитки с заполнением пустот.
-    Возвращает (tiles_h, tiles_v, fills_p1, fills_p2).
-    fills_p1 — пусто тип 0 (между вертикальными плитками, tw x tw)
-    fills_p2 — пусто тип 1 (между горизонтальными плитками, th x th)"""
+def _gen_herringbone(tw, th, angle_rad, boundary_2d, seed,
+                     offset_x=0.0, offset_y=0.0):
     unit = tw + th
 
     mu, Mu, mv, Mv = _bbox_2d(boundary_2d)
@@ -490,8 +487,8 @@ def _gen_herringbone(tw, th, angle_rad, boundary_2d, seed):
             h_tile = [(ux, uy), (ux + tw, uy),
                       (ux + tw, uy + th), (ux, uy + th)]
             if abs(angle_rad) > 1e-8:
-                h_tile = [_rotate_pt_2d(p[0], p[1], cx, cy, angle_rad)
-                          for p in h_tile]
+                h_tile = [_rotate_pt_2d(p[0], p[1], cx, cy, angle_rad) for p in h_tile]
+            h_tile = [(p[0] + offset_x, p[1] + offset_y) for p in h_tile]
             if any(_point_in_polygon(p[0], p[1], boundary_2d) for p in h_tile):
                 tiles_h.append(h_tile)
 
@@ -500,24 +497,24 @@ def _gen_herringbone(tw, th, angle_rad, boundary_2d, seed):
                       (ux + tw + th, uy + th + tw),
                       (ux + tw, uy + th + tw)]
             if abs(angle_rad) > 1e-8:
-                v_tile = [_rotate_pt_2d(p[0], p[1], cx, cy, angle_rad)
-                          for p in v_tile]
+                v_tile = [_rotate_pt_2d(p[0], p[1], cx, cy, angle_rad) for p in v_tile]
+            v_tile = [(p[0] + offset_x, p[1] + offset_y) for p in v_tile]
             if any(_point_in_polygon(p[0], p[1], boundary_2d) for p in v_tile):
                 tiles_v.append(v_tile)
 
             f0 = [(ux, uy + th), (ux + tw, uy + th),
                   (ux + tw, uy + th + tw), (ux, uy + th + tw)]
             if abs(angle_rad) > 1e-8:
-                f0 = [_rotate_pt_2d(p[0], p[1], cx, cy, angle_rad)
-                      for p in f0]
+                f0 = [_rotate_pt_2d(p[0], p[1], cx, cy, angle_rad) for p in f0]
+            f0 = [(p[0] + offset_x, p[1] + offset_y) for p in f0]
             if any(_point_in_polygon(p[0], p[1], boundary_2d) for p in f0):
                 fills_p1.append(f0)
 
             f1 = [(ux + tw, uy), (ux + tw + th, uy),
                   (ux + tw + th, uy + th), (ux + tw, uy + th)]
             if abs(angle_rad) > 1e-8:
-                f1 = [_rotate_pt_2d(p[0], p[1], cx, cy, angle_rad)
-                      for p in f1]
+                f1 = [_rotate_pt_2d(p[0], p[1], cx, cy, angle_rad) for p in f1]
+            f1 = [(p[0] + offset_x, p[1] + offset_y) for p in f1]
             if any(_point_in_polygon(p[0], p[1], boundary_2d) for p in f1):
                 fills_p2.append(f1)
 
@@ -525,10 +522,7 @@ def _gen_herringbone(tw, th, angle_rad, boundary_2d, seed):
 
 
 def _gen_parquet(tw, th, angle_rad, offset, boundary_2d, seed,
-                 rand_w_range=0.0):
-    """Паркет: прямоугольная сетка со смещением рядов.
-    rand_w_range — максимальное отклонение ширины (в долях, 0.0–1.0).
-    Плитки в ряду стыкуются краем к краю без зазоров."""
+                 rand_w_range=0.0, offset_x=0.0, offset_y=0.0):
     angle = angle_rad
     mu, Mu, mv, Mv = _bbox_2d(boundary_2d)
     margin = tw + th
@@ -567,6 +561,7 @@ def _gen_parquet(tw, th, angle_rad, offset, boundary_2d, seed,
 
             if abs(angle) > 1e-8:
                 tile = [_rotate_pt_2d(p[0], p[1], cx, cy, angle) for p in tile]
+            tile = [(p[0] + offset_x, p[1] + offset_y) for p in tile]
 
             if any(_point_in_polygon(p[0], p[1], boundary_2d) for p in tile):
                 tiles.append(tile)
@@ -574,8 +569,8 @@ def _gen_parquet(tw, th, angle_rad, offset, boundary_2d, seed,
     return tiles
 
 
-def _gen_honeycomb(size, angle_rad, boundary_2d, seed):
-    """Соты: гексагональная сетка (flat-top)."""
+def _gen_honeycomb(size, angle_rad, boundary_2d, seed,
+                   offset_x=0.0, offset_y=0.0):
     angle = angle_rad
     mu, Mu, mv, Mv = _bbox_2d(boundary_2d)
     margin = size * 3
@@ -606,7 +601,7 @@ def _gen_honeycomb(size, angle_rad, boundary_2d, seed):
                 py = hy + size * math.sin(a)
                 if abs(angle) > 1e-8:
                     px, py = _rotate_pt_2d(px, py, cx, cy, angle)
-                hex_pts.append((px, py))
+                hex_pts.append((px + offset_x, py + offset_y))
 
             if any(_point_in_polygon(p[0], p[1], boundary_2d) for p in hex_pts):
                 tiles.append(hex_pts)
@@ -614,9 +609,8 @@ def _gen_honeycomb(size, angle_rad, boundary_2d, seed):
     return tiles
 
 
-def _gen_herringbone_v2(tw, th, angle_rad, boundary_2d, seed):
-    """Ёлка: горизонтальные и вертикальные плитки без пустот.
-    Ширина плитки (tw) должна быть кратна высоте (th)."""
+def _gen_herringbone_v2(tw, th, angle_rad, boundary_2d, seed,
+                        offset_x=0.0, offset_y=0.0):
     n = int(round(tw / th))
     if n < 1:
         n = 1
@@ -657,6 +651,7 @@ def _gen_herringbone_v2(tw, th, angle_rad, boundary_2d, seed):
 
             if abs(angle_rad) > 1e-8:
                 tile = [_rotate_pt_2d(p[0], p[1], cx, cy, angle_rad) for p in tile]
+            tile = [(p[0] + offset_x, p[1] + offset_y) for p in tile]
 
             if any(_point_in_polygon(p[0], p[1], boundary_2d) for p in tile):
                 tiles_h.append(tile)
@@ -677,6 +672,7 @@ def _gen_herringbone_v2(tw, th, angle_rad, boundary_2d, seed):
 
             if abs(angle_rad) > 1e-8:
                 tile = [_rotate_pt_2d(p[0], p[1], cx, cy, angle_rad) for p in tile]
+            tile = [(p[0] + offset_x, p[1] + offset_y) for p in tile]
 
             if any(_point_in_polygon(p[0], p[1], boundary_2d) for p in tile):
                 tiles_v.append(tile)
@@ -883,7 +879,6 @@ def _build_floor(op):
     seam_on    = bool(_ud_get(op, FG_SEAM_ON, DEF_SEAM_ON))
     seam_w     = max(0.0, float(_ud_get(op, FG_SEAM_W, DEF_SEAM_W)))
 
-    boundary_2d = [(p[0] - pat_x, p[1] - pat_y) for p in boundary_2d]
     uv_sx      = max(0.1, float(_ud_get(op, FG_UV_SX, DEF_UV_SX)))
     uv_sy      = max(0.1, float(_ud_get(op, FG_UV_SY, DEF_UV_SY)))
     uv_rot     = float(_ud_get(op, FG_UV_ROT, DEF_UV_ROT))
@@ -904,24 +899,24 @@ def _build_floor(op):
 
     if pattern == PAT_HERRINGBONE:
         tiles_h_2d, tiles_v_2d, fills_p1_2d, fills_p2_2d = _gen_herringbone(
-            tile_w, tile_h, angle, boundary_2d, seed)
+            tile_w, tile_h, angle, boundary_2d, seed, pat_x, pat_y)
         tiles_2d = tiles_h_2d + tiles_v_2d
         h_count = len(tiles_h_2d)
     elif pattern == PAT_PARQUET:
         tiles_2d = _gen_parquet(tile_w, tile_h, angle, offset, boundary_2d, seed,
-                                parq_rand_w)
+                                parq_rand_w, pat_x, pat_y)
         h_count = 0
     elif pattern == PAT_HONEYCOMB:
-        tiles_2d = _gen_honeycomb(tile_w, angle, boundary_2d, seed)
+        tiles_2d = _gen_honeycomb(tile_w, angle, boundary_2d, seed, pat_x, pat_y)
         h_count = 0
     elif pattern == PAT_HERRINGBONE_V2:
         tiles_h_2d, tiles_v_2d = _gen_herringbone_v2(
-            tile_w, tile_h, angle, boundary_2d, seed)
+            tile_w, tile_h, angle, boundary_2d, seed, pat_x, pat_y)
         tiles_2d = tiles_h_2d + tiles_v_2d
         h_count = len(tiles_h_2d)
     else:
         tiles_h_2d, tiles_v_2d, fills_p1_2d, fills_p2_2d = _gen_herringbone(
-            tile_w, tile_h, angle, boundary_2d, seed)
+            tile_w, tile_h, angle, boundary_2d, seed, pat_x, pat_y)
         tiles_2d = tiles_h_2d + tiles_v_2d
         h_count = len(tiles_h_2d)
 
