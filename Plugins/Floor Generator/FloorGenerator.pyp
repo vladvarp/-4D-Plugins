@@ -37,7 +37,7 @@ import tempfile
 # ══════════════════════════════════════════════════════════════════════════════
 
 ID_FLOORGEN   = 1068969
-NAME_FLOORGEN = "Floor Generator v2.5"
+NAME_FLOORGEN = "Floor Generator v2.6"
 
 # ══════════════════════════════════════════════════════════════════════════════
 #  Паттерны
@@ -612,6 +612,123 @@ def _clip_polygon_subject(subject, clip):
     return _merge_polygon_fragments(results)
 
 
+def _subtract_convex_hole_single(poly, hole_ccw):
+    """Вычитает один ВЫПУКЛЫЙ полигон-дырку (CCW) из одного полигона `poly`.
+    Возвращает список фрагментов `poly`, лежащих СНАРУЖИ дырки (0, 1 или
+    несколько кусков) — то есть именно то, что должно остаться видимым
+    после прорезания окна, а не то, что попало внутрь окна.
+
+    Идея алгоритма: проходим по рёбрам выпуклой дырки одно за другим.
+    На каждом шаге текущий «остаток» (часть poly, ещё не классифицированная)
+    разрезается прямой этого ребра на две части: outside_part (снаружи этой
+    полуплоскости — а значит точно снаружи всей выпуклой дырки, т.к. дырка
+    выпуклая) и inside_part (внутри этой полуплоскости — может быть как
+    внутри, так и снаружи остальных рёбер, поэтому идёт на следующий шаг).
+    outside_part на каждом шаге сразу добавляется в результат — кусочки
+    не перекрываются, т.к. являются смежными частями одного и того же
+    остатка. То, что осталось после обработки всех рёбер, лежит внутри
+    дырки целиком и отбрасывается.
+    Это устраняет ошибку прежней реализации, которая вместо разности
+    (снаружи дырки) накопительно пересекала полигон со всеми полуплоскостями
+    подряд (логическое И), что эквивалентно вычислению части ВНУТРИ дырки,
+    а не снаружи — из-за этого плитки рядом с окном пропадали целиком."""
+    remaining = list(poly)
+    outside_pieces = []
+    n_hole = len(hole_ccw)
+
+    for i in range(n_hole):
+        if not remaining:
+            break
+        a = hole_ccw[i]
+        b = hole_ccw[(i + 1) % n_hole]
+        ex = b[0] - a[0]
+        ey = b[1] - a[1]
+
+        outside_part = []
+        inside_part = []
+        m = len(remaining)
+        for j in range(m):
+            cur = remaining[j]
+            prev = remaining[j - 1] if j > 0 else remaining[-1]
+
+            dx_cur = cur[0] - a[0]
+            dy_cur = cur[1] - a[1]
+            side_cur = ex * dy_cur - ey * dx_cur
+
+            dx_prev = prev[0] - a[0]
+            dy_prev = prev[1] - a[1]
+            side_prev = ex * dy_prev - ey * dx_prev
+
+            cur_inside = side_cur >= 0
+            prev_inside = side_prev >= 0
+
+            if cur_inside != prev_inside:
+                det = ex * (prev[1] - cur[1]) - ey * (prev[0] - cur[0])
+                if abs(det) > 1e-12:
+                    t = (ex * (a[1] - cur[1]) - ey * (a[0] - cur[0])) / det
+                    ix = cur[0] + t * (prev[0] - cur[0])
+                    iy = cur[1] + t * (prev[1] - cur[1])
+                    outside_part.append((ix, iy))
+                    inside_part.append((ix, iy))
+
+            if cur_inside:
+                inside_part.append(cur)
+            else:
+                outside_part.append(cur)
+
+        if len(outside_part) >= 3:
+            outside_pieces.append(outside_part)
+        remaining = inside_part if len(inside_part) >= 3 else []
+
+    # Кусочки outside_pieces разделены только диагоналями-«мазками» от рёбер
+    # дырки (а не реальной геометрией), поэтому склеиваем их обратно в один
+    # цельный фрагмент на каждую дырку — ровно так же, как _clip_polygon_subject
+    # склеивает фрагменты триангуляции невыпуклого внешнего контура.
+    return _merge_polygon_fragments(outside_pieces)
+
+
+def _subtract_hole_from_polygons(polygons, hole):
+    """Вычитает одну дырку (CW-контур, например окно) из списка полигонов
+    (плиток). Для каждой плитки из списка оставляет только ту её часть,
+    которая лежит СНАРУЖИ дырки — то есть внутренняя граница (окно) обрезает
+    плитки точно так же, как и внешняя граница плоскости, а не «съедает»
+    их целиком, если они лишь частично попадают в проём.
+
+    Невыпуклые дырки (например, Г-образные оконные проёмы) триангулируются,
+    после чего каждый полигон последовательно «протравливается» каждым
+    треугольником дырки по очереди — итоговый результат эквивалентен
+    вычитанию исходной (невыпуклой) дырки целиком."""
+    if not hole or len(hole) < 3:
+        return polygons
+
+    # Дырка приходит как CW; переводим в CCW для удобства обхода рёбер
+    hole_ccw = list(reversed(hole))
+
+    if _is_convex(hole_ccw):
+        hole_pieces = [hole_ccw]
+    else:
+        # Невыпуклая дырка — триангулируем её, чтобы свести вычитание
+        # к последовательности вычитаний выпуклых треугольников.
+        hole_pieces = _triangulate_polygon(hole_ccw)
+        # Триангуляция может вернуть треугольники в любой ориентации —
+        # приводим каждый к CCW, как того требует _subtract_convex_hole_single.
+        hole_pieces = [
+            list(tri) if _poly_area_2d(list(tri)) > 0 else list(reversed(tri))
+            for tri in hole_pieces
+        ]
+
+    current = polygons
+    for piece in hole_pieces:
+        if not current:
+            break
+        next_current = []
+        for poly in current:
+            next_current.extend(_subtract_convex_hole_single(poly, piece))
+        current = next_current
+
+    return current
+
+
 def _inset_polygon(poly, amount):
     """Inset convex polygon by `amount` (positive = shrink).
     Returns new list of (u, v) or None if degenerate.
@@ -671,8 +788,9 @@ def _inset_polygon(poly, amount):
 
 def _get_boundary_info(mesh):
     """
-    Возвращает (normal, origin, boundary_2d, u_axis, v_axis) или None.
-    boundary_2d — список (u, v) вершин контура.
+    Возвращает (normal, origin, boundary_2d, u_axis, v_axis, holes_2d) или None.
+    boundary_2d — список (u, v) вершин внешнего контура (CCW).
+    holes_2d    — список дырок; каждая дырка — список (u, v) (CW в 2D, т.е. отверстие).
     """
     if mesh.GetPolygonCount() == 0 or mesh.GetPointCount() < 3:
         return None
@@ -703,17 +821,35 @@ def _get_boundary_info(mesh):
         d = pt - origin
         pts_2d.append((_v3_dot(d, u_axis), _v3_dot(d, v_axis)))
 
-    boundary = _find_boundary_loop(mesh)
-    if boundary is None:
-        boundary = list(range(n_pts))
+    # Получаем все граничные петли (внешний контур + дыры)
+    all_loops = _find_all_boundary_loops(mesh)
+    if not all_loops:
+        all_loops = [list(range(n_pts))]
 
-    boundary_2d = [pts_2d[i] for i in boundary]
+    # Преобразуем индексы в 2D-координаты и вычисляем знаковую площадь
+    loops_2d = [[pts_2d[i] for i in lp] for lp in all_loops]
 
-    is_ccw = _poly_area_2d(boundary_2d) > 0
-    if not is_ccw:
-        boundary_2d.reverse()
+    # Петля с наибольшей абсолютной площадью — внешний контур
+    areas = [_poly_area_2d(lp) for lp in loops_2d]
+    outer_idx = max(range(len(loops_2d)), key=lambda i: abs(areas[i]))
 
-    return normal, origin, boundary_2d, u_axis, v_axis
+    boundary_2d = loops_2d[outer_idx]
+    # Внешний контур должен быть CCW (положительная площадь)
+    if areas[outer_idx] < 0:
+        boundary_2d = list(reversed(boundary_2d))
+
+    # Остальные петли — дырки; они должны быть CW (отрицательная площадь в нашей СК)
+    holes_2d = []
+    for i, lp in enumerate(loops_2d):
+        if i == outer_idx:
+            continue
+        hole = lp
+        # Дырки должны быть CW (чтобы тест на вычитание работал правильно)
+        if areas[i] > 0:
+            hole = list(reversed(hole))
+        holes_2d.append(hole)
+
+    return normal, origin, boundary_2d, u_axis, v_axis, holes_2d
 
 
 def _poly_area_2d(poly):
@@ -728,7 +864,30 @@ def _poly_area_2d(poly):
 
 
 def _find_boundary_loop(mesh):
-    """Найти граничные рёбра меша и соединить в замкнутый контур."""
+    """Найти граничные рёбра меша и соединить в замкнутый контур.
+    Возвращает только первую (наружную) петлю — оставлен для совместимости,
+    основная логика перенесена в _find_all_boundary_loops."""
+    loops = _find_all_boundary_loops(mesh)
+    if not loops:
+        return None
+    # Возвращаем петлю с наибольшей площадью (внешний контур)
+    return max(loops, key=lambda lp: abs(_poly_area_2d_indices(mesh, lp)))
+
+
+def _poly_area_2d_indices(mesh, loop):
+    """Знаковая площадь петли по индексам вершин меша (для определения внешнего контура)."""
+    n = len(loop)
+    area = 0.0
+    for i in range(n):
+        a = mesh.GetPoint(loop[i])
+        b = mesh.GetPoint(loop[(i + 1) % n])
+        area += a.x * b.z - b.x * a.z  # используем XZ как плоскость для оценки
+    return area * 0.5
+
+
+def _find_all_boundary_loops(mesh):
+    """Найти все граничные петли меша (внешний контур + контуры отверстий).
+    Возвращает список петель — каждая петля это список индексов вершин."""
     edge_count = {}
     n_polys = mesh.GetPolygonCount()
 
@@ -748,35 +907,45 @@ def _find_boundary_loop(mesh):
     boundary_edges = [e for e, c in edge_count.items() if c == 1]
 
     if not boundary_edges:
-        return None
+        return []
 
     adj = {}
     for e in boundary_edges:
         adj.setdefault(e[0], []).append(e[1])
         adj.setdefault(e[1], []).append(e[0])
 
-    start = boundary_edges[0][0]
-    loop = [start]
-    visited = {start}
-    cur = start
+    # Собираем все замкнутые петли из граничных рёбер
+    unvisited = set(v for e in boundary_edges for v in e)
+    loops = []
 
-    while True:
-        neighbors = adj.get(cur, [])
-        nxt = None
-        for nb in neighbors:
-            if nb not in visited:
-                nxt = nb
-                break
-        if nxt is None:
+    while unvisited:
+        start = next(iter(unvisited))
+        loop = [start]
+        visited_local = {start}
+        cur = start
+
+        while True:
+            neighbors = adj.get(cur, [])
+            nxt = None
             for nb in neighbors:
-                if nb == start and len(loop) > 2:
-                    return loop
-            break
-        loop.append(nxt)
-        visited.add(nxt)
-        cur = nxt
+                if nb not in visited_local:
+                    nxt = nb
+                    break
+            if nxt is None:
+                # Проверяем замыкание на start
+                for nb in neighbors:
+                    if nb == start and len(loop) > 2:
+                        loops.append(loop)
+                        break
+                break
+            loop.append(nxt)
+            visited_local.add(nxt)
+            cur = nxt
 
-    return loop if len(loop) >= 3 else None
+        for v in loop:
+            unvisited.discard(v)
+
+    return [lp for lp in loops if len(lp) >= 3]
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -1190,7 +1359,7 @@ def _build_floor(op):
         print("[FloorGenerator] Не удалось определить границу плоскости.")
         return None
 
-    normal, origin, boundary_2d, u_axis, v_axis = info
+    normal, origin, boundary_2d, u_axis, v_axis, holes_2d = info
 
     pattern    = int(_ud_get(op, FG_PATTERN,   DEF_PATTERN))
     tile_w     = max(1.0, float(_ud_get(op, FG_TILE_W,    DEF_TILE_W)))
@@ -1248,6 +1417,13 @@ def _build_floor(op):
 
     if not tiles_2d:
         return None
+
+    # Вычитаем дырки (отверстия в поверхности, например под окна) из всех плиток
+    if holes_2d:
+        for hole in holes_2d:
+            tiles_2d = _subtract_hole_from_polygons(tiles_2d, hole)
+            fills_p1_2d = _subtract_hole_from_polygons(fills_p1_2d, hole)
+            fills_p2_2d = _subtract_hole_from_polygons(fills_p2_2d, hole)
 
     all_verts = []
     all_polys = []
