@@ -10,8 +10,6 @@ Tesseract — Cinema 4D ObjectData Plugin
   • Перспективная проекция 4D → 3D
   • Отображение: каркас, рёбра-трубы, вершины, ячейки с прозрачностью
   • Автоматическая анимация вращения
-  • Глубинная подсветка (color by depth)
-  • Фонг-сглаживание
 """
 
 import c4d  # type: ignore
@@ -25,7 +23,7 @@ import tempfile
 # ══════════════════════════════════════════════════════════════════════════════
 
 ID_TESSERACT = 1068993
-NAME_TESSERACT = "Tesseract v1.1"
+NAME_TESSERACT = "Tesseract v1.3"
 
 # ══════════════════════════════════════════════════════════════════════════════
 #  UserData SubID — строго фиксированы
@@ -64,8 +62,6 @@ TS_EDGE_SEGS   = 23  # сегменты окружности рёбер (int)
 TS_VERTEX_RADIUS = 24  # радиус вершин (float)
 TS_VERTEX_SEGS   = 25  # сегменты окружности вершин (int)
 TS_SHOW_CELLS    = 26  # показывать ячейки (bool)
-TS_CELL_ALPHA    = 27  # прозрачность ячеек (float 0..1)
-TS_COLOR_DEPTH   = 28  # окраска по глубине (bool)
 
 # Первый параметр данных (проверка инициализации)
 TS_FIRST_PARAM = TS_SIZE
@@ -76,31 +72,29 @@ TS_FIRST_PARAM = TS_SIZE
 
 DEFAULT_SIZE       = 200.0
 DEFAULT_PROJ_DIST  = 400.0
-DEFAULT_DISPLAY    = 0     # 0=Каркас, 1=Рёбра+Вершины, 2=Ячейки, 3=Всё
+DEFAULT_DISPLAY    = 1     # 0=Каркас, 1=Рёбра+Вершины, 2=Ячейки, 3=Всё
 
 DEFAULT_ROT_XY     = 0.0
 DEFAULT_ROT_XZ     = 0.0
-DEFAULT_ROT_XW     = math.radians(25.0)  # начальный поворот для красоты
+DEFAULT_ROT_XW     = math.radians(0.0)  
 DEFAULT_ROT_YZ     = 0.0
-DEFAULT_ROT_YW     = math.radians(15.0)  # начальный поворот для красоты
+DEFAULT_ROT_YW     = math.radians(0.0)  
 DEFAULT_ROT_ZW     = 0.0
 
 DEFAULT_AUTO_ROT   = False
-DEFAULT_SPEED_XY   = 0.3
+DEFAULT_SPEED_XY   = 0.0
 DEFAULT_SPEED_XZ   = 0.0
-DEFAULT_SPEED_XW   = 0.5
+DEFAULT_SPEED_XW   = 0.0
 DEFAULT_SPEED_YZ   = 0.0
-DEFAULT_SPEED_YW   = 0.4
-DEFAULT_SPEED_ZW   = 0.0
+DEFAULT_SPEED_YW   = 0.0
+DEFAULT_SPEED_ZW   = 1.0
 DEFAULT_ANIM_PHASE = 0.0
 
-DEFAULT_EDGE_RADIUS = 2.0
-DEFAULT_EDGE_SEGS   = 4
-DEFAULT_VERTEX_RADIUS = 5.0
-DEFAULT_VERTEX_SEGS   = 6
+DEFAULT_EDGE_RADIUS = 5.0
+DEFAULT_EDGE_SEGS   = 9
+DEFAULT_VERTEX_RADIUS = 10.0
+DEFAULT_VERTEX_SEGS   = 8
 DEFAULT_SHOW_CELLS    = False
-DEFAULT_CELL_ALPHA    = 0.3
-DEFAULT_COLOR_DEPTH   = True
 
 # ══════════════════════════════════════════════════════════════════════════════
 #  UserData helpers
@@ -430,10 +424,6 @@ def _make_sphere(center, radius, segs_r, segs_h, all_pts, all_polys):
             all_polys.append(c4d.CPolygon(bl, tl, tr, br))
 
 
-def _make_quad_face(indices_3d, all_pts, all_polys):
-    """Добавляет 4-угольный полигон по 4 индексам 3D-точек."""
-    if len(indices_3d) == 4:
-        all_polys.append(c4d.CPolygon(*indices_3d))
 
 
 def _add_phong_tag(obj, angle_deg=45.0):
@@ -477,8 +467,6 @@ def _build_tesseract(op):
     vert_r     = max(1.0, float(_ud_get(op, TS_VERTEX_RADIUS, DEFAULT_VERTEX_RADIUS)))
     vert_segs  = max(3, int(_ud_get(op, TS_VERTEX_SEGS, DEFAULT_VERTEX_SEGS)))
     show_cells = bool(_ud_get(op, TS_SHOW_CELLS, DEFAULT_SHOW_CELLS))
-    cell_alpha = max(0.0, min(1.0, float(_ud_get(op, TS_CELL_ALPHA, DEFAULT_CELL_ALPHA))))
-    color_depth = bool(_ud_get(op, TS_COLOR_DEPTH, DEFAULT_COLOR_DEPTH))
 
     # ── Автовращение: добавляем фазу к углам ────────────────────────────
     if auto_rot:
@@ -560,36 +548,99 @@ def _build_tesseract(op):
     # ── Ячейки (грани кубов) ────────────────────────────────────────────
     if show_cells_mesh:
         for cell_idx, cell_verts in enumerate(_TESS_CELLS):
-            cell_pts_3d = [verts_3d[vi] for vi in cell_verts]
-            cell_pt_indices = list(range(len(cell_pts_3d)))
+            fixed_bit = cell_idx // 2
+            free_bits = [b for b in range(4) if b != fixed_bit]
 
-            # Грань — 24 квадрата, каждый строим как полигон
-            # Индексы cell_verts: 8 вершин куба
-            # Грани куба: пары вершин, differing in 1 bit (within the cell subset)
-            cell_polys = []
-            for bi in range(3):
-                for bval in (0, 1):
-                    face = []
-                    for ci, vi in enumerate(cell_verts):
-                        if ((vi >> bi) & 1) == bval:
-                            face.append(ci)
-                    if len(face) == 4:
-                        # Сортируем вершины квадрата по углу вокруг нормали
-                        cx = sum(cell_pts_3d[f][0] for f in face) / 4.0
-                        cy = sum(cell_pts_3d[f][1] for f in face) / 4.0
-                        cz = sum(cell_pts_3d[f][2] for f in face) / 4.0
-                        def _sort_key(fi, _cx=cx, _cy=cy, _cz=cz):
-                            p = cell_pts_3d[fi]
-                            return math.atan2(p[1]-_cy, p[0]-_cx)
-                        face.sort(key=_sort_key)
-                        cell_polys.append(c4d.CPolygon(face[0], face[1], face[2], face[3]))
+            all_cell_pts = []
+            all_cell_polys = []
 
-            if cell_pts_3d and cell_polys:
-                c_obj = c4d.PolygonObject(len(cell_pts_3d), len(cell_polys))
+            for face_fixed in free_bits:
+                face_bits = [b for b in free_bits if b != face_fixed]
+
+                for face_val in (0, 1):
+                    face_vi = []
+                    for vi in cell_verts:
+                        if ((vi >> face_fixed) & 1) == face_val:
+                            face_vi.append(vi)
+                    if len(face_vi) != 4:
+                        continue
+
+                    pts3 = [verts_3d[vi] for vi in face_vi]
+
+                    # 2D-проекция: опорная плоскость = среднее нормалей 2 рёбер
+                    e0 = (pts3[1][0]-pts3[0][0], pts3[1][1]-pts3[0][1], pts3[1][2]-pts3[0][2])
+                    e1 = (pts3[2][0]-pts3[0][0], pts3[2][1]-pts3[0][1], pts3[2][2]-pts3[0][2])
+                    nx = e0[1]*e1[2] - e0[2]*e1[1]
+                    ny = e0[2]*e1[0] - e0[0]*e1[2]
+                    nz = e0[0]*e1[1] - e0[1]*e1[0]
+                    nl = math.sqrt(nx*nx + ny*ny + nz*nz)
+                    if nl < 1e-12:
+                        nx, ny, nz = 0, 0, 1
+                    else:
+                        nx /= nl; ny /= nl; nz /= nl
+
+                    if abs(nx) > 0.9:
+                        u = (0, 1, 0)
+                    else:
+                        u = (1, 0, 0)
+                    ux = u[0] - (u[0]*nx + u[1]*ny + u[2]*nz)*nx
+                    uy = u[1] - (u[0]*nx + u[1]*ny + u[2]*nz)*ny
+                    uz = u[2] - (u[0]*nx + u[1]*ny + u[2]*nz)*nz
+                    ul = math.sqrt(ux*ux + uy*uy + uz*uz)
+                    ux /= ul; uy /= ul; uz /= ul
+                    vx = ny*uz - nz*uy
+                    vy = nz*ux - nx*uz
+                    vz = nx*uy - ny*ux
+
+                    def proj2d(p):
+                        return (p[0]*ux + p[1]*uy + p[2]*uz,
+                                p[0]*vx + p[1]*vy + p[2]*vz)
+
+                    pts2d = [proj2d(p) for p in pts3]
+
+                    # 2D convex hull (Graham scan)
+                    ptsIndexed = list(enumerate(pts2d))
+                    ptsIndexed.sort(key=lambda x: (x[1][1], x[1][0]))
+                    p0 = ptsIndexed[0][1]
+                    ptsIndexed[1:] = sorted(ptsIndexed[1:],
+                        key=lambda x: math.atan2(x[1][1]-p0[1], x[1][0]-p0[0]))
+                    hull = [ptsIndexed[0][0]]
+                    for idx, pt in ptsIndexed[1:]:
+                        while len(hull) > 1:
+                            a = pts2d[hull[-2]]
+                            b = pts2d[hull[-1]]
+                            cross = (b[0]-a[0])*(pt[1]-a[1]) - (b[1]-a[1])*(pt[0]-a[0])
+                            if cross <= 0:
+                                hull.pop()
+                            else:
+                                break
+                        hull.append(idx)
+
+                    if len(hull) < 3:
+                        continue
+
+                    base = len(all_cell_pts)
+                    for hi in hull:
+                        v = pts3[hi]
+                        all_cell_pts.append(c4d.Vector(v[0], v[1], v[2]))
+                    n = len(hull)
+                    if n == 3:
+                        all_cell_polys.append(c4d.CPolygon(base, base+1, base+2, base+2))
+                    elif n == 4:
+                        all_cell_polys.append(c4d.CPolygon(base, base+1, base+2, base+3))
+                    elif n == 5:
+                        all_cell_polys.append(c4d.CPolygon(base, base+1, base+2, base+3))
+                        all_cell_polys.append(c4d.CPolygon(base, base+3, base+4, base+4))
+                    elif n == 6:
+                        all_cell_polys.append(c4d.CPolygon(base, base+1, base+2, base+3))
+                        all_cell_polys.append(c4d.CPolygon(base, base+3, base+4, base+5))
+
+            if all_cell_pts and all_cell_polys:
+                c_obj = c4d.PolygonObject(len(all_cell_pts), len(all_cell_polys))
                 c_obj.SetName("Cell_%d" % cell_idx)
-                for i, p in enumerate(cell_pts_3d):
-                    c_obj.SetPoint(i, c4d.Vector(p[0], p[1], p[2]))
-                for i, pl in enumerate(cell_polys):
+                for i, p in enumerate(all_cell_pts):
+                    c_obj.SetPoint(i, p)
+                for i, pl in enumerate(all_cell_polys):
                     c_obj.SetPolygon(i, pl)
                 c_obj.Message(c4d.MSG_UPDATE)
 
@@ -680,11 +731,7 @@ def _create_userdata(op):
         "Сегменты вершин", DEFAULT_VERTEX_SEGS, 3, 16))
     _add_in_group(op, g_vis, _bool_bc(
         "Показать ячейки", DEFAULT_SHOW_CELLS))
-    _add_in_group(op, g_vis, _float_bc(
-        "Прозрачность ячеек", DEFAULT_CELL_ALPHA, 0.0, 1.0,
-        unit=c4d.DESC_UNIT_FLOAT, step=0.05))
-    _add_in_group(op, g_vis, _bool_bc(
-        "Цвет по глубине", DEFAULT_COLOR_DEPTH))
+
 
 
 def _set_defaults(op):
@@ -713,8 +760,6 @@ def _set_defaults(op):
     _ud_set(op, TS_VERTEX_RADIUS, DEFAULT_VERTEX_RADIUS)
     _ud_set(op, TS_VERTEX_SEGS,   DEFAULT_VERTEX_SEGS)
     _ud_set(op, TS_SHOW_CELLS,    DEFAULT_SHOW_CELLS)
-    _ud_set(op, TS_CELL_ALPHA,    DEFAULT_CELL_ALPHA)
-    _ud_set(op, TS_COLOR_DEPTH,   DEFAULT_COLOR_DEPTH)
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -758,62 +803,28 @@ class TesseractObject(c4d.plugins.ObjectData):
 #  Иконка (программно сгенерированная — гиперкуб)
 # ══════════════════════════════════════════════════════════════════════════════
 
-def _create_icon():
-    """Создаёт простую иконку — куб с проекцией тессеракта."""
-    size = 128
-    bmp = c4d.bitmaps.BaseBitmap()
-    bmp.Init(size, size, 24)
 
-    # Тёмный фон
-    for y in range(size):
-        for x in range(size):
-            bmp.SetPixel(x, y, 20, 22, 30)
 
-    # Упрощённая проекция тессеракта (8 вершин → 2D)
-    cx, cy = 64, 64
-    s = 35
-    # Внешний куб
-    outer = [(-1,-1,-1), (1,-1,-1), (1,1,-1), (-1,1,-1),
-             (-1,-1,1), (1,-1,1), (1,1,1), (-1,1,1)]
-    # Внутренний куб (проекция)
-    inner = [(-0.5,-0.5,-0.5), (0.5,-0.5,-0.5), (0.5,0.5,-0.5), (-0.5,0.5,-0.5),
-             (-0.5,-0.5,0.5), (0.5,-0.5,0.5), (0.5,0.5,0.5), (-0.5,0.5,0.5)]
+_ICON_TC = (
+    "iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAABYUlEQVR4nO1XS47DMAiF0RzFi6xyjK56nB4jx+mqx/CqC9+FLtpkHGwwOLWqSoMU9aPweBjyIEjwWfv5cPx/Ak4Cy3S8ZRgGmhEzRzxdu2LT7fz343LH55+GC2IiiIlomchyvwfD5FiA9AZneASNHsCYiOaA7cPVMQAAJJySwDIRxkRScJoDrqCiZRhacADehG9uNDxdi+BFYkXNlomkWvN+EHtGaVbu98szyFlbjpBnt2FAsLjoTUhzwLXmvO40B9yJyuu7t2mLE5CIADwz3Gq4Bs9I7ITGaO5ZUGSe26puIwkUgTqCHieQW6UPxhNQStAUqXcQ2ETqcsetBK9P3rBNsJZQ1IaKR6T4/U0hUsnezlV5VX24qLFHtVhIakMIYyKu8T1mWkj4Ee2OvbGQSDNfW0jUEnhngTSqtb1CfAq8wTUcFcMzjs2XA2PoQmKS6Rr77sw7MOzvBYPsy17NBtgDsVjZHzIujxIAAAAASUVORK5CYII="
+)
 
-    def proj(p):
-        return (cx + int(p[0]*s + p[2]*s*0.3), cy + int(p[1]*s - p[2]*s*0.2))
-
-    edges = [(0,1),(1,2),(2,3),(3,0),(4,5),(5,6),(6,7),(7,4),(0,4),(1,5),(2,6),(3,7)]
-
-    # Рисуем линии (упрощённо — пикселями)
-    def draw_line(x0, y0, x1, y1, r, g, b, w=1):
-        steps = max(abs(x1-x0), abs(y1-y0), 1)
-        for t in range(steps + 1):
-            f = t / steps
-            px = int(x0 + (x1-x0)*f)
-            py = int(y0 + (y1-y0)*f)
-            for dy in range(-w//2, w//2+1):
-                for dx in range(-w//2, w//2+1):
-                    nx, ny = px+dx, py+dy
-                    if 0 <= nx < size and 0 <= ny < size:
-                        bmp.SetPixel(nx, ny, r, g, b)
-
-    for a, b_ in edges:
-        p0 = proj(outer[a])
-        p1 = proj(outer[b_])
-        draw_line(p0[0], p0[1], p1[0], p1[1], 80, 140, 220, 1)
-        p0 = proj(inner[a])
-        p1 = proj(inner[b_])
-        draw_line(p0[0], p0[1], p1[0], p1[1], 120, 180, 255, 1)
-    # Соединения внутрь-наружу
-    for i in range(8):
-        p0 = proj(outer[i])
-        p1 = proj(inner[i])
-        draw_line(p0[0], p0[1], p1[0], p1[1], 60, 100, 160, 1)
-
+def _make_icon_tc():
+    png_data = base64.b64decode(_ICON_TC)
+    try:
+        bmp = c4d.bitmaps.BaseBitmap()
+    except AttributeError:
+        bmp = c4d.BaseBitmap()
+    tmp = tempfile.NamedTemporaryFile(suffix=".png", delete=False)
+    try:
+        tmp.write(png_data)
+        tmp.close()
+        bmp.InitWith(tmp.name)
+    finally:
+        os.unlink(tmp.name)
     return bmp
 
-
-ICO_TS = _create_icon()
+ICO_TS = _make_icon_tc()
 
 
 # ══════════════════════════════════════════════════════════════════════════════
