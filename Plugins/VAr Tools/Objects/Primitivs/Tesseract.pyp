@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Tesseract — Cinema 4D ObjectData Plugin v1.0
+Tesseract — Cinema 4D ObjectData Plugin
 =============================================
 Генератор тессеракта (4D гиперкуб) с проекцией в 3D пространство.
 
@@ -25,7 +25,7 @@ import tempfile
 # ══════════════════════════════════════════════════════════════════════════════
 
 ID_TESSERACT = 1068993
-NAME_TESSERACT = "Tesseract v1.0"
+NAME_TESSERACT = "Tesseract v1.1"
 
 # ══════════════════════════════════════════════════════════════════════════════
 #  UserData SubID — строго фиксированы
@@ -80,9 +80,9 @@ DEFAULT_DISPLAY    = 0     # 0=Каркас, 1=Рёбра+Вершины, 2=Яч
 
 DEFAULT_ROT_XY     = 0.0
 DEFAULT_ROT_XZ     = 0.0
-DEFAULT_ROT_XW     = 25.0  # начальный поворот для красоты
+DEFAULT_ROT_XW     = math.radians(25.0)  # начальный поворот для красоты
 DEFAULT_ROT_YZ     = 0.0
-DEFAULT_ROT_YW     = 15.0  # начальный поворот для красоты
+DEFAULT_ROT_YW     = math.radians(15.0)  # начальный поворот для красоты
 DEFAULT_ROT_ZW     = 0.0
 
 DEFAULT_AUTO_ROT   = False
@@ -219,13 +219,13 @@ def _mat4_identity():
     return [[1.0 if i == j else 0.0 for j in range(4)] for i in range(4)]
 
 
-def _rot4d(axis1, axis2, angle_deg):
+def _rot4d(axis1, axis2, angle_rad):
     """
     Матрица поворота в 4D в плоскости (axis1, axis2).
     axis1, axis2 — индексы 0..3 (x, y, z, w).
-    angle_deg — угол в градусах.
+    angle_rad — угол в радианах (Значения передаются непосредственно из пользовательских данных).
     """
-    a = math.radians(angle_deg)
+    a = angle_rad
     c = math.cos(a)
     s = math.sin(a)
     m = _mat4_identity()
@@ -329,7 +329,7 @@ def _build_rotation_matrix(rot_xy, rot_xz, rot_xw, rot_yz, rot_yw, rot_zw):
 def _rotate_verts(mat, size):
     """Поворачивает и масштабирует 16 вершин тессеракта."""
     half = size * 0.5
-    return [tuple(v[i] * half for i in range(4)) for v in _TESS_VERTS]
+    return [_apply_mat4(mat, tuple(v[i] * half for i in range(4))) for v in _TESS_VERTS]
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -482,12 +482,17 @@ def _build_tesseract(op):
 
     # ── Автовращение: добавляем фазу к углам ────────────────────────────
     if auto_rot:
-        rot_xy += speed_xy * phase
-        rot_xz += speed_xz * phase
-        rot_xw += speed_xw * phase
-        rot_yz += speed_yz * phase
-        rot_yw += speed_yw * phase
-        rot_zw += speed_zw * phase
+        doc = op.GetDocument()
+        if doc:
+            t = doc.GetTime().Get()
+        else:
+            t = 0.0
+        rot_xy += speed_xy * t
+        rot_xz += speed_xz * t
+        rot_xw += speed_xw * t
+        rot_yz += speed_yz * t
+        rot_yw += speed_yw * t
+        rot_zw += speed_zw * t
 
     # ── 4D → 3D ──────────────────────────────────────────────────────────
     mat = _build_rotation_matrix(rot_xy, rot_xz, rot_xw, rot_yz, rot_yw, rot_zw)
@@ -588,26 +593,7 @@ def _build_tesseract(op):
                     c_obj.SetPolygon(i, pl)
                 c_obj.Message(c4d.MSG_UPDATE)
 
-                # Прозрачность через Phong-тег (базовая)
                 _add_phong_tag(c_obj, 80.0)
-
-                # Добавляем тег материала с прозрачностью
-                if cell_alpha < 0.99:
-                    mat = c4d.BaseMaterial(c4d.Mmaterial)
-                    if mat:
-                        mat.SetName("Cell_%d" % cell_idx)
-                        mat[c4d.MATERIAL_USE_COLOR] = True
-                        mat[c4d.MATERIAL_USE_ALPHA] = True
-                        mat[c4d.MATERIAL_ALPHA] = cell_alpha
-                        # Базовый цвет — голубой с вариациями по глуботе
-                        w_norm = (verts_4d[cell_verts[0]][3] - w_min) / w_range
-                        r = 0.2 + 0.6 * (1.0 - w_norm)
-                        g = 0.4 + 0.4 * (1.0 - w_norm)
-                        b = 0.8
-                        mat[c4d.MATERIAL_COLOR_COLOR] = c4d.Vector(r, g, b)
-                        mat.Message(c4d.MSG_UPDATE)
-                        c_obj.InsertTag(mat.MakeTag(c4d.Ttexture))
-
                 c_obj.InsertUnder(root)
 
     return root
@@ -629,25 +615,32 @@ def _create_userdata(op):
         ["Каркас", "Рёбра + Вершины", "Ячейки", "Всё"]))
 
     # SubID=5 → «Поворот 4D»
+    # Все значения min/max/step в радианах (DESC_UNIT_DEGREE хранит радианы)
     g_rot = _add_group(op, "Поворот 4D")
     _add_in_group(op, g_rot, _float_bc(
-        "Поворот XY", DEFAULT_ROT_XY, -360.0, 360.0,
-        unit=c4d.DESC_UNIT_DEGREE, step=1.0))
+        "Поворот XY", DEFAULT_ROT_XY,
+        math.radians(-360.0), math.radians(360.0),
+        unit=c4d.DESC_UNIT_DEGREE, step=math.radians(1.0)))
     _add_in_group(op, g_rot, _float_bc(
-        "Поворот XZ", DEFAULT_ROT_XZ, -360.0, 360.0,
-        unit=c4d.DESC_UNIT_DEGREE, step=1.0))
+        "Поворот XZ", DEFAULT_ROT_XZ,
+        math.radians(-360.0), math.radians(360.0),
+        unit=c4d.DESC_UNIT_DEGREE, step=math.radians(1.0)))
     _add_in_group(op, g_rot, _float_bc(
-        "Поворот XW", DEFAULT_ROT_XW, -360.0, 360.0,
-        unit=c4d.DESC_UNIT_DEGREE, step=1.0))
+        "Поворот XW", DEFAULT_ROT_XW,
+        math.radians(-360.0), math.radians(360.0),
+        unit=c4d.DESC_UNIT_DEGREE, step=math.radians(1.0)))
     _add_in_group(op, g_rot, _float_bc(
-        "Поворот YZ", DEFAULT_ROT_YZ, -360.0, 360.0,
-        unit=c4d.DESC_UNIT_DEGREE, step=1.0))
+        "Поворот YZ", DEFAULT_ROT_YZ,
+        math.radians(-360.0), math.radians(360.0),
+        unit=c4d.DESC_UNIT_DEGREE, step=math.radians(1.0)))
     _add_in_group(op, g_rot, _float_bc(
-        "Поворот YW", DEFAULT_ROT_YW, -360.0, 360.0,
-        unit=c4d.DESC_UNIT_DEGREE, step=1.0))
+        "Поворот YW", DEFAULT_ROT_YW,
+        math.radians(-360.0), math.radians(360.0),
+        unit=c4d.DESC_UNIT_DEGREE, step=math.radians(1.0)))
     _add_in_group(op, g_rot, _float_bc(
-        "Поворот ZW", DEFAULT_ROT_ZW, -360.0, 360.0,
-        unit=c4d.DESC_UNIT_DEGREE, step=1.0))
+        "Поворот ZW", DEFAULT_ROT_ZW,
+        math.radians(-360.0), math.radians(360.0),
+        unit=c4d.DESC_UNIT_DEGREE, step=math.radians(1.0)))
 
     # SubID=12 → «Автовращение»
     g_anim = _add_group(op, "Автовращение")
@@ -755,11 +748,7 @@ class TesseractObject(c4d.plugins.ObjectData):
         return True, flags | c4d.DESCFLAGS_DESC_LOADED
 
     def CheckDirty(self, op, doc):
-        auto_rot = bool(_ud_get(op, TS_AUTO_ROT, DEFAULT_AUTO_ROT))
-        if auto_rot:
-            op.SetDirty(c4d.DIRTYFLAGS_DATA)
-        else:
-            op.SetDirty(c4d.DIRTYFLAGS_DATA)
+        op.SetDirty(c4d.DIRTYFLAGS_DATA)
 
     def Draw(self, op, drawpass, bd, bh):
         return c4d.DRAWRESULT_OK
