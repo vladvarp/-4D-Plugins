@@ -56,7 +56,7 @@ import random
 # ══════════════════════════════════════════════════════════════════════════════
 
 ID_TRITORUS  = 1068874
-NAME_TRITORUS = "Tri Torus v2.2"
+NAME_TRITORUS = "Tri Torus v2.3"
 
 # ══════════════════════════════════════════════════════════════════════════════
 #  UserData SubID
@@ -269,18 +269,52 @@ def _build_uv_grid(segs_m, segs_n):
     return uv_map
 
 
-def _create_uvw_tag(polys, uv_map):
-    """Создаёт c4d.UVWTag на основе полигональной сетки и UV-карты вершин."""
+def _create_uvw_tag(polys, uv_map, segs_m, segs_n):
+    """Создаёт c4d.UVWTag на основе полигональной сетки.
+
+    Полигоны во всех генераторах мешей создаются строго в порядке
+    "for j in range(segs_m): for i in range(segs_n): ..." — один квад
+    (или два треугольника из него) на итерацию. Поэтому UV для каждого
+    полигона строится тем же проходом по (j, i), а не через uv_map по
+    индексам вершин: вершины на шве (последний столбец/ряд) физически
+    совпадают с вершинами j=0/i=0 (геометрия замкнута через %segs_m и
+    %segs_n), поэтому их UV там равны 0.0. Если брать UV по индексу
+    вершины, полигоны на шве получают U/V=0.0 вместо 1.0, и текстура
+    схлопывается в одну сжатую полосу на шве (видно как частую
+    "штриховку"). Прямой проход по (j, i) даёт каждому полигону
+    собственные развёрнутые границы U: [j/segs_m, (j+1)/segs_m] и
+    V: [i/segs_n, (i+1)/segs_n], независимо от того, какие вершины
+    использует геометрия.
+    """
     n_polys = len(polys)
     uvw_tag = c4d.UVWTag(n_polys)
-    zero = c4d.Vector(0, 0, 0)
-    for pi in range(n_polys):
-        cp = polys[pi]
-        a = uv_map.get(cp.a, zero)
-        b = uv_map.get(cp.b, zero)
-        c = uv_map.get(cp.c, zero)
-        d = uv_map.get(cp.d, zero)
-        uvw_tag.SetSlow(pi, a, b, c, d)
+
+    pi = 0
+    for j in range(segs_m):
+        u0 = float(j) / float(segs_m)
+        u1 = float(j + 1) / float(segs_m)
+        for i in range(segs_n):
+            v0 = float(i) / float(segs_n)
+            v1 = float(i + 1) / float(segs_n)
+
+            a = c4d.Vector(u0, v0, 0.0)
+            b = c4d.Vector(u0, v1, 0.0)
+            c = c4d.Vector(u1, v1, 0.0)
+            d = c4d.Vector(u1, v0, 0.0)
+
+            if pi >= n_polys:
+                break
+
+            if polys[pi].c == polys[pi].d:
+                # Квад разбит на два треугольника (a,b,c,c) и (a,c,d,d)
+                uvw_tag.SetSlow(pi, a, b, c, c)
+                pi += 1
+                if pi < n_polys:
+                    uvw_tag.SetSlow(pi, a, c, d, d)
+                    pi += 1
+            else:
+                uvw_tag.SetSlow(pi, a, b, c, d)
+                pi += 1
     return uvw_tag
 
 
@@ -449,7 +483,7 @@ def _apply_deformations(verts, segs_m, segs_n,
                         scale_x, scale_y, scale_z):
     for j in range(segs_m):
         phi = j / segs_m * 2.0 * math.pi
-        twist_angle = math.radians(twist) * (j / max(segs_m - 1, 1))
+        twist_angle = twist * (j / max(segs_m - 1, 1))
         ct = math.cos(twist_angle)
         st = math.sin(twist_angle)
         for i in range(segs_n):
@@ -591,7 +625,7 @@ def _build_mesh(op):
 
     uv_map = _build_uv_grid(segs_m, segs_n)
 
-    return verts, polys, uv_map
+    return verts, polys, uv_map, segs_m, segs_n
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -610,7 +644,8 @@ def _create_userdata(op):
 
     g_deform = _add_group(op, "Деформации")
     _add_in_group(op, g_deform, _float_bc("Кручение (Twist)", DEFAULT_TWIST,
-                  -3600.0, 3600.0, unit=c4d.DESC_UNIT_DEGREE, step=1.0))
+                  math.radians(-3600.0), math.radians(3600.0),
+                  unit=c4d.DESC_UNIT_DEGREE, step=math.radians(1.0)))
     _add_in_group(op, g_deform, _float_bc("Сужение X (Taper)", DEFAULT_TAPER_X,
                   -2.0, 2.0, unit=c4d.DESC_UNIT_FLOAT, step=0.01))
     _add_in_group(op, g_deform, _float_bc("Сужение Y (Taper)", DEFAULT_TAPER_Y,
@@ -702,10 +737,10 @@ class TriTorusObject(c4d.plugins.ObjectData):
     def GetVirtualObjects(self, op, hh):
         self._ensure_ud(op)
 
-        points, polys, uv_map = _build_mesh(op)
+        points, polys, uv_map, segs_m, segs_n = _build_mesh(op)
         obj = _make_poly_object(points, polys, self.OBJECT_NAME)
 
-        uvw_tag = _create_uvw_tag(polys, uv_map)
+        uvw_tag = _create_uvw_tag(polys, uv_map, segs_m, segs_n)
         obj.InsertTag(uvw_tag)
 
         phong_angle_rad = max(0.0, min(math.radians(180.0),
