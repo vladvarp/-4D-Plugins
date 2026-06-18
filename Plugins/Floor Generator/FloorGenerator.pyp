@@ -37,7 +37,7 @@ import tempfile
 # ══════════════════════════════════════════════════════════════════════════════
 
 ID_FLOORGEN   = 1068969
-NAME_FLOORGEN = "Floor Generator v2.2"
+NAME_FLOORGEN = "Floor Generator v2.3"
 
 # ══════════════════════════════════════════════════════════════════════════════
 #  Паттерны
@@ -60,32 +60,34 @@ UD_G_PAT    = 1
 FG_PATTERN  = 2
 FG_TILE_W   = 3
 FG_TILE_H   = 4
-FG_ANGLE    = 5
-FG_OFFSET   = 6
-FG_SEED     = 7
-FG_PARQ_RAND_W = 8
+FG_PAT_X    = 5
+FG_PAT_Y    = 6
+FG_ANGLE    = 7
+FG_OFFSET   = 8
+FG_SEED     = 9
+FG_PARQ_RAND_W = 10
 
 # Группа «Толщина и фаска»
-UD_G_THK    = 9
-FG_THICKNESS = 10
-FG_BEVEL    = 11
+UD_G_THK    = 11
+FG_THICKNESS = 12
+FG_BEVEL    = 13
 
 # Группа «Швы»
-UD_G_SEAM   = 12
-FG_SEAM_ON  = 13
-FG_SEAM_W   = 14
+UD_G_SEAM   = 14
+FG_SEAM_ON  = 15
+FG_SEAM_W   = 16
 
 # Группа «UV»
-UD_G_UV     = 15
-FG_UV_SX    = 16
-FG_UV_SY    = 17
-FG_UV_ROT   = 18
-FG_UV_RAND  = 19
-FG_UV_RANDR = 20
-FG_UV_RANDOFF   = 21
-FG_UV_RANDOFF_X = 22
-FG_UV_RANDOFF_Y = 23
-FG_UV_RAND_SEED = 24
+UD_G_UV     = 17
+FG_UV_SX    = 18
+FG_UV_SY    = 19
+FG_UV_ROT   = 20
+FG_UV_RAND  = 21
+FG_UV_RANDR = 22
+FG_UV_RANDOFF   = 23
+FG_UV_RANDOFF_X = 24
+FG_UV_RANDOFF_Y = 25
+FG_UV_RAND_SEED = 26
 
 FG_FIRST_PARAM = FG_PATTERN
 
@@ -97,6 +99,8 @@ FG_FIRST_PARAM = FG_PATTERN
 DEF_PATTERN   = PAT_HERRINGBONE
 DEF_TILE_W    = 100.0
 DEF_TILE_H    = 20.0
+DEF_PAT_X     = 0.0
+DEF_PAT_Y     = 0.0
 DEF_ANGLE     = 0.0
 DEF_OFFSET    = 0.5
 DEF_SEED      = 0
@@ -869,6 +873,8 @@ def _build_floor(op):
     pattern    = int(_ud_get(op, FG_PATTERN,   DEF_PATTERN))
     tile_w     = max(1.0, float(_ud_get(op, FG_TILE_W,    DEF_TILE_W)))
     tile_h     = max(1.0, float(_ud_get(op, FG_TILE_H,    DEF_TILE_H)))
+    pat_x      = float(_ud_get(op, FG_PAT_X,  DEF_PAT_X))
+    pat_y      = float(_ud_get(op, FG_PAT_Y,  DEF_PAT_Y))
     angle      = float(_ud_get(op, FG_ANGLE,  DEF_ANGLE))
     offset     = float(_ud_get(op, FG_OFFSET, DEF_OFFSET))
     seed       = int(_ud_get(op, FG_SEED,     DEF_SEED))
@@ -876,6 +882,8 @@ def _build_floor(op):
     bevel      = max(0.0, float(_ud_get(op, FG_BEVEL, DEF_BEVEL)))
     seam_on    = bool(_ud_get(op, FG_SEAM_ON, DEF_SEAM_ON))
     seam_w     = max(0.0, float(_ud_get(op, FG_SEAM_W, DEF_SEAM_W)))
+
+    boundary_2d = [(p[0] - pat_x, p[1] - pat_y) for p in boundary_2d]
     uv_sx      = max(0.1, float(_ud_get(op, FG_UV_SX, DEF_UV_SX)))
     uv_sy      = max(0.1, float(_ud_get(op, FG_UV_SY, DEF_UV_SY)))
     uv_rot     = float(_ud_get(op, FG_UV_ROT, DEF_UV_ROT))
@@ -1088,6 +1096,10 @@ def _create_userdata(op):
     _add_in_group(op, g1, _cycle_bc("Тип", DEF_PATTERN, PAT_NAMES))
     _add_in_group(op, g1, _float_bc("Ширина плитки", DEF_TILE_W, 1.0, 10000.0))
     _add_in_group(op, g1, _float_bc("Длина плитки", DEF_TILE_H, 1.0, 10000.0))
+    _add_in_group(op, g1, _float_bc("Смещение X", DEF_PAT_X,
+                  -10000.0, 10000.0, c4d.DESC_UNIT_METER, 1.0))
+    _add_in_group(op, g1, _float_bc("Смещение Y", DEF_PAT_Y,
+                  -10000.0, 10000.0, c4d.DESC_UNIT_METER, 1.0))
     _add_in_group(op, g1, _float_bc("Угол поворота", DEF_ANGLE,
                   -180.0, 180.0, c4d.DESC_UNIT_DEGREE, math.radians(1.0)))
     _add_in_group(op, g1, _float_bc("Смещение рядов", DEF_OFFSET,
@@ -1124,6 +1136,8 @@ def _set_defaults(op):
     _ud_set(op, FG_PATTERN,   DEF_PATTERN)
     _ud_set(op, FG_TILE_W,    DEF_TILE_W)
     _ud_set(op, FG_TILE_H,    DEF_TILE_H)
+    _ud_set(op, FG_PAT_X,     DEF_PAT_X)
+    _ud_set(op, FG_PAT_Y,     DEF_PAT_Y)
     _ud_set(op, FG_ANGLE,     DEF_ANGLE)
     _ud_set(op, FG_OFFSET,    DEF_OFFSET)
     _ud_set(op, FG_SEED,      DEF_SEED)
