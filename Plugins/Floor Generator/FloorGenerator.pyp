@@ -37,7 +37,7 @@ import tempfile
 # ══════════════════════════════════════════════════════════════════════════════
 
 ID_FLOORGEN   = 1068969
-NAME_FLOORGEN = "Floor Generator v2.4"
+NAME_FLOORGEN = "Floor Generator v2.5"
 
 # ══════════════════════════════════════════════════════════════════════════════
 #  Паттерны
@@ -264,6 +264,93 @@ def _point_in_polygon(px, py, polygon):
     return inside
 
 
+def _is_convex(poly):
+    """Check if a 2D polygon is convex."""
+    n = len(poly)
+    if n < 3:
+        return True
+    has_pos = False
+    has_neg = False
+    for i in range(n):
+        a = poly[i]
+        b = poly[(i + 1) % n]
+        c = poly[(i + 2) % n]
+        cross = (b[0] - a[0]) * (c[1] - b[1]) - (b[1] - a[1]) * (c[0] - b[0])
+        if cross > 1e-10:
+            has_pos = True
+        elif cross < -1e-10:
+            has_neg = True
+        if has_pos and has_neg:
+            return False
+    return True
+
+
+def _point_in_triangle(p, a, b, c):
+    """Check if point p is inside triangle (a, b, c)."""
+    d1 = (p[0] - b[0]) * (a[1] - b[1]) - (a[0] - b[0]) * (p[1] - b[1])
+    d2 = (p[0] - c[0]) * (b[1] - c[1]) - (b[0] - c[0]) * (p[1] - c[1])
+    d3 = (p[0] - a[0]) * (c[1] - a[1]) - (c[0] - a[0]) * (p[1] - a[1])
+    has_neg = (d1 < -1e-12) or (d2 < -1e-12) or (d3 < -1e-12)
+    has_pos = (d1 > 1e-12) or (d2 > 1e-12) or (d3 > 1e-12)
+    return not (has_neg and has_pos)
+
+
+def _triangulate_polygon(poly):
+    """Ear clipping triangulation of a simple 2D polygon.
+    Returns list of triangles as [(a, b, c), ...]."""
+    n = len(poly)
+    if n < 3:
+        return []
+    if n == 3:
+        return [(poly[0], poly[1], poly[2])]
+
+    pts = list(poly)
+    if _poly_area_2d(pts) < 0:
+        pts = list(reversed(pts))
+
+    indices = list(range(len(pts)))
+    triangles = []
+
+    max_iter = len(indices) * 3
+    while len(indices) > 2 and max_iter > 0:
+        max_iter -= 1
+        m = len(indices)
+        ear_found = False
+
+        for i in range(m):
+            i0 = indices[(i - 1) % m]
+            i1 = indices[i]
+            i2 = indices[(i + 1) % m]
+            a, b, c = pts[i0], pts[i1], pts[i2]
+
+            cross = (b[0] - a[0]) * (c[1] - b[1]) - (b[1] - a[1]) * (c[0] - b[0])
+            if cross <= 1e-12:
+                continue
+
+            is_ear = True
+            for j in range(m):
+                jdx = indices[j]
+                if jdx == i0 or jdx == i1 or jdx == i2:
+                    continue
+                if _point_in_triangle(pts[jdx], a, b, c):
+                    is_ear = False
+                    break
+
+            if is_ear:
+                triangles.append((a, b, c))
+                indices.pop(i)
+                ear_found = True
+                break
+
+        if not ear_found:
+            a = pts[indices[0]]
+            for i in range(1, len(indices) - 1):
+                triangles.append((a, pts[indices[i]], pts[indices[i + 1]]))
+            break
+
+    return triangles
+
+
 def _build_frame(normal):
     """Orthonormal basis from normal: returns (u, v, n)."""
     n = _v3_normalize(normal)
@@ -284,6 +371,245 @@ def _bbox_2d(pts):
     us = [p[0] for p in pts]
     vs = [p[1] for p in pts]
     return min(us), max(us), min(vs), max(vs)
+
+
+def _clip_sh(subject, clip):
+    """Sutherland-Hodgman clipping (single convex clip polygon).
+    Returns a single polygon or []."""
+    output = list(subject)
+    n = len(clip)
+    if n < 3 or not output:
+        return []
+
+    for i in range(n):
+        if not output:
+            return []
+        input_list = output
+        output = []
+        edge_start = clip[i]
+        edge_end = clip[(i + 1) % n]
+        ex = edge_end[0] - edge_start[0]
+        ey = edge_end[1] - edge_start[1]
+
+        for j in range(len(input_list)):
+            cur = input_list[j]
+            prev = input_list[j - 1] if j > 0 else input_list[-1]
+
+            dx_cur = cur[0] - edge_start[0]
+            dy_cur = cur[1] - edge_start[1]
+            inside_cur = ex * dy_cur - ey * dx_cur >= 0
+
+            dx_prev = prev[0] - edge_start[0]
+            dy_prev = prev[1] - edge_start[1]
+            inside_prev = ex * dy_prev - ey * dx_prev >= 0
+
+            if inside_cur:
+                if not inside_prev:
+                    det = ex * (prev[1] - cur[1]) - ey * (prev[0] - cur[0])
+                    if abs(det) > 1e-12:
+                        t = (ex * (edge_start[1] - cur[1]) - ey * (edge_start[0] - cur[0])) / det
+                        ix = cur[0] + t * (prev[0] - cur[0])
+                        iy = cur[1] + t * (prev[1] - cur[1])
+                        output.append((ix, iy))
+                output.append(cur)
+            elif inside_prev:
+                det = ex * (prev[1] - cur[1]) - ey * (prev[0] - cur[0])
+                if abs(det) > 1e-12:
+                    t = (ex * (edge_start[1] - cur[1]) - ey * (edge_start[0] - cur[0])) / det
+                    ix = cur[0] + t * (prev[0] - cur[0])
+                    iy = cur[1] + t * (prev[1] - cur[1])
+                    output.append((ix, iy))
+
+    return output if len(output) >= 3 else []
+
+
+def _pt_key(p):
+    """Округление точки для устойчивого сравнения координат с учётом погрешности float."""
+    return (round(p[0], 6), round(p[1], 6))
+
+
+def _merge_polygon_fragments(fragments):
+    """Склеивает фрагменты, полученные обрезкой по треугольникам триангуляции,
+    обратно в единые полигоны по совпадающим внутренним рёбрам.
+    Это убирает «ложные» разрезы, появившиеся только из-за диагоналей
+    триангуляции невыпуклого контура, а не из-за реальной внешней границы.
+    Возвращает список объединённых полигонов (списков (u, v))."""
+    if not fragments:
+        return []
+    if len(fragments) == 1:
+        return fragments
+
+    # Собираем все рёбра всех фрагментов; ребро, встретившееся ровно
+    # 2 раза (в противоположных направлениях) у двух разных фрагментов —
+    # это внутренний (фиктивный) разрез триангуляции, его нужно «сшить».
+    edge_owner = {}
+    for fi, frag in enumerate(fragments):
+        n = len(frag)
+        for i in range(n):
+            a = _pt_key(frag[i])
+            b = _pt_key(frag[(i + 1) % n])
+            edge_owner.setdefault((a, b), []).append(fi)
+
+    shared_edges = set()
+    for (a, b), owners in edge_owner.items():
+        rev = (b, a)
+        if rev in edge_owner:
+            for fi in owners:
+                for fj in edge_owner[rev]:
+                    if fi != fj:
+                        shared_edges.add((a, b))
+                        shared_edges.add((b, a))
+
+    if not shared_edges:
+        return fragments
+
+    # Union-Find для группировки фрагментов, соединённых общими внутренними рёбрами.
+    parent = list(range(len(fragments)))
+
+    def _find(x):
+        while parent[x] != x:
+            parent[x] = parent[parent[x]]
+            x = parent[x]
+        return x
+
+    def _union(x, y):
+        rx, ry = _find(x), _find(y)
+        if rx != ry:
+            parent[rx] = ry
+
+    for (a, b), owners in edge_owner.items():
+        rev = (b, a)
+        if rev in edge_owner:
+            for fi in owners:
+                for fj in edge_owner[rev]:
+                    if fi != fj:
+                        _union(fi, fj)
+
+    groups = {}
+    for fi in range(len(fragments)):
+        root = _find(fi)
+        groups.setdefault(root, []).append(fi)
+
+    merged = []
+    for group in groups.values():
+        if len(group) == 1:
+            merged.append(fragments[group[0]])
+            continue
+
+        # Собираем граф рёбер группы, отбрасывая внутренние (общие) рёбра —
+        # останутся только рёбра внешнего контура объединённого куска.
+        boundary_adj = {}
+        for fi in group:
+            frag = fragments[fi]
+            n = len(frag)
+            for i in range(n):
+                a_pt = frag[i]
+                b_pt = frag[(i + 1) % n]
+                a, b = _pt_key(a_pt), _pt_key(b_pt)
+                if (a, b) in shared_edges:
+                    continue
+                boundary_adj.setdefault(a, []).append((b, b_pt, a_pt))
+
+        if not boundary_adj:
+            merged.extend(fragments[fi] for fi in group)
+            continue
+
+        # Обходим оставшиеся рёбра, строя замкнутый внешний контур.
+        start = next(iter(boundary_adj))
+        loop = []
+        cur = start
+        visited_edges = set()
+        ok = True
+        max_steps = sum(len(v) for v in boundary_adj.values()) + 1
+        steps = 0
+        while True:
+            steps += 1
+            if steps > max_steps:
+                ok = False
+                break
+            options = boundary_adj.get(cur)
+            if not options:
+                ok = False
+                break
+            nxt_key, nxt_pt, cur_pt = options[0]
+            edge_id = (cur, nxt_key, len(loop))
+            if edge_id in visited_edges:
+                ok = False
+                break
+            visited_edges.add(edge_id)
+            loop.append(cur_pt)
+            options.pop(0)
+            if not options:
+                del boundary_adj[cur]
+            cur = nxt_key
+            if cur == start and len(loop) >= 3:
+                break
+            if len(loop) > 5000:
+                ok = False
+                break
+
+        if ok and len(loop) >= 3:
+            merged.append(loop)
+        else:
+            merged.extend(fragments[fi] for fi in group)
+
+    return [_remove_collinear_points(p) for p in merged]
+
+
+def _remove_collinear_points(poly):
+    """Удаляет лишние вершины, лежащие на прямой между соседями.
+    После склейки фрагментов триангуляции на местах бывших швов
+    остаются «технические» точки на сторонах плитки — без этой
+    чистки прямоугольная плитка перестаёт быть 4-угольником и может
+    плохо триангулироваться при построении 3D-геометрии (см. _build_tile_3d)."""
+    n = len(poly)
+    if n < 4:
+        return poly
+
+    result = []
+    for i in range(n):
+        prev_p = poly[i - 1]
+        cur_p = poly[i]
+        next_p = poly[(i + 1) % n]
+
+        dx1, dy1 = cur_p[0] - prev_p[0], cur_p[1] - prev_p[1]
+        dx2, dy2 = next_p[0] - cur_p[0], next_p[1] - cur_p[1]
+        cross = dx1 * dy2 - dy1 * dx2
+        len1 = math.sqrt(dx1 * dx1 + dy1 * dy1)
+        len2 = math.sqrt(dx2 * dx2 + dy2 * dy2)
+
+        if len1 < 1e-9 or len2 < 1e-9:
+            continue
+
+        if abs(cross) / (len1 * len2) < 1e-6:
+            continue
+
+        result.append(cur_p)
+
+    return result if len(result) >= 3 else poly
+
+
+def _clip_polygon_subject(subject, clip):
+    """Clip subject polygon against clip polygon (both lists of (x,y)).
+    Returns a list of intersection polygons (may be 0, 1, or more).
+    Handles concave clip polygons by triangulating first.
+    Фрагменты, разделённые только диагоналями триангуляции (а не реальной
+    внешней границей), склеиваются обратно в единый полигон — это убирает
+    ложные линии разреза внутри плиток у невыпуклых контуров (внутренние углы)."""
+    if not subject or len(clip) < 3:
+        return []
+
+    if _is_convex(clip):
+        result = _clip_sh(subject, clip)
+        return [result] if result else []
+
+    triangles = _triangulate_polygon(clip)
+    results = []
+    for tri in triangles:
+        clipped = _clip_sh(subject, tri)
+        if clipped and len(clipped) >= 3:
+            results.append(clipped)
+    return _merge_polygon_fragments(results)
 
 
 def _inset_polygon(poly, amount):
@@ -489,8 +815,8 @@ def _gen_herringbone(tw, th, angle_rad, boundary_2d, seed,
             if abs(angle_rad) > 1e-8:
                 h_tile = [_rotate_pt_2d(p[0], p[1], cx, cy, angle_rad) for p in h_tile]
             h_tile = [(p[0] + offset_x, p[1] + offset_y) for p in h_tile]
-            if any(_point_in_polygon(p[0], p[1], boundary_2d) for p in h_tile):
-                tiles_h.append(h_tile)
+            clipped_list = _clip_polygon_subject(h_tile, boundary_2d)
+            tiles_h.extend(clipped_list)
 
             v_tile = [(ux + tw, uy + th),
                       (ux + tw + th, uy + th),
@@ -499,24 +825,24 @@ def _gen_herringbone(tw, th, angle_rad, boundary_2d, seed,
             if abs(angle_rad) > 1e-8:
                 v_tile = [_rotate_pt_2d(p[0], p[1], cx, cy, angle_rad) for p in v_tile]
             v_tile = [(p[0] + offset_x, p[1] + offset_y) for p in v_tile]
-            if any(_point_in_polygon(p[0], p[1], boundary_2d) for p in v_tile):
-                tiles_v.append(v_tile)
+            clipped_list = _clip_polygon_subject(v_tile, boundary_2d)
+            tiles_v.extend(clipped_list)
 
             f0 = [(ux, uy + th), (ux + tw, uy + th),
                   (ux + tw, uy + th + tw), (ux, uy + th + tw)]
             if abs(angle_rad) > 1e-8:
                 f0 = [_rotate_pt_2d(p[0], p[1], cx, cy, angle_rad) for p in f0]
             f0 = [(p[0] + offset_x, p[1] + offset_y) for p in f0]
-            if any(_point_in_polygon(p[0], p[1], boundary_2d) for p in f0):
-                fills_p1.append(f0)
+            clipped_list = _clip_polygon_subject(f0, boundary_2d)
+            fills_p1.extend(clipped_list)
 
             f1 = [(ux + tw, uy), (ux + tw + th, uy),
                   (ux + tw + th, uy + th), (ux + tw, uy + th)]
             if abs(angle_rad) > 1e-8:
                 f1 = [_rotate_pt_2d(p[0], p[1], cx, cy, angle_rad) for p in f1]
             f1 = [(p[0] + offset_x, p[1] + offset_y) for p in f1]
-            if any(_point_in_polygon(p[0], p[1], boundary_2d) for p in f1):
-                fills_p2.append(f1)
+            clipped_list = _clip_polygon_subject(f1, boundary_2d)
+            fills_p2.extend(clipped_list)
 
     return tiles_h, tiles_v, fills_p1, fills_p2
 
@@ -563,8 +889,8 @@ def _gen_parquet(tw, th, angle_rad, offset, boundary_2d, seed,
                 tile = [_rotate_pt_2d(p[0], p[1], cx, cy, angle) for p in tile]
             tile = [(p[0] + offset_x, p[1] + offset_y) for p in tile]
 
-            if any(_point_in_polygon(p[0], p[1], boundary_2d) for p in tile):
-                tiles.append(tile)
+            clipped_list = _clip_polygon_subject(tile, boundary_2d)
+            tiles.extend(clipped_list)
 
     return tiles
 
@@ -603,8 +929,8 @@ def _gen_honeycomb(size, angle_rad, boundary_2d, seed,
                     px, py = _rotate_pt_2d(px, py, cx, cy, angle)
                 hex_pts.append((px + offset_x, py + offset_y))
 
-            if any(_point_in_polygon(p[0], p[1], boundary_2d) for p in hex_pts):
-                tiles.append(hex_pts)
+            clipped_list = _clip_polygon_subject(hex_pts, boundary_2d)
+            tiles.extend(clipped_list)
 
     return tiles
 
@@ -653,8 +979,8 @@ def _gen_herringbone_v2(tw, th, angle_rad, boundary_2d, seed,
                 tile = [_rotate_pt_2d(p[0], p[1], cx, cy, angle_rad) for p in tile]
             tile = [(p[0] + offset_x, p[1] + offset_y) for p in tile]
 
-            if any(_point_in_polygon(p[0], p[1], boundary_2d) for p in tile):
-                tiles_h.append(tile)
+            clipped_list = _clip_polygon_subject(tile, boundary_2d)
+            tiles_h.extend(clipped_list)
 
     for c in range(min_col, max_col + 1):
         base_anchor = (c + 1) % period
@@ -674,8 +1000,8 @@ def _gen_herringbone_v2(tw, th, angle_rad, boundary_2d, seed,
                 tile = [_rotate_pt_2d(p[0], p[1], cx, cy, angle_rad) for p in tile]
             tile = [(p[0] + offset_x, p[1] + offset_y) for p in tile]
 
-            if any(_point_in_polygon(p[0], p[1], boundary_2d) for p in tile):
-                tiles_v.append(tile)
+            clipped_list = _clip_polygon_subject(tile, boundary_2d)
+            tiles_v.extend(clipped_list)
 
     return tiles_h, tiles_v
 
