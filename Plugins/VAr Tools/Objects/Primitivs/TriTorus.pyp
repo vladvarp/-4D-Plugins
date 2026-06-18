@@ -56,7 +56,7 @@ import random
 # ══════════════════════════════════════════════════════════════════════════════
 
 ID_TRITORUS  = 1068874
-NAME_TRITORUS = "Tri Torus v2.3"
+NAME_TRITORUS = "Tri Torus v2.4"
 
 # ══════════════════════════════════════════════════════════════════════════════
 #  UserData SubID
@@ -68,32 +68,31 @@ TT_RADIUS_MINOR = 3
 TT_SEGS_MAJOR   = 4
 TT_SEGS_MINOR   = 5
 TT_SURFACE_TYPE = 6
-TT_QUADS        = 7
 
-UD_G_DEFORM  = 8
-TT_TWIST     = 9
-TT_TAPER_X   = 10
-TT_TAPER_Y   = 11
-TT_SCALE_X   = 12
-TT_SCALE_Y   = 13
-TT_SCALE_Z   = 14
+UD_G_DEFORM  = 7
+TT_TWIST     = 8
+TT_TAPER_X   = 9
+TT_TAPER_Y   = 10
+TT_SCALE_X   = 11
+TT_SCALE_Y   = 12
+TT_SCALE_Z   = 13
 
-UD_G_DISP    = 15
-TT_DISP_TYPE = 16
-TT_DISP_AMP  = 17
-TT_DISP_FREQ = 18
-TT_DISP_PHASE = 19
-TT_DISP_OCTAVES  = 20
-TT_DISP_LACUNARITY = 21
-TT_DISP_GAIN  = 22
+UD_G_DISP    = 14
+TT_DISP_TYPE = 15
+TT_DISP_AMP  = 16
+TT_DISP_FREQ = 17
+TT_DISP_PHASE = 18
+TT_DISP_OCTAVES  = 19
+TT_DISP_LACUNARITY = 20
+TT_DISP_GAIN  = 21
 
-UD_G_SPIRAL  = 23
-TT_SPIRAL_TURNS   = 24
-TT_SPIRAL_DIRECTION = 25
+UD_G_SPIRAL  = 22
+TT_SPIRAL_TURNS   = 23
+TT_SPIRAL_DIRECTION = 24
 
-UD_G_PHONG   = 26
-TT_PHONG_ANGLE = 27
-TT_PHONG_LIMIT = 28
+UD_G_PHONG   = 25
+TT_PHONG_ANGLE = 26
+TT_PHONG_LIMIT = 27
 
 TT_FIRST_PARAM = TT_RADIUS_MAJOR
 
@@ -106,7 +105,6 @@ DEFAULT_RADIUS_MINOR = 50.0
 DEFAULT_SEGS_MAJOR   = 24
 DEFAULT_SEGS_MINOR   = 12
 DEFAULT_SURFACE_TYPE = 0
-DEFAULT_QUADS        = True
 
 DEFAULT_TWIST   = 0.0
 DEFAULT_TAPER_X = 0.0
@@ -565,7 +563,7 @@ def _build_mesh(op):
     segs_m       = max(3,    int(_ud_get(op, TT_SEGS_MAJOR, DEFAULT_SEGS_MAJOR)))
     segs_n       = max(3,    int(_ud_get(op, TT_SEGS_MINOR, DEFAULT_SEGS_MINOR)))
     surface_type = int(_ud_get(op, TT_SURFACE_TYPE, DEFAULT_SURFACE_TYPE))
-    quads        = bool(_ud_get(op, TT_QUADS, DEFAULT_QUADS))
+    quads        = True  # параметр "Квадратные ячейки" убран из интерфейса, поведение зафиксировано
 
     twist        = float(_ud_get(op, TT_TWIST, DEFAULT_TWIST))
     taper_x      = float(_ud_get(op, TT_TAPER_X, DEFAULT_TAPER_X))
@@ -640,7 +638,6 @@ def _create_userdata(op):
     _add_in_group(op, g_base, _int_bc("Сегменты (труба)", DEFAULT_SEGS_MINOR, 3, 500))
     _add_in_group(op, g_base, _cycle_bc("Тип поверхности", DEFAULT_SURFACE_TYPE,
                   ["Квадратная", "Треугольная", "Спиральная", "Диагональная"]))
-    _add_in_group(op, g_base, _bool_bc("Квадратные ячейки", DEFAULT_QUADS))
 
     g_deform = _add_group(op, "Деформации")
     _add_in_group(op, g_deform, _float_bc("Кручение (Twist)", DEFAULT_TWIST,
@@ -690,7 +687,6 @@ def _set_defaults(op):
     _ud_set(op, TT_SEGS_MAJOR,    DEFAULT_SEGS_MAJOR)
     _ud_set(op, TT_SEGS_MINOR,    DEFAULT_SEGS_MINOR)
     _ud_set(op, TT_SURFACE_TYPE,  DEFAULT_SURFACE_TYPE)
-    _ud_set(op, TT_QUADS,         DEFAULT_QUADS)
 
     _ud_set(op, TT_TWIST,   DEFAULT_TWIST)
     _ud_set(op, TT_TAPER_X, DEFAULT_TAPER_X)

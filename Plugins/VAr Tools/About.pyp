@@ -12,7 +12,7 @@ import base64
 import tempfile
 
 PLUGIN_ID   = 1068833
-VERS = 'v2.32.2'
+VERS = 'v2.33.4'
 LABLE =  'VAr Tools'
 PLUGIN_NAME = "About"
 PLUGIN_HELP = "Информация о наборе плагинов VAr Tools"
