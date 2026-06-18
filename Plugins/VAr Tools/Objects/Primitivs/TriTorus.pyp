@@ -56,7 +56,7 @@ import random
 # ══════════════════════════════════════════════════════════════════════════════
 
 ID_TRITORUS  = 1068874
-NAME_TRITORUS = "Tri Torus v2.1"
+NAME_TRITORUS = "Tri Torus v2.2"
 
 # ══════════════════════════════════════════════════════════════════════════════
 #  UserData SubID
@@ -240,7 +240,7 @@ def _add_phong_tag(obj, angle_deg=45.0, limit=True):
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-#  PolygonObject утилита
+#  PolygonObject утилита + UVW
 # ══════════════════════════════════════════════════════════════════════════════
 
 def _make_poly_object(pts, cpolys, name):
@@ -252,6 +252,36 @@ def _make_poly_object(pts, cpolys, name):
         obj.SetPolygon(i, cp)
     obj.Message(c4d.MSG_UPDATE)
     return obj
+
+
+def _build_uv_grid(segs_m, segs_n):
+    """Строит UV-координаты для вершин тора на основе сетки segs_m x segs_n.
+    U = j / segs_m (воколь кольца), V = i / segs_n (воколь трубы).
+    Возвращает словарь {vertex_index: c4d.Vector(u, v, 0)}.
+    """
+    uv_map = {}
+    for j in range(segs_m):
+        for i in range(segs_n):
+            idx = j * segs_n + i
+            u = float(j) / float(segs_m)
+            v = float(i) / float(segs_n)
+            uv_map[idx] = c4d.Vector(u, v, 0.0)
+    return uv_map
+
+
+def _create_uvw_tag(polys, uv_map):
+    """Создаёт c4d.UVWTag на основе полигональной сетки и UV-карты вершин."""
+    n_polys = len(polys)
+    uvw_tag = c4d.UVWTag(n_polys)
+    zero = c4d.Vector(0, 0, 0)
+    for pi in range(n_polys):
+        cp = polys[pi]
+        a = uv_map.get(cp.a, zero)
+        b = uv_map.get(cp.b, zero)
+        c = uv_map.get(cp.c, zero)
+        d = uv_map.get(cp.d, zero)
+        uvw_tag.SetSlow(pi, a, b, c, d)
+    return uvw_tag
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -559,7 +589,9 @@ def _build_mesh(op):
                         disp_type, disp_amp, disp_freq, disp_phase,
                         disp_oct, disp_lac, disp_gain)
 
-    return verts, polys
+    uv_map = _build_uv_grid(segs_m, segs_n)
+
+    return verts, polys, uv_map
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -670,8 +702,11 @@ class TriTorusObject(c4d.plugins.ObjectData):
     def GetVirtualObjects(self, op, hh):
         self._ensure_ud(op)
 
-        points, polys = _build_mesh(op)
+        points, polys, uv_map = _build_mesh(op)
         obj = _make_poly_object(points, polys, self.OBJECT_NAME)
+
+        uvw_tag = _create_uvw_tag(polys, uv_map)
+        obj.InsertTag(uvw_tag)
 
         phong_angle_rad = max(0.0, min(math.radians(180.0),
             float(_ud_get(op, TT_PHONG_ANGLE, math.radians(DEFAULT_PHONG_ANGLE)))))
