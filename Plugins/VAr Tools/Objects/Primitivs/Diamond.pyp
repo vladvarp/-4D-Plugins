@@ -388,15 +388,19 @@ def build_brilliant(size, height, crown_h, girdle_h, segs, table_size, culet):
         polys += _band(culet_ring, gird_b)
 
     # Рундист: тонкая полоса квадов
-    polys += _band(gird_b, gird_t)
+    # ВАЖНО: выше рундиста камень обращён наружу-вверх, поэтому обход
+    # вершин зеркалим относительно павильона (lo, hi → hi, lo),
+    # иначе нормаль рундиста и всей короны смотрит внутрь камня.
+    polys += _band(gird_t, gird_b)
 
     # Корона нижняя: рундист → промежуточное кольцо (смещено на полшага)
     # Чередуем «остроугольные» треугольники (как главные грани бриллианта)
+    # Обход развёрнут (lo_b, lo_a, hi) — грань должна смотреть наружу-вверх.
     for i in range(segs):
         lo_a = gird_t[i]
         lo_b = gird_t[(i + 1) % segs]
         hi   = crown_mid[i]
-        polys.append(_tri(lo_a, lo_b, hi))
+        polys.append(_tri(lo_b, lo_a, hi))
 
     # Корона верхняя: промежуточное кольцо → площадка (тоже смещена)
     for i in range(segs):
@@ -406,12 +410,14 @@ def build_brilliant(size, height, crown_h, girdle_h, segs, table_size, culet):
         ta   = table[i]
         tb   = table[(i + 1) % segs]
         # Квад со срезанными углами — стандартный бриллиант
-        polys.append(_quad(hi_a, hi_b, tb, ta))
+        # Обход развёрнут (hi_b, hi_a, ta, tb) для правильной нормали наружу-вверх.
+        polys.append(_quad(hi_b, hi_a, ta, tb))
 
     # Площадка: веер из первой вершины площадки
+    # Обход развёрнут (table[i+1], table[i]) — нормаль площадки должна смотреть вверх.
     hub = table[0]
     for i in range(1, segs - 1):
-        polys.append(_tri(hub, table[i], table[i + 1]))
+        polys.append(_tri(hub, table[i + 1], table[i]))
 
     return pts, polys
 
