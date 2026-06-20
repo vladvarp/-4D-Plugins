@@ -982,15 +982,16 @@ function renderPhotoCarousel(type, title, w, h, content) {
     const id = 'pc-' + Math.random().toString(36).substr(2, 9);
     const width = parseInt(w) || 400;
     const height = parseInt(h) || 300;
+    const photosJson = JSON.stringify(photos).replace(/"/g, '&quot;');
 
-    let out = `<div class="md-photo-carousel" id="${id}" style="width:${width}px;max-width:100%">`;
+    let out = `<div class="md-photo-carousel" id="${id}" data-photos="${photosJson}" style="width:${width}px;max-width:100%">`;
     if (title) {
         out += `<div class="md-photo-carousel-title">${escapeHtml(title)}</div>`;
     }
     out += `<div class="md-photo-carousel-viewport" style="height:${height}px">`;
     out += `<div class="md-photo-carousel-track" data-current="0">`;
-    photos.forEach(p => {
-        out += `<div class="md-photo-carousel-slide"><img src="${escapeHtml(p)}" alt="" loading="lazy"></div>`;
+    photos.forEach((p, i) => {
+        out += `<div class="md-photo-carousel-slide${i === 0 ? ' active' : ''}" data-index="${i}"><img src="${escapeHtml(p)}" alt="" loading="lazy"></div>`;
     });
     out += `</div>`;
     if (photos.length > 1) {
@@ -1011,10 +1012,21 @@ function renderPhotoCarousel(type, title, w, h, content) {
    Фотоальбом: модальное окно (кнопка)
    ======================================== */
 
-function openPhotoModal(btn) {
+function openPhotoModal(btn, startIndex) {
     const photos = JSON.parse(btn.dataset.photos || '[]');
     if (photos.length === 0) return;
+    showPhotoModal(photos, startIndex || 0);
+}
 
+function openCarouselPhoto(carouselId, photoIndex) {
+    const el = document.getElementById(carouselId);
+    if (!el) return;
+    const photos = JSON.parse(el.dataset.photos || '[]');
+    if (photos.length === 0) return;
+    showPhotoModal(photos, photoIndex);
+}
+
+function showPhotoModal(photos, startIndex) {
     let modal = document.getElementById('md-photo-modal-global');
     if (!modal) {
         modal = document.createElement('div');
@@ -1044,8 +1056,12 @@ function openPhotoModal(btn) {
         }, { passive: true });
     }
 
+    if (modal._keyHandler) {
+        document.removeEventListener('keydown', modal._keyHandler);
+    }
+
     modal._photos = photos;
-    modal._current = 0;
+    modal._current = startIndex;
     modal.classList.add('active');
     document.body.style.overflow = 'hidden';
     updatePhotoModal();
@@ -1087,47 +1103,82 @@ function updatePhotoModal() {
 }
 
 /* ========================================
-   Фотокарусель: навигация
+   Фотокарусель: навигация (3D)
    ======================================== */
+
+function applyCarousel3D(id, index) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    const track = el.querySelector('.md-photo-carousel-track');
+    const slides = Array.from(track.children);
+    const dots = el.querySelectorAll('.md-photo-carousel-dot');
+    const counter = el.querySelector('.md-photo-carousel-counter');
+    track.dataset.current = index;
+
+    slides.forEach((slide, i) => {
+        const offset = i - index;
+        const absOffset = Math.abs(offset);
+
+        if (offset === 0) {
+            slide.style.transform = 'translateX(0) translateZ(0) scale(1)';
+            slide.style.opacity = '1';
+            slide.style.zIndex = slides.length;
+        } else {
+            const sign = offset > 0 ? 1 : -1;
+            const tx = sign * (60 + absOffset * 10);
+            const tz = -120 * absOffset;
+            const sc = Math.max(0.55, 1 - absOffset * 0.18);
+            const op = Math.max(0.25, 1 - absOffset * 0.35);
+            slide.style.transform = `translateX(${tx}%) translateZ(${tz}px) scale(${sc})`;
+            slide.style.opacity = op;
+            slide.style.zIndex = slides.length - absOffset;
+        }
+        slide.classList.toggle('active', i === index);
+    });
+
+    dots.forEach((d, i) => d.classList.toggle('active', i === index));
+    if (counter) counter.textContent = `${index + 1} / ${slides.length}`;
+}
 
 function slideCarousel(id, dir) {
     const el = document.getElementById(id);
     if (!el) return;
     const track = el.querySelector('.md-photo-carousel-track');
     const slides = track.children;
-    const dots = el.querySelectorAll('.md-photo-carousel-dot');
-    const counter = el.querySelector('.md-photo-carousel-counter');
     let current = parseInt(track.dataset.current || '0');
     current = (current + dir + slides.length) % slides.length;
-    track.dataset.current = current;
-    track.style.transform = `translateX(-${current * 100}%)`;
-    dots.forEach((d, i) => d.classList.toggle('active', i === current));
-    if (counter) counter.textContent = `${current + 1} / ${slides.length}`;
+    applyCarousel3D(id, current);
 }
 
 function goToSlide(id, index) {
-    const el = document.getElementById(id);
-    if (!el) return;
-    const track = el.querySelector('.md-photo-carousel-track');
-    const dots = el.querySelectorAll('.md-photo-carousel-dot');
-    const counter = el.querySelector('.md-photo-carousel-counter');
-    track.dataset.current = index;
-    track.style.transform = `translateX(-${index * 100}%)`;
-    dots.forEach((d, i) => d.classList.toggle('active', i === index));
-    if (counter) counter.textContent = `${index + 1} / ${track.children.length}`;
+    applyCarousel3D(id, index);
 }
 
 function initPhotoCarousels(root = document) {
     root.querySelectorAll('.md-photo-carousel').forEach(carousel => {
         if (carousel.dataset.initialized) return;
         carousel.dataset.initialized = 'true';
+
+        const id = carousel.id;
+        const slides = carousel.querySelectorAll('.md-photo-carousel-slide');
+
+        slides.forEach(slide => {
+            slide.addEventListener('click', () => {
+                const idx = parseInt(slide.dataset.index || '0');
+                openCarouselPhoto(id, idx);
+            });
+        });
+
         const viewport = carousel.querySelector('.md-photo-carousel-viewport');
         if (!viewport) return;
+
         let startX = 0;
         viewport.addEventListener('touchstart', (e) => { startX = e.touches[0].clientX; }, { passive: true });
         viewport.addEventListener('touchend', (e) => {
             const diff = startX - e.changedTouches[0].clientX;
-            if (Math.abs(diff) > 50) slideCarousel(carousel.id, diff > 0 ? 1 : -1);
+            if (Math.abs(diff) > 50) slideCarousel(id, diff > 0 ? 1 : -1);
         }, { passive: true });
+
+        applyCarousel3D(id, 0);
     });
 }
