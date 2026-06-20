@@ -31,7 +31,7 @@ if not hasattr(c4d, "DESC_UNIT_NONE"):
 # ─── Plugin ID & Name ────────────────────────────────────────────────────────
 
 ID_DIAMOND   = 1069031
-NAME_DIAMOND = "Diamond v1.0"
+NAME_DIAMOND = "Diamond v1.15"
 
 # ─── UserData SubID ───────────────────────────────────────────────────────────
 # SubID=1 зарезервирован под группу. Поля начинаются с 2.
@@ -1355,7 +1355,7 @@ def build_heart(size, height, crown_h, girdle_h, segs, table_size, culet):
             n = segs
         idxs = []
         for i in range(n):
-            t = i / n
+            t = (i + 0.5) / n
             x, z = _heart_xy(t)
             idxs.append(_add(c4d.Vector(x * radius, y, z * radius)))
         return idxs
