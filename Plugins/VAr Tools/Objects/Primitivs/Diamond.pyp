@@ -606,26 +606,6 @@ def build_princess(size, height, crown_h, girdle_h, table_size, culet, steps):
             _add(c4d.Vector( half, y, -half)),
         ]
 
-    def _sq_ring8(half, y):
-        """
-        8 точек квадрата (углы + середины сторон).
-        Позволяет строить грани-шевроны павильона.
-        """
-        h = half
-        m = half  # середина стороны = половина стороны квадрата
-        # Порядок: угол, середина, угол, …
-        pts_list = [
-            c4d.Vector( h, y,  0),   # 0  правая середина
-            c4d.Vector( h, y,  h),   # 1  правый-передний угол
-            c4d.Vector( 0, y,  h),   # 2  передняя середина
-            c4d.Vector(-h, y,  h),   # 3  левый-передний угол
-            c4d.Vector(-h, y,  0),   # 4  левая середина
-            c4d.Vector(-h, y, -h),   # 5  левый-задний угол
-            c4d.Vector( 0, y, -h),   # 6  задняя середина
-            c4d.Vector( h, y, -h),   # 7  правый-задний угол
-        ]
-        return [_add(p) for p in pts_list]
-
     # Калета
     if r_culet < 0.5:
         culet_idx = _add(c4d.Vector(0.0, y_culet, 0.0))
@@ -634,16 +614,16 @@ def build_princess(size, height, crown_h, girdle_h, table_size, culet, steps):
         culet_ring = _sq_ring(r_culet, y_culet)
         culet_idx = None
 
-    # Ступени павильона
+    # Ступени павильона (4 угловые точки — без средних)
     pav_rings = []
     for s in range(steps):
         t = (s + 1) / (steps + 1)
         half = _lerp(sq, r_culet if r_culet >= 0.5 else 0.0, t)
         y    = _lerp(y_gird_b, y_culet, t)
-        pav_rings.append(_sq_ring8(half, y))
+        pav_rings.append(_sq_ring(half, y))
 
-    # Нижний рундист (8 точек)
-    gird_b = _sq_ring8(sq, y_gird_b)
+    # Нижний рундист (4 угловые точки)
+    gird_b = _sq_ring(sq, y_gird_b)
 
     # Верхний рундист (4 точки)
     gird_t = _sq_ring(sq, y_gird_t)
@@ -652,59 +632,21 @@ def build_princess(size, height, crown_h, girdle_h, table_size, culet, steps):
     table = _sq_ring(r_table, y_table)
 
     # ── Полигоны павильона ────────────────────────────────────────────────────
-    # Павильон строится «шевронами» между gird_b и калетой через ступени.
-    # gird_b имеет 8 точек (чередование угол/середина).
-    # Для каждой грани (4 основные + 4 угловые) строим вееры.
-
     prev_ring = gird_b
     for pav_ring in pav_rings:
-        # Квады между текущим и предыдущим кольцами (оба 8-точечные)
-        polys += _band(prev_ring, pav_ring)
+        polys += _band(pav_ring, prev_ring)
         prev_ring = pav_ring
 
     # Закрываем до калеты
     if culet_ring is None:
-        # Веер треугольников к точке
-        polys += _fan(culet_idx, prev_ring, 0)
+        polys += _fan(culet_idx, list(reversed(prev_ring)), 0)
     else:
-        # prev_ring — 8-точечное кольцо (углы + середины), culet_ring — 4-точечное
-        # (только углы), поэтому _band тут не подходит (разный размер колец,
-        # вызывал IndexError). Триангулируем стык вручную по тому же принципу,
-        # что и переход рундист(8)→корона(4) ниже: по 3 треугольника на сторону
-        # квадрата. Направление (b0,b1,c0)/(b1,c1,c0)/(b1,b2,c1) подобрано так,
-        # чтобы ребро prev_ring[i]→prev_ring[i+1] было общим с полосой павильона
-        # выше в противоположном направлении (иначе грань выворачивается).
-        for i in range(4):
-            b0 = prev_ring[i * 2]
-            b1 = prev_ring[i * 2 + 1]
-            b2 = prev_ring[(i * 2 + 2) % 8]
-            c0 = culet_ring[i]
-            c1 = culet_ring[(i + 1) % 4]
-            polys.append(_tri(b0, b1, c0))
-            polys.append(_tri(b1, c1, c0))
-            polys.append(_tri(b1, b2, c1))
-        # Кольцо калеты → точка (замыкающий веер маленького квадрата калеты;
-        # раньше отсутствовал — дырка на кончике камня при Калета (%) > 0).
+        polys += _band(culet_ring, prev_ring)
         c4_idx = _add(c4d.Vector(0.0, y_culet, 0.0))
-        polys += _fan(c4_idx, culet_ring, 0)
+        polys += _fan(c4_idx, list(reversed(culet_ring)), 0)
 
-    # Рундист → корона: правильная триангуляция стыка 8-точечного gird_b
-    # с 4-точечным gird_t. Раньше тут не хватало диагонального треугольника
-    # между gird_t[i] и gird_t[i+1] (как «верхняя звезда» у бриллианта) —
-    # из-за этого по периметру рундиста были сквозные дырки. Теперь строим
-    # полную полосу из трёх треугольников на каждую сторону квадрата:
-    # gird_t[i] → gird_b[2i] → gird_b[2i+1] → gird_t[i+1] → gird_b[2i+2].
-    # gird_b: [0=R-mid, 1=RF, 2=F-mid, 3=LF, 4=L-mid, 5=LB, 6=B-mid, 7=RB]
-    # gird_t: [0=RF, 1=LF, 2=LB, 3=RB]
-    for i in range(4):
-        b0 = gird_b[i * 2]            # середина стороны
-        b1 = gird_b[i * 2 + 1]        # угол
-        b2 = gird_b[(i * 2 + 2) % 8]  # следующая середина
-        t0 = gird_t[i]
-        t1 = gird_t[(i + 1) % 4]
-        polys.append(_tri(t0, b1, b0))
-        polys.append(_tri(t0, t1, b1))
-        polys.append(_tri(t1, b2, b1))
+    # Рундист → корона (простые квады, оба кольца 4-точечные)
+    polys += _band(gird_b, gird_t)
 
     # Корона: gird_t(4) → table(4) (простые квады)
     # Обход развёрнут (table, gird_t вместо gird_t, table), чтобы ребро
