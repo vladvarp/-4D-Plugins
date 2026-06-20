@@ -5,16 +5,18 @@ Diamond — Cinema 4D ObjectData Plugin
 
 Поддерживаемые огранки:
   0 — Brilliant (Бриллиант / Круглая)
-  1 — Princess  (Принцесса / Квадратная)
-  2 — Emerald   (Изумруд / Ступенчатая)
-  3 — Marquise  (Маркиза / Навет)
-  4 — Pear      (Груша)
-  5 — Oval      (Овал)
-  6 — Cushion   (Кушон / Подушка)
-  7 — Asscher   (Ашер / Квадрат-ступени)
-  8 — Heart     (Сердце)
-  9 — Rose      (Роза — старинная огранка)
-  
+  1 — Brilliant2 (Бриллиант — квадратная корона)
+  2 — Princess  (Принцесса / Квадратная)
+  3 — Emerald   (Изумруд / Ступенчатая)
+  4 — Marquise  (Маркиза / Навет)
+  5 — Pear      (Груша)
+  6 — Oval      (Овал)
+  7 — Cushion   (Кушон / Подушка)
+  8 — Asscher   (Ашер / Квадрат-ступени)
+  9 — Heart     (Сердце)
+ 10 — Rose      (Роза — старинная огранка)
+
+
 """
 
 import c4d  # type: ignore
@@ -47,16 +49,18 @@ DM_CULET      = 9   # Размер калеты (кончик павильона
 DM_STEPS      = 10  # Число ступеней (для Emerald / Asscher)
 
 # Индексы огранок
-CUT_BRILLIANT = 0
-CUT_PRINCESS  = 1
-CUT_EMERALD   = 2
-CUT_MARQUISE  = 3
-CUT_PEAR      = 4
-CUT_OVAL      = 5
-CUT_CUSHION   = 6
-CUT_ASSCHER   = 7
-CUT_HEART     = 8
-CUT_ROSE      = 9
+CUT_BRILLIANT  = 0
+CUT_BRILLIANT2 = 1
+CUT_PRINCESS   = 2
+CUT_EMERALD    = 3
+CUT_MARQUISE   = 4
+CUT_PEAR       = 5
+CUT_OVAL       = 6
+CUT_CUSHION    = 7
+CUT_ASSCHER    = 8
+CUT_HEART      = 9
+CUT_ROSE       = 10
+
 
 
 # ─── Вспомогательные функции UserData ────────────────────────────────────────
@@ -426,20 +430,129 @@ def build_brilliant(size, height, crown_h, girdle_h, segs, table_size, culet):
         polys.append(_tri(a, b, c))
 
     # Корона верхняя (основные грани к площадке): промежуточное кольцо → площадка.
-    # Обход развёрнут (hi_b, hi_a, ta, tb), чтобы ребро crown_mid[i]→crown_mid[i+1]
-    # было общим с верхним звёздным треугольником в противоположном направлении.
+    # Из-за смещения crown_mid (math.pi / segs) каждый квад crown_mid→table
+    # перекручивается, поэтому триангулируем: 2 треугольника на сегмент.
     for i in range(segs):
         hi_a = crown_mid[i]
         hi_b = crown_mid[(i + 1) % segs]
-        # Чередуем: ромбы к площадке
         ta   = table[i]
         tb   = table[(i + 1) % segs]
-        # Квад со срезанными углами — стандартный бриллиант
-        polys.append(_quad(hi_b, hi_a, ta, tb))
+        polys.append(_tri(hi_a, ta, tb))
+        polys.append(_tri(hi_a, tb, hi_b))
 
     # Площадка: веер из центральной точки площадки
     # Обход развёрнут (table[i+1], table[i]), чтобы ребро table[i]→table[i+1]
     # было общим с короной верхней в противоположном направлении.
+    for i in range(segs):
+        polys.append(_tri(table_center_idx, table[(i + 1) % segs], table[i]))
+
+    return pts, polys
+
+
+def build_brilliant2(size, height, crown_h, girdle_h, segs, table_size, culet):
+    """
+    Бриллиант (Квадратная корона) — вариант с выровненным средним кольцом.
+
+    Отличается от build_brilliant:
+      • crown_mid без смещения (нет math.pi / segs) — выровнен с gird_t и table.
+      • Корона строится четырёхугольниками (квады), а не треугольниками.
+    """
+
+    segs = max(8, segs)
+    if segs % 2 != 0:
+        segs += 1
+
+    r        = size
+    r_table  = r * max(0.01, min(0.99, table_size))
+    r_culet  = r * max(0.0,  min(0.3,  culet))
+
+    total_h  = max(1.0, height)
+    girdle   = max(0.5, girdle_h)
+    crown    = max(1.0, total_h * max(0.05, min(0.6, crown_h)))
+    pavilion = max(1.0, total_h - crown - girdle)
+
+    y_culet    = -(pavilion + girdle / 2.0)
+    y_gird_b   = -girdle / 2.0
+    y_gird_t   = +girdle / 2.0
+    y_table    = y_gird_t + crown
+
+    pts = []
+
+    def _add(v):
+        idx = len(pts)
+        pts.append(v)
+        return idx
+
+    if r_culet < 0.5:
+        culet_idx = _add(c4d.Vector(0.0, y_culet, 0.0))
+        culet_ring = None
+    else:
+        culet_ring = []
+        for i in range(segs):
+            a = i / segs * 2.0 * math.pi
+            culet_ring.append(_add(c4d.Vector(r_culet * math.cos(a),
+                                               y_culet,
+                                               r_culet * math.sin(a))))
+        culet_idx = _add(c4d.Vector(0.0, y_culet, 0.0))
+
+    gird_b = [_add(c4d.Vector(r * math.cos(i / segs * 2.0 * math.pi),
+                               y_gird_b,
+                               r * math.sin(i / segs * 2.0 * math.pi)))
+              for i in range(segs)]
+
+    gird_t = [_add(c4d.Vector(r * math.cos(i / segs * 2.0 * math.pi),
+                               y_gird_t,
+                               r * math.sin(i / segs * 2.0 * math.pi)))
+              for i in range(segs)]
+
+    r_mid   = r * 0.85
+    y_mid   = y_gird_t + crown * 0.45
+    crown_mid = [_add(c4d.Vector(r_mid * math.cos(i / segs * 2.0 * math.pi),
+                                  y_mid,
+                                  r_mid * math.sin(i / segs * 2.0 * math.pi)))
+                 for i in range(segs)]
+
+    table_center_idx = _add(c4d.Vector(0.0, y_table, 0.0))
+
+    table = [_add(c4d.Vector(r_table * math.cos(i / segs * 2.0 * math.pi),
+                              y_table,
+                              r_table * math.sin(i / segs * 2.0 * math.pi)))
+             for i in range(segs)]
+
+    polys = []
+
+    if culet_ring is None:
+        polys += _fan(culet_idx, gird_b, 0)
+    else:
+        n_cr = len(culet_ring)
+        for i in range(n_cr):
+            a = culet_ring[(i + 1) % n_cr]
+            b = culet_ring[i]
+            c = gird_b[i]
+            d = gird_b[(i + 1) % n_cr]
+            polys.append(_quad(a, b, c, d))
+        for i in range(n_cr):
+            polys.append(_tri(culet_idx, culet_ring[i], culet_ring[(i + 1) % n_cr]))
+
+    polys += _band(gird_t, gird_b)
+
+    # Корона нижняя: квады gird_t → crown_mid (без смещения, чистые квады)
+    for i in range(segs):
+        lo_a = gird_t[i]
+        lo_b = gird_t[(i + 1) % segs]
+        hi_a = crown_mid[i]
+        hi_b = crown_mid[(i + 1) % segs]
+        polys.append(_quad(lo_b, lo_a, hi_a, hi_b))
+
+    # Корона верхняя: квады crown_mid → table
+    for i in range(segs):
+        hi_a = crown_mid[i]
+        hi_b = crown_mid[(i + 1) % segs]
+        ta   = table[i]
+        tb   = table[(i + 1) % segs]
+        polys.append(_quad(hi_b, hi_a, ta, tb))
+
+    # Площадка
     for i in range(segs):
         polys.append(_tri(table_center_idx, table[(i + 1) % segs], table[i]))
 
@@ -1434,34 +1547,28 @@ def build_diamond_mesh(cut, size, height, crown_h, girdle_h,
     """
 
     if cut == CUT_BRILLIANT:
-        return build_brilliant(size, height, crown_h, girdle_h,
-                               segs, table_size, culet)
+        return build_brilliant(size, height, crown_h, girdle_h, segs, table_size, culet)
+    elif cut == CUT_BRILLIANT2:
+        return build_brilliant2(size, height, crown_h, girdle_h, segs, table_size, culet)
     elif cut == CUT_PRINCESS:
-        return build_princess(size, height, crown_h, girdle_h,
-                              table_size, culet, steps)
+        return build_princess(size, height, crown_h, girdle_h, table_size, culet, steps)
     elif cut == CUT_EMERALD:
-        return build_emerald(size, height, crown_h, girdle_h,
-                             table_size, culet, steps)
+        return build_emerald(size, height, crown_h, girdle_h, table_size, culet, steps)
     elif cut == CUT_MARQUISE:
-        return build_marquise(size, height, crown_h, girdle_h,
-                              segs, table_size, culet)
+        return build_marquise(size, height, crown_h, girdle_h,  segs, table_size, culet)
     elif cut == CUT_PEAR:
-        return build_pear(size, height, crown_h, girdle_h,
-                          segs, table_size, culet)
+        return build_pear(size, height, crown_h, girdle_h, segs, table_size, culet)
     elif cut == CUT_OVAL:
-        return build_oval(size, height, crown_h, girdle_h,
-                          segs, table_size, culet)
+        return build_oval(size, height, crown_h, girdle_h, segs, table_size, culet)
     elif cut == CUT_CUSHION:
-        return build_cushion(size, height, crown_h, girdle_h,
-                             segs, table_size, culet)
+        return build_cushion(size, height, crown_h, girdle_h, segs, table_size, culet)
     elif cut == CUT_ASSCHER:
-        return build_asscher(size, height, crown_h, girdle_h,
-                             table_size, culet, steps)
+        return build_asscher(size, height, crown_h, girdle_h, table_size, culet, steps)
     elif cut == CUT_HEART:
-        return build_heart(size, height, crown_h, girdle_h,
-                           segs, table_size, culet)
+        return build_heart(size, height, crown_h, girdle_h, segs, table_size, culet)
     elif cut == CUT_ROSE:
         return build_rose(size, height, crown_h, girdle_h, segs, culet)
+
     else:
         return build_brilliant(size, height, crown_h, girdle_h,
                                segs, table_size, culet)
@@ -1539,6 +1646,7 @@ class DiamondObject(_MeshPrimitiveBase):
         _add_in_group(op, grp_subid, _make_cycle_bc(
             "Огранка", CUT_BRILLIANT, [
                 "Бриллиант (Круглая)",
+                "Бриллиант (Квадратная)",
                 "Принцесса (Квадратная)",
                 "Изумруд (Ступенчатая)",
                 "Маркиза (Навет)",
