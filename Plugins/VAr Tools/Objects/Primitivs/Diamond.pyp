@@ -31,7 +31,7 @@ if not hasattr(c4d, "DESC_UNIT_NONE"):
 # ─── Plugin ID & Name ────────────────────────────────────────────────────────
 
 ID_DIAMOND   = 1069031
-NAME_DIAMOND = "Diamond v1.18"
+NAME_DIAMOND = "Diamond v1.19"
 
 # ─── UserData SubID ───────────────────────────────────────────────────────────
 # SubID=1 зарезервирован под группу. Поля начинаются с 2.
@@ -103,7 +103,8 @@ def _add_in_group(op, grp_subid, bc):
 
 
 def _make_float_bc(name, default, minval, maxval,
-                   unit=c4d.DESC_UNIT_METER, step=1.0):
+                   unit=c4d.DESC_UNIT_METER, step=1.0,
+                   slider_min=None, slider_max=None):
     bc = c4d.GetCustomDatatypeDefault(c4d.DTYPE_REAL)
     bc[c4d.DESC_NAME]       = name
     bc[c4d.DESC_SHORT_NAME] = name
@@ -113,6 +114,11 @@ def _make_float_bc(name, default, minval, maxval,
     bc[c4d.DESC_UNIT]       = unit
     bc[c4d.DESC_STEP]       = step
     bc[c4d.DESC_ANIMATE]    = c4d.DESC_ANIMATE_ON
+    bc[c4d.DESC_CUSTOMGUI]  = c4d.CUSTOMGUI_REALSLIDER
+    if slider_min is not None:
+        bc[c4d.DESC_MINSLIDER] = slider_min
+    if slider_max is not None:
+        bc[c4d.DESC_MAXSLIDER] = slider_max
     return bc
 
 
@@ -125,6 +131,7 @@ def _make_int_bc(name, default, minval, maxval):
     bc[c4d.DESC_MAX]        = maxval
     bc[c4d.DESC_STEP]       = 1
     bc[c4d.DESC_ANIMATE]    = c4d.DESC_ANIMATE_ON
+    bc[c4d.DESC_CUSTOMGUI]  = c4d.CUSTOMGUI_REALSLIDER
     return bc
 
 
@@ -1574,12 +1581,14 @@ class DiamondObject(_MeshPrimitiveBase):
         # 2. Общий размер
         _add_in_group(op, grp_subid, _make_float_bc(
             "Размер", 100.0, 1.0, 100000.0,
-            unit=c4d.DESC_UNIT_METER, step=1.0))
+            unit=c4d.DESC_UNIT_METER, step=1.0,
+            slider_min=20.0, slider_max=200.0))
 
         # 3. Высота
         _add_in_group(op, grp_subid, _make_float_bc(
             "Высота", 65.0, 1.0, 100000.0,
-            unit=c4d.DESC_UNIT_METER, step=1.0))
+            unit=c4d.DESC_UNIT_METER, step=1.0,
+            slider_min=20.0, slider_max=200.0))
 
         # 4. Доля короны
         _add_in_group(op, grp_subid, _make_float_bc(
