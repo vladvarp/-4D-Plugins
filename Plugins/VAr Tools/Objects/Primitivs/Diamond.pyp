@@ -958,16 +958,16 @@ def build_pear(size, height, crown_h, girdle_h, segs, table_size, culet):
     # рундиста ниже — рёбра дублировались) и был замкнут (рисовал паразитную
     # диагональ через центр камня вместо настоящих рёбер рундиста на стыках
     # дуг) — оба дефекта давали дырки/наложения по периметру павильона.
-    polys += _fan(tip_idx, list(reversed(front_arc)), 0, closed=False)
+    polys += _fan(tip_idx, front_arc, 0, closed=False)
 
     # Нижняя дуга → к калете
     bottom_arc = gird_b[half_b:] + gird_b[:half_f]
     if r_culet < 0.5:
         culet_idx = _add(c4d.Vector(0.0, y_culet, -rz * 0.5))
-        polys += _fan(culet_idx, list(reversed(bottom_arc)), 0, closed=False)
+        polys += _fan(culet_idx, bottom_arc, 0, closed=False)
     else:
         culet_ring = _pear_ring(r_culet, r_culet * 1.6, y_culet)
-        polys += _band(bottom_arc, culet_ring)
+        polys += _band(culet_ring, bottom_arc)
         c4c = _add(c4d.Vector(0.0, y_culet, 0.0))
         polys += _fan(c4c, culet_ring, 0)
 
@@ -978,21 +978,21 @@ def build_pear(size, height, crown_h, girdle_h, segs, table_size, culet):
     seamA_first  = gird_b[half_f]
     seamB_last   = gird_b[half_b - 1]
     seamB_after  = gird_b[half_b % segs]
-    polys.append(_tri(tip_idx, seamB_after, seamB_last))
-    polys.append(_tri(culet_idx, seamA_first, seamA_before))
-    polys.append(_tri(culet_idx, seamB_after, tip_idx))
-    polys.append(_tri(tip_idx, seamA_first, culet_idx))
+    polys.append(_tri(tip_idx, seamB_last, seamB_after))
+    polys.append(_tri(culet_idx, seamA_before, seamA_first))
+    polys.append(_tri(culet_idx, tip_idx, seamB_after))
+    polys.append(_tri(tip_idx, culet_idx, seamA_first))
 
     # Рундист
-    polys += _band(gird_b, gird_t)
+    polys += _band(gird_t, gird_b)
 
     # Корона → площадка
-    polys += _band(gird_t, table)
+    polys += _band(table, gird_t)
 
-    # Площадка
-    hub = table[0]
-    for i in range(1, segs - 1):
-        polys.append(_tri(hub, table[i], table[i + 1]))
+    # Площадка (веер от центра)
+    table_center = _add(c4d.Vector(0.0, y_table, 0.0))
+    for i in range(segs):
+        polys.append(_tri(table_center, table[(i + 1) % segs], table[i]))
 
     return pts, polys
 
@@ -1059,24 +1059,31 @@ def build_oval(size, height, crown_h, girdle_h, segs, table_size, culet):
     if culet_ring is None:
         polys += _fan(culet_idx, gird_b, 0)
     else:
-        polys += _band(culet_ring, gird_b)
+        polys += _band(gird_b, culet_ring)
 
     # Рундист
-    polys += _band(gird_b, gird_t)
+    polys += _band(gird_t, gird_b)
 
-    # Корона нижняя (треугольники)
+    # Корона нижняя (квады)
     for i in range(segs):
-        polys.append(_tri(gird_t[i], gird_t[(i + 1) % segs], crown_mid[i]))
+        lo_a = gird_t[i]
+        lo_b = gird_t[(i + 1) % segs]
+        hi_a = crown_mid[i]
+        hi_b = crown_mid[(i + 1) % segs]
+        polys.append(_quad(lo_b, lo_a, hi_a, hi_b))
 
     # Корона верхняя (квады)
     for i in range(segs):
-        polys.append(_quad(crown_mid[i], crown_mid[(i + 1) % segs],
-                           table[(i + 1) % segs], table[i]))
+        hi_a = crown_mid[i]
+        hi_b = crown_mid[(i + 1) % segs]
+        ta   = table[i]
+        tb   = table[(i + 1) % segs]
+        polys.append(_quad(hi_b, hi_a, ta, tb))
 
-    # Площадка
-    hub = table[0]
-    for i in range(1, segs - 1):
-        polys.append(_tri(hub, table[i], table[i + 1]))
+    # Площадка (веер от центра)
+    table_center = _add(c4d.Vector(0.0, y_table, 0.0))
+    for i in range(segs):
+        polys.append(_tri(table_center, table[(i + 1) % segs], table[i]))
 
     return pts, polys
 
@@ -1151,24 +1158,31 @@ def build_cushion(size, height, crown_h, girdle_h, segs, table_size, culet):
     if culet_ring is None:
         polys += _fan(culet_idx, gird_b, 0)
     else:
-        polys += _band(culet_ring, gird_b)
+        polys += _band(gird_b, culet_ring)
 
     # Рундист
-    polys += _band(gird_b, gird_t)
+    polys += _band(gird_t, gird_b)
 
-    # Корона нижняя
+    # Корона нижняя (квады)
     for i in range(segs):
-        polys.append(_tri(gird_t[i], gird_t[(i + 1) % segs], crown_mid[i]))
+        lo_a = gird_t[i]
+        lo_b = gird_t[(i + 1) % segs]
+        hi_a = crown_mid[i]
+        hi_b = crown_mid[(i + 1) % segs]
+        polys.append(_quad(lo_b, lo_a, hi_a, hi_b))
 
-    # Корона верхняя
+    # Корона верхняя (квады)
     for i in range(segs):
-        polys.append(_quad(crown_mid[i], crown_mid[(i + 1) % segs],
-                           table[(i + 1) % segs], table[i]))
+        hi_a = crown_mid[i]
+        hi_b = crown_mid[(i + 1) % segs]
+        ta   = table[i]
+        tb   = table[(i + 1) % segs]
+        polys.append(_quad(hi_b, hi_a, ta, tb))
 
-    # Площадка
-    hub = table[0]
-    for i in range(1, segs - 1):
-        polys.append(_tri(hub, table[i], table[i + 1]))
+    # Площадка (веер от центра)
+    table_center = _add(c4d.Vector(0.0, y_table, 0.0))
+    for i in range(segs):
+        polys.append(_tri(table_center, table[(i + 1) % segs], table[i]))
 
     return pts, polys
 
@@ -1247,22 +1261,18 @@ def build_asscher(size, height, crown_h, girdle_h, table_size, culet, steps):
     # иначе рёбра рундиста дублировались, а не сшивались.
     prev = gird_b
     for pr in pav_rings:
-        polys += _band(pr, prev)
+        polys += _band(prev, pr)
         prev = pr
 
     if culet_ring is None:
-        # Веер развёрнут (reversed(prev)), чтобы остаться согласованным с
-        # развёрнутой цепочкой павильона выше.
-        polys += _fan(culet_idx, list(reversed(prev)), 0)
+        polys += _fan(culet_idx, prev, 0)
     else:
-        polys += _band(culet_ring, prev)
+        polys += _band(prev, culet_ring)
         c4c = _add(c4d.Vector(0.0, y_culet, 0.0))
-        # Веер развёрнут (reversed(culet_ring)), чтобы быть согласованным
-        # с направлением шва band(culet_ring, prev) выше.
-        polys += _fan(c4c, list(reversed(culet_ring)), 0)
+        polys += _fan(c4c, culet_ring, 0)
 
     # Рундист
-    polys += _band(gird_b, gird_t)
+    polys += _band(gird_t, gird_b)
 
     # Ступени короны
     crown_rings = []
@@ -1275,14 +1285,14 @@ def build_asscher(size, height, crown_h, girdle_h, table_size, culet, steps):
 
     prev = gird_t
     for cr in crown_rings:
-        polys += _band(prev, cr)
+        polys += _band(cr, prev)
         prev = cr
-    polys += _band(prev, table)
+    polys += _band(table, prev)
 
-    # Площадка
-    hub = table[0]
-    for i in range(1, 7):
-        polys.append(_tri(hub, table[i], table[i + 1]))
+    # Площадка (веер от центра)
+    table_center = _add(c4d.Vector(0.0, y_table, 0.0))
+    for i in range(8):
+        polys.append(_tri(table_center, table[(i + 1) % 8], table[i]))
 
     return pts, polys
 
@@ -1366,24 +1376,31 @@ def build_heart(size, height, crown_h, girdle_h, segs, table_size, culet):
     if culet_ring is None:
         polys += _fan(culet_idx, gird_b, 0)
     else:
-        polys += _band(culet_ring, gird_b)
+        polys += _band(gird_b, culet_ring)
 
     # Рундист
-    polys += _band(gird_b, gird_t)
+    polys += _band(gird_t, gird_b)
 
-    # Корона нижняя
+    # Корона нижняя (квады)
     for i in range(segs):
-        polys.append(_tri(gird_t[i], gird_t[(i + 1) % segs], crown_mid[i]))
+        lo_a = gird_t[i]
+        lo_b = gird_t[(i + 1) % segs]
+        hi_a = crown_mid[i]
+        hi_b = crown_mid[(i + 1) % segs]
+        polys.append(_quad(lo_b, lo_a, hi_a, hi_b))
 
-    # Корона верхняя
+    # Корона верхняя (квады)
     for i in range(segs):
-        polys.append(_quad(crown_mid[i], crown_mid[(i + 1) % segs],
-                           table[(i + 1) % segs], table[i]))
+        hi_a = crown_mid[i]
+        hi_b = crown_mid[(i + 1) % segs]
+        ta   = table[i]
+        tb   = table[(i + 1) % segs]
+        polys.append(_quad(hi_b, hi_a, ta, tb))
 
-    # Площадка
-    hub = table[0]
-    for i in range(1, segs - 1):
-        polys.append(_tri(hub, table[i], table[i + 1]))
+    # Площадка (веер от центра)
+    table_center = _add(c4d.Vector(0.0, y_table, 0.0))
+    for i in range(segs):
+        polys.append(_tri(table_center, table[(i + 1) % segs], table[i]))
 
     return pts, polys
 
