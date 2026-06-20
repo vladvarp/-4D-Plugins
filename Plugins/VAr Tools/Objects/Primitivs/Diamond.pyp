@@ -31,7 +31,7 @@ if not hasattr(c4d, "DESC_UNIT_NONE"):
 # ─── Plugin ID & Name ────────────────────────────────────────────────────────
 
 ID_DIAMOND   = 1069031
-NAME_DIAMOND = "Diamond v1.15"
+NAME_DIAMOND = "Diamond v1.17"
 
 # ─── UserData SubID ───────────────────────────────────────────────────────────
 # SubID=1 зарезервирован под группу. Поля начинаются с 2.
@@ -1460,31 +1460,18 @@ def build_rose(size, height, crown_h, girdle_h, segs, culet):
         polys.append(_tri(base_center, a, b))
 
     # Рундист
-    gird_b = base_ring
     gird_t = _ring(r, y_gird_t)
-    polys += _band(gird_t, gird_b)
+    polys += _band(gird_t, base_ring)
 
-    # Корона Розы: два яруса треугольников к вершине.
-    # Первый ярус: промежуточное кольцо
+    # Корона Розы: квады от рундиста к промежуточному кольцу, затем веер к вершине.
     r_mid  = r * 0.5
     y_mid  = y_gird_t + crown * 0.55
     mid_ring = _ring(r_mid, y_mid)
 
-    # Нижние «лепестки» — треугольники от gird_t к mid_ring
-    for i in range(segs):
-        lo_a = gird_t[i]
-        lo_b = gird_t[(i + 1) % segs]
-        hi   = mid_ring[i]
-        polys.append(_tri(lo_b, lo_a, hi))
+    # Нижний ярус — квады от gird_t к mid_ring
+    polys += _band(mid_ring, gird_t)
 
-    # «Звёздные» треугольники между нижними лепестками и средним кольцом
-    for i in range(segs):
-        hi_a = mid_ring[i]
-        hi_b = mid_ring[(i + 1) % segs]
-        lo   = gird_t[(i + 1) % segs]
-        polys.append(_tri(lo, hi_a, hi_b))
-
-    # Вершина
+    # Вершина — веер треугольников от mid_ring к apex
     apex_idx = _add(c4d.Vector(0.0, y_apex, 0.0))
     polys += _fan(apex_idx, list(reversed(mid_ring)), 0)
 
