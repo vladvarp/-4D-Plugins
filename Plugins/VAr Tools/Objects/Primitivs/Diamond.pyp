@@ -32,7 +32,7 @@ if not hasattr(c4d, "DESC_UNIT_NONE"):
 # ─── Plugin ID & Name ────────────────────────────────────────────────────────
 
 ID_DIAMOND   = 1069031
-NAME_DIAMOND = "Diamond v1.19"
+NAME_DIAMOND = "Diamond v2.0"
 
 # ─── UserData SubID ───────────────────────────────────────────────────────────
 # SubID=1 зарезервирован под группу. Поля начинаются с 2.
@@ -1705,7 +1705,8 @@ class DiamondObject(_MeshPrimitiveBase):
         # 5. Толщина рундиста
         _add_in_group(op, grp_subid, _make_float_bc(
             "Рундист", 3.0, 0.5, 50.0,
-            unit=c4d.DESC_UNIT_METER, step=0.5))
+            unit=c4d.DESC_UNIT_METER, step=0.5,
+            slider_min=0.5, slider_max=10.0))
 
         # 6. Число граней (сегментов)
         _add_in_group(op, grp_subid, _make_int_bc(
