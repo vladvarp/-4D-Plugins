@@ -50,6 +50,7 @@ MENU_ITEMS = [
                 1068899,    # MolecularHexLattice 
                 1068993,    # Tesseract
                 # 1069004,    # PenroseTiling3D
+                1069031,    # Diamond
             ]},
 
             {"name": "XPressos objects", "items": [
