@@ -1457,12 +1457,12 @@ def build_rose(size, height, crown_h, girdle_h, segs, culet):
     for i in range(segs):
         a = base_ring[i]
         b = base_ring[(i + 1) % segs]
-        polys.append(_tri(base_center, b, a))  # перевёрнут: нормаль вниз
+        polys.append(_tri(base_center, a, b))
 
     # Рундист
     gird_b = base_ring
     gird_t = _ring(r, y_gird_t)
-    polys += _band(gird_b, gird_t)
+    polys += _band(gird_t, gird_b)
 
     # Корона Розы: два яруса треугольников к вершине.
     # Первый ярус: промежуточное кольцо
@@ -1475,7 +1475,7 @@ def build_rose(size, height, crown_h, girdle_h, segs, culet):
         lo_a = gird_t[i]
         lo_b = gird_t[(i + 1) % segs]
         hi   = mid_ring[i]
-        polys.append(_tri(lo_a, lo_b, hi))
+        polys.append(_tri(lo_b, lo_a, hi))
 
     # «Звёздные» треугольники между нижними лепестками и средним кольцом
     for i in range(segs):
