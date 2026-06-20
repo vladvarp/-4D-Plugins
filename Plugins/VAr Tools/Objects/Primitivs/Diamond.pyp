@@ -746,28 +746,20 @@ def build_emerald(size, height, crown_h, girdle_h, table_size, culet, steps):
         pav_rings.append(_oct_ring(srx, srz, cut_main, sy))
 
     # Полигоны: павильон
-    # Цепочка развёрнута (band(pr, prev) вместо band(prev, pr)), чтобы кольцо
-    # gird_b отдавало ребро gird_b[i+1]→gird_b[i] (противоположное направление
-    # относительно полосы рундиста ниже, которая использует gird_b[i]→gird_b[i+1]
-    # как «lo»-сторону) — иначе рёбра рундиста дублировались, а не сшивались.
     prev = gird_b
     for pr in pav_rings:
-        polys += _band(pr, prev)
+        polys += _band(prev, pr)
         prev = pr
 
     if culet_ring is None:
-        # Веер развёрнут (reversed(prev)), чтобы остаться согласованным с
-        # развёрнутой цепочкой павильона выше.
-        polys += _fan(culet_idx, list(reversed(prev)), 0)
+        polys += _fan(culet_idx, prev, 0)
     else:
-        polys += _band(culet_ring, prev)
+        polys += _band(prev, culet_ring)
         c4c = _add(c4d.Vector(0.0, y_culet, 0.0))
-        # Веер развёрнут (reversed(culet_ring)), чтобы быть согласованным
-        # с направлением шва band(culet_ring, prev) выше.
-        polys += _fan(c4c, list(reversed(culet_ring)), 0)
+        polys += _fan(c4c, culet_ring, 0)
 
     # Рундист
-    polys += _band(gird_b, gird_t)
+    polys += _band(gird_t, gird_b)
 
     # Ступени короны
     crown_rings = []
@@ -780,14 +772,14 @@ def build_emerald(size, height, crown_h, girdle_h, table_size, culet, steps):
 
     prev = gird_t
     for cr in crown_rings:
-        polys += _band(prev, cr)
+        polys += _band(cr, prev)
         prev = cr
-    polys += _band(prev, table)
+    polys += _band(table, prev)
 
-    # Площадка (веер)
-    hub = table[0]
-    for i in range(1, 7):
-        polys.append(_tri(hub, table[i], table[i + 1]))
+    # Площадка (веер от центра)
+    table_center = _add(c4d.Vector(0.0, y_table, 0.0))
+    for i in range(8):
+        polys.append(_tri(table_center, table[(i + 1) % 8], table[i]))
 
     return pts, polys
 
