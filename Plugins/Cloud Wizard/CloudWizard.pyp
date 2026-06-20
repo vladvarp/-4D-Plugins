@@ -22,10 +22,10 @@ _NOISE_WAVY_TURBULENCE = getattr(c4d, 'SLA_NOISE_NOISE_WAVY_TURBULENCE', 2)
 _NOISE_DENTS           = getattr(c4d, 'SLA_NOISE_NOISE_DENTS',           3)
 
 # ─── ID ───────────────────────────────────────────────────────────────────────
-PLUGIN_ID   = 1069028
-PLUGIN_NAME = "Cloud Wizard"
-PLUGIN_NAME_V = "Cloud Wizard v1.7"
-PLUGIN_HELP = "Процедурная генерация облаков в сцене"
+PLUGIN_ID     = 1069028
+PLUGIN_NAME   = "Cloud Wizard"
+PLUGIN_NAME_V = "Cloud Wizard v1.8"
+PLUGIN_HELP   = "Процедурная генерация облаков в сцене"
 
 # ─── ID виджетов ──────────────────────────────────────────────────────────────
 ID_BASE = 20000
@@ -84,6 +84,7 @@ ID_LBL_TRANSP       = ID_BASE + 77
 ID_EDIT_TRANSP      = ID_BASE + 78   # Прозрачность (для перистых) %
 ID_CHK_NOISE        = ID_BASE + 79   # Добавить шумовой слой
 ID_CHK_SSS          = ID_BASE + 80   # Рассеяние внутри (подповерхностное)
+ID_CHK_CREATE_MAT   = ID_BASE + 108  # Создавать материал
 
 # --- Расположение ---
 ID_GRP_POS          = ID_BASE + 90
@@ -258,14 +259,15 @@ def _generate_cloud(params):
         sphere.SetName("blob_{:03d}".format(i))
         sphere.InsertUnder(meta)
 
-    # ── Создаём материал ──────────────────────────────────────────────────────
-    mat = _create_cloud_material(params, rng)
-    doc.InsertMaterial(mat)
+    # ── Создаём материал (опционально) ──────────────────────────────────────────
+    if params.get("create_mat"):
+        mat = _create_cloud_material(params, rng)
+        doc.InsertMaterial(mat)
 
-    # ── Применяем материал к метаболе ────────────────────────────────────────
-    tag = meta.MakeTag(c4d.Ttexture)
-    tag[c4d.TEXTURETAG_MATERIAL] = mat
-    tag[c4d.TEXTURETAG_PROJECTION] = c4d.TEXTURETAG_PROJECTION_SPHERICAL
+        # ── Применяем материал к метаболе ────────────────────────────────────
+        tag = meta.MakeTag(c4d.Ttexture)
+        tag[c4d.TEXTURETAG_MATERIAL] = mat
+        tag[c4d.TEXTURETAG_PROJECTION] = c4d.TEXTURETAG_PROJECTION_SPHERICAL
 
     # ── Физическое небо (опционально) ─────────────────────────────────────────
     if params.get("add_sky"):
@@ -498,8 +500,8 @@ class CloudWizardDialog(c4d.gui.GeDialog):
         self.GroupBorderSpace(8, 4, 8, 2)
         self.AddStaticText(ID_LBL_NAME, c4d.BFH_LEFT, initw=90, name="Имя:")
         self.AddEditText(ID_EDIT_NAME, c4d.BFH_SCALEFIT, initw=150)
-        self.AddStaticText(ID_LBL_SEED, c4d.BFH_LEFT, initw=60, name="Seed:")
-        self.AddEditNumberArrows(ID_EDIT_SEED, c4d.BFH_LEFT, initw=80)
+        self.AddStaticText(ID_LBL_SEED, c4d.BFH_LEFT, initw=60, name="Зерно:")
+        self.AddEditNumberArrows(ID_EDIT_SEED, c4d.BFH_LEFT, initw=120)
         self.GroupEnd()
 
         self.AddSeparatorH(0)
@@ -550,9 +552,10 @@ class CloudWizardDialog(c4d.gui.GeDialog):
         self.AddSeparatorH(0)
 
         # ── Материал ─────────────────────────────────────────────────────────
-        self.GroupBegin(ID_GRP_MAT, c4d.BFH_SCALEFIT, cols=1, rows=1)
+        self.GroupBegin(ID_GRP_MAT, c4d.BFH_SCALEFIT, cols=2, rows=1)
         self.GroupBorderSpace(8, 4, 8, 4)
-        self.AddStaticText(0, c4d.BFH_LEFT | c4d.BFH_SCALEFIT, name="Материал:")
+        self.AddStaticText(0, c4d.BFH_LEFT | c4d.BFH_LEFT, initw=160, name="Материал:")
+        self.AddCheckbox(ID_CHK_CREATE_MAT, c4d.BFH_LEFT, initw=0, inith=0, name="Создавать материал")
         self.GroupEnd()
 
         self.GroupBegin(ID_GRP_SHAPE, c4d.BFH_SCALEFIT, cols=4, rows=1)
@@ -563,6 +566,13 @@ class CloudWizardDialog(c4d.gui.GeDialog):
         self.AddColorField(ID_COLOR_SHADOW, c4d.BFH_LEFT, initw=120, inith=14)
         self.GroupEnd()
 
+        self.GroupBegin(ID_GRP_SHAPE, c4d.BFH_SCALEFIT, cols=3, rows=1)
+        self.GroupBorderSpace(8, 4, 8, 4)
+        self.AddStaticText(ID_LBL_COLOR_MAIN, c4d.BFH_LEFT, initw=160, name="")
+        self.AddCheckbox(ID_CHK_NOISE, c4d.BFH_LEFT, initw=120, inith=0, name="Noise")
+        self.AddCheckbox(ID_CHK_SSS,   c4d.BFH_LEFT, initw=0, inith=0, name="Luminance")
+        self.GroupEnd()
+
         self.GroupBegin(ID_GRP_SHAPE, c4d.BFH_SCALEFIT, cols=2, rows=1)
         self.GroupBorderSpace(8, 4, 8, 4)
         self.AddStaticText(ID_LBL_LUMI, c4d.BFH_LEFT, initw=160, name="Светимость (%):")
@@ -571,11 +581,9 @@ class CloudWizardDialog(c4d.gui.GeDialog):
         self.AddEditSlider(ID_EDIT_TRANSP, c4d.BFH_SCALEFIT, initw=120)
         self.GroupEnd()
 
-        self.GroupBegin(ID_GRP_SHAPE, c4d.BFH_SCALEFIT, cols=2, rows=1)
-        self.GroupBorderSpace(8, 4, 8, 4)
-        self.AddCheckbox(ID_CHK_NOISE, c4d.BFH_LEFT, initw=0, inith=0, name="Noise")
-        self.AddCheckbox(ID_CHK_SSS, c4d.BFH_LEFT, initw=0, inith=0, name="Luminance")
-        self.GroupEnd()
+
+
+
 
         self.AddSeparatorH(0)
 
@@ -583,11 +591,11 @@ class CloudWizardDialog(c4d.gui.GeDialog):
         self.GroupBegin(ID_GRP_POS, c4d.BFH_SCALEFIT, cols=6, rows=1)
         self.GroupBorderSpace(8, 4, 8, 4)
         self.AddStaticText(ID_LBL_POS_X, c4d.BFH_LEFT, initw=26, name="X:")
-        self.AddEditNumberArrows(ID_EDIT_POS_X, c4d.BFH_LEFT, initw=70)
+        self.AddEditNumberArrows(ID_EDIT_POS_X, c4d.BFH_SCALEFIT, initw=70)
         self.AddStaticText(ID_LBL_POS_Y, c4d.BFH_LEFT, initw=26, name="Y:")
-        self.AddEditNumberArrows(ID_EDIT_POS_Y, c4d.BFH_LEFT, initw=70)
+        self.AddEditNumberArrows(ID_EDIT_POS_Y, c4d.BFH_SCALEFIT, initw=70)
         self.AddStaticText(ID_LBL_POS_Z, c4d.BFH_LEFT, initw=26, name="Z:")
-        self.AddEditNumberArrows(ID_EDIT_POS_Z, c4d.BFH_LEFT, initw=70)
+        self.AddEditNumberArrows(ID_EDIT_POS_Z, c4d.BFH_SCALEFIT, initw=70)
         self.GroupEnd()
 
         self.AddSeparatorH(0)
@@ -655,6 +663,7 @@ class CloudWizardDialog(c4d.gui.GeDialog):
         self.SetFloat(ID_EDIT_TRANSP,  0.0, min=0.0, max=100.0, step=1.0)
         self.SetBool(ID_CHK_NOISE, False)
         self.SetBool(ID_CHK_SSS,   False)
+        self.SetBool(ID_CHK_CREATE_MAT, False)
 
         # Позиция
         self.SetFloat(ID_EDIT_POS_X, 0.0,    min=-100000.0, max=100000.0,
@@ -793,6 +802,7 @@ class CloudWizardDialog(c4d.gui.GeDialog):
             transparency = self.GetFloat(ID_EDIT_TRANSP),
             use_noise    = self.GetBool(ID_CHK_NOISE),
             use_sss      = self.GetBool(ID_CHK_SSS),
+            create_mat   = self.GetBool(ID_CHK_CREATE_MAT),
             pos_x        = self.GetFloat(ID_EDIT_POS_X),
             pos_y        = self.GetFloat(ID_EDIT_POS_Y),
             pos_z        = self.GetFloat(ID_EDIT_POS_Z),
