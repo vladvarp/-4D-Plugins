@@ -31,7 +31,7 @@ if not hasattr(c4d, "DESC_UNIT_NONE"):
 # ─── Plugin ID & Name ────────────────────────────────────────────────────────
 
 ID_DIAMOND   = 1069031
-NAME_DIAMOND = "Diamond v1.17"
+NAME_DIAMOND = "Diamond v1.18"
 
 # ─── UserData SubID ───────────────────────────────────────────────────────────
 # SubID=1 зарезервирован под группу. Поля начинаются с 2.
@@ -941,47 +941,19 @@ def build_pear(size, height, crown_h, girdle_h, segs, table_size, culet):
             idxs.append(_add(c4d.Vector(px, y, pz)))
         return idxs
 
-    # Кончик груши
-    tip_idx = _add(c4d.Vector(0.0, y_culet, rz))
-
     gird_b = _pear_ring(rx, rz, y_gird_b)
     gird_t = _pear_ring(rx, rz, y_gird_t)
     table  = _pear_ring(r_table_x, r_table_z, y_table)
 
-    # Верхняя «острая» половина павильона → к точке
-    half_f = segs // 4
-    half_b = segs - half_f
-    front_arc = gird_b[half_f:half_b]  # верхняя дуга
-
-    # Веер развёрнут (reversed) и НЕ замкнут (closed=False): раньше веер не был
-    # развёрнут (давал то же направление gird_b[i]→gird_b[i+1], что и полоса
-    # рундиста ниже — рёбра дублировались) и был замкнут (рисовал паразитную
-    # диагональ через центр камня вместо настоящих рёбер рундиста на стыках
-    # дуг) — оба дефекта давали дырки/наложения по периметру павильона.
-    polys += _fan(tip_idx, front_arc, 0, closed=False)
-
-    # Нижняя дуга → к калете
-    bottom_arc = gird_b[half_b:] + gird_b[:half_f]
+    # Павильон — веер от калеты ко всему рундисту
     if r_culet < 0.5:
-        culet_idx = _add(c4d.Vector(0.0, y_culet, -rz * 0.5))
-        polys += _fan(culet_idx, bottom_arc, 0, closed=False)
+        culet_idx = _add(c4d.Vector(0.0, y_culet, 0.0))
+        polys += _fan(culet_idx, gird_b, 0)
     else:
         culet_ring = _pear_ring(r_culet, r_culet * 1.6, y_culet)
-        polys += _band(culet_ring, bottom_arc)
-        c4c = _add(c4d.Vector(0.0, y_culet, 0.0))
-        polys += _fan(c4c, culet_ring, 0)
-
-    # Грани-мостики между кончиком и калетой на двух стыках дуг (там, где
-    # front_arc и bottom_arc сходятся на боках камня) — без них там были дырки,
-    # т.к. ни один из вееров не покрывает сами стыковые рёбра рундиста.
-    seamA_before = gird_b[half_f - 1]
-    seamA_first  = gird_b[half_f]
-    seamB_last   = gird_b[half_b - 1]
-    seamB_after  = gird_b[half_b % segs]
-    polys.append(_tri(tip_idx, seamB_last, seamB_after))
-    polys.append(_tri(culet_idx, seamA_before, seamA_first))
-    polys.append(_tri(culet_idx, tip_idx, seamB_after))
-    polys.append(_tri(tip_idx, culet_idx, seamA_first))
+        culet_idx = _add(c4d.Vector(0.0, y_culet, 0.0))
+        polys += _band(gird_b, culet_ring)
+        polys += _fan(culet_idx, culet_ring, 0)
 
     # Рундист
     polys += _band(gird_t, gird_b)
