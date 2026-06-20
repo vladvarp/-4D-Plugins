@@ -50,7 +50,14 @@
           "info": "Процедурный генератор напольных покрытий — ёлочка, паркет, шеврон, соты — с фаской, швами и рандомизированными UV.",
           "info_url": "https://vladvarp.github.io/-4D-Plugins/web/plugin.html?md=plugins%2Ffloor-generator.md",
           "version": ""
-        }      
+        },
+        {
+          "name": "Cloud Wizard",
+          "url": "https://github.com/vladvarp/-4D-Plugins/tree/main/Plugins/Cloud Wizard",
+          "info": "Процедурный генератор облаков — кучевые, перистые, грозовые, слоистые и высококучевые.",
+          "info_url": "https://vladvarp.github.io/-4D-Plugins/web/pplugin.html?md=plugins%2Fcloud-wizard.md",
+          "version": ""
+        }        
       ]
     }
   ]

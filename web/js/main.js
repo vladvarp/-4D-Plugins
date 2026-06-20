@@ -95,7 +95,16 @@ function initIndexPage() {
             tags: [`Моделирование`, `Процедурный`],
             version: 'v2.7',
             mdFile: 'plugins/floor-generator.md'
-        }
+        },
+        {
+            id: '7',
+            title: 'Cloud Wizard',
+            description: 'Процедурный генератор облаков — кучевые, перистые, грозовые, слоистые и высококучевые.',
+            icon: 'ico/CloudWizard.png',
+            tags: [`Генератор`, `Процедурный`, `Облака`],
+            version: 'v1.8',
+            mdFile: 'plugins/cloud-wizard.md'
+        }        
     ];
 
     // Рендерим карточки плагинов
