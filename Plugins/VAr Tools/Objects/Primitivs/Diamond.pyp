@@ -23,6 +23,9 @@ import os
 import base64
 import tempfile
 
+if not hasattr(c4d, "DESC_UNIT_NONE"):
+    c4d.DESC_UNIT_NONE = 0
+
 # ─── Plugin ID & Name ────────────────────────────────────────────────────────
 
 ID_DIAMOND   = 1069031
