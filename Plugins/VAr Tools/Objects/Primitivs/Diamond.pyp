@@ -634,19 +634,19 @@ def build_princess(size, height, crown_h, girdle_h, table_size, culet, steps):
     # ── Полигоны павильона ────────────────────────────────────────────────────
     prev_ring = gird_b
     for pav_ring in pav_rings:
-        polys += _band(pav_ring, prev_ring)
+        polys += _band(prev_ring, pav_ring)
         prev_ring = pav_ring
 
     # Закрываем до калеты
     if culet_ring is None:
-        polys += _fan(culet_idx, list(reversed(prev_ring)), 0)
+        polys += _fan(culet_idx, prev_ring, 0)
     else:
-        polys += _band(culet_ring, prev_ring)
+        polys += _band(prev_ring, culet_ring)
         c4_idx = _add(c4d.Vector(0.0, y_culet, 0.0))
-        polys += _fan(c4_idx, list(reversed(culet_ring)), 0)
+        polys += _fan(c4_idx, culet_ring, 0)
 
     # Рундист → корона (простые квады, оба кольца 4-точечные)
-    polys += _band(gird_b, gird_t)
+    polys += _band(gird_t, gird_b)
 
     # Корона: gird_t(4) → table(4) (простые квады)
     # Обход развёрнут (table, gird_t вместо gird_t, table), чтобы ребро
