@@ -16,10 +16,15 @@ import random
 import base64
 import tempfile
 
+_NOISE_BUYA            = getattr(c4d, 'SLA_NOISE_NOISE_BUYA',            0)
+_NOISE_TURBULENCE      = getattr(c4d, 'SLA_NOISE_NOISE_TURBULENCE',      1)
+_NOISE_WAVY_TURBULENCE = getattr(c4d, 'SLA_NOISE_NOISE_WAVY_TURBULENCE', 2)
+_NOISE_DENTS           = getattr(c4d, 'SLA_NOISE_NOISE_DENTS',           3)
+
 # ─── ID ───────────────────────────────────────────────────────────────────────
 PLUGIN_ID   = 1069028
 PLUGIN_NAME = "Cloud Wizard"
-PLUGIN_NAME_V = "Cloud Wizard v1.0"
+PLUGIN_NAME_V = "Cloud Wizard v1.7"
 PLUGIN_HELP = "Процедурная генерация облаков в сцене"
 
 # ─── ID виджетов ──────────────────────────────────────────────────────────────
@@ -95,6 +100,7 @@ ID_LBL_STATUS       = ID_BASE + 101
 ID_BTN_GENERATE     = ID_BASE + 102
 ID_BTN_CLEAR        = ID_BASE + 103
 ID_BTN_RANDOMIZE    = ID_BASE + 104
+ID_BTN_RAND_MAT     = ID_BASE + 107
 ID_CHK_SKY          = ID_BASE + 105  # Добавить физическое небо
 ID_CHK_HDRI_SUN     = ID_BASE + 106  # Добавить солнце
 
@@ -194,17 +200,12 @@ def _generate_cloud(params):
     variance    = params["variance"]    # 0–1 разброс размеров
     puff        = params["puff"]        # 0–1 → размер сферы
 
-    # ── Создаём корневую null-группу ─────────────────────────────────────────
-    root_null = c4d.BaseObject(c4d.Onull)
-    root_null.SetName(params["name"])
-    root_null[c4d.NULLOBJECT_DISPLAY] = c4d.NULLOBJECT_DISPLAY_NONE
-
-    pos = c4d.Vector(params["pos_x"], params["pos_y"], params["pos_z"])
-    root_null.SetAbsPos(pos)
-
     # ── Создаём Metaball ──────────────────────────────────────────────────────
     meta = c4d.BaseObject(c4d.Ometaball)
-    meta.SetName(params["name"] + "_Metaball")
+    meta.SetName(params["name"])
+
+    pos = c4d.Vector(params["pos_x"], params["pos_y"], params["pos_z"])
+    meta.SetAbsPos(pos)
 
     # Порог (Hull Value) — чем меньше, тем мягче поверхность
     hull_c4d = max(1.0, min(100.0, float(hull_val)))
@@ -215,8 +216,6 @@ def _generate_cloud(params):
     subdiv_map = {0: 8, 1: 12, 2: 6, 3: 14, 4: 9}
     meta[c4d.METABALLOBJECT_SUBEDITOR] = subdiv_map.get(cloud_type, 8)
     meta[c4d.METABALLOBJECT_SUBRAY]    = max(4, subdiv_map.get(cloud_type, 8) - 2)
-
-    meta.InsertUnder(root_null)
 
     # ── Добавляем дочерние сферы в метаболу ──────────────────────────────────
     # Базовый радиус одного шарика = пышность * масштаб / кубический корень из числа шариков
@@ -283,10 +282,25 @@ def _generate_cloud(params):
         if existing_sun is None:
             sun = c4d.BaseObject(c4d.Olight)
             sun.SetName("Sun Light")
-            sun[c4d.LIGHT_TYPE]      = c4d.LIGHT_TYPE_DISTANT
-            sun[c4d.LIGHT_COLOR]     = c4d.Vector(1.0, 0.97, 0.88)
-            sun[c4d.LIGHT_INTENSITY] = 1.5
-            sun[c4d.LIGHT_SHADOWTYPE] = c4d.LIGHT_SHADOWTYPE_AREA
+            try:
+                sun[c4d.LIGHT_TYPE]       = c4d.LIGHT_TYPE_DISTANT
+            except Exception:
+                pass
+            try:
+                sun[c4d.LIGHT_COLOR]      = c4d.Vector(1.0, 0.97, 0.88)
+            except Exception:
+                pass
+            try:
+                sun[c4d.LIGHT_INTENSITY]  = 1.5
+            except Exception:
+                try:
+                    sun[c4d.LIGHT_BRIGHTNESS] = 1.5
+                except Exception:
+                    pass
+            try:
+                sun[c4d.LIGHT_SHADOWTYPE] = c4d.LIGHT_SHADOWTYPE_AREA
+            except Exception:
+                pass
             # Угол солнца ~45°
             sun.SetRelRot(c4d.Vector(
                 c4d.utils.DegToRad(-45.0),
@@ -295,9 +309,9 @@ def _generate_cloud(params):
             ))
             doc.InsertObject(sun)
 
-    # ── Вставляем root_null в документ ───────────────────────────────────────
-    doc.InsertObject(root_null)
-    doc.SetActiveObject(root_null)
+    # ── Вставляем метаболу в документ ──────────────────────────────────────────
+    doc.InsertObject(meta)
+    doc.SetActiveObject(meta)
     c4d.EventAdd()
 
     return True, "Облако «{}» создано ({} шариков)".format(params["name"], blob_count)
@@ -321,10 +335,13 @@ def _create_cloud_material(params, rng):
     # Немного зашумить цвет для перистых
     if params.get("use_noise") and cloud_type == 1:
         noise_shader = c4d.BaseShader(c4d.Xnoise)
-        noise_shader[c4d.SLA_NOISE_NOISE]     = c4d.SLA_NOISE_NOISE_BUYA
-        noise_shader[c4d.SLA_NOISE_OCTAVES]   = 5
-        noise_shader[c4d.SLA_NOISE_SCALE]     = 45.0
-        noise_shader[c4d.SLA_NOISE_GLOBAL_SCALE] = 250.0
+        try:
+            noise_shader[c4d.SLA_NOISE_NOISE]     = _NOISE_BUYA
+            noise_shader[c4d.SLA_NOISE_OCTAVES]   = 5
+            noise_shader[c4d.SLA_NOISE_SCALE]     = 45.0
+            noise_shader[c4d.SLA_NOISE_GLOBAL_SCALE] = 250.0
+        except Exception:
+            pass
         mat[c4d.MATERIAL_COLOR_SHADER] = noise_shader
         mat.InsertShader(noise_shader)
 
@@ -356,10 +373,13 @@ def _create_cloud_material(params, rng):
     if params.get("use_noise"):
         mat[c4d.MATERIAL_USE_DIFFUSION] = True
         diff_noise = c4d.BaseShader(c4d.Xnoise)
-        diff_noise[c4d.SLA_NOISE_NOISE]   = c4d.SLA_NOISE_NOISE_TURBULENCE
-        diff_noise[c4d.SLA_NOISE_OCTAVES] = 4
-        diff_noise[c4d.SLA_NOISE_SCALE]   = 60.0
-        diff_noise[c4d.SLA_NOISE_GLOBAL_SCALE] = 180.0
+        try:
+            diff_noise[c4d.SLA_NOISE_NOISE]   = _NOISE_TURBULENCE
+            diff_noise[c4d.SLA_NOISE_OCTAVES] = 4
+            diff_noise[c4d.SLA_NOISE_SCALE]   = 60.0
+            diff_noise[c4d.SLA_NOISE_GLOBAL_SCALE] = 180.0
+        except Exception:
+            pass
         mat[c4d.MATERIAL_DIFFUSION_SHADER] = diff_noise
         mat.InsertShader(diff_noise)
 
@@ -367,16 +387,19 @@ def _create_cloud_material(params, rng):
     if params.get("use_noise"):
         mat[c4d.MATERIAL_USE_BUMP] = True
         bump_noise = c4d.BaseShader(c4d.Xnoise)
-        bump_type_map = {0: c4d.SLA_NOISE_NOISE_TURBULENCE,
-                         1: c4d.SLA_NOISE_NOISE_BUYA,
-                         2: c4d.SLA_NOISE_NOISE_TURBULENCE,
-                         3: c4d.SLA_NOISE_NOISE_WAVY_TURBULENCE,
-                         4: c4d.SLA_NOISE_NOISE_DENTS}
-        bump_noise[c4d.SLA_NOISE_NOISE]   = bump_type_map.get(cloud_type,
-                                                c4d.SLA_NOISE_NOISE_TURBULENCE)
-        bump_noise[c4d.SLA_NOISE_OCTAVES] = 6
-        bump_noise[c4d.SLA_NOISE_SCALE]   = 35.0
-        bump_noise[c4d.SLA_NOISE_GLOBAL_SCALE] = 120.0
+        bump_type_map = {0: _NOISE_TURBULENCE,
+                         1: _NOISE_BUYA,
+                         2: _NOISE_TURBULENCE,
+                         3: _NOISE_WAVY_TURBULENCE,
+                         4: _NOISE_DENTS}
+        try:
+            bump_noise[c4d.SLA_NOISE_NOISE]   = bump_type_map.get(cloud_type,
+                                                    _NOISE_TURBULENCE)
+            bump_noise[c4d.SLA_NOISE_OCTAVES] = 6
+            bump_noise[c4d.SLA_NOISE_SCALE]   = 35.0
+            bump_noise[c4d.SLA_NOISE_GLOBAL_SCALE] = 120.0
+        except Exception:
+            pass
         mat[c4d.MATERIAL_BUMP_SHADER]     = bump_noise
         mat[c4d.MATERIAL_BUMP_STRENGTH]   = 0.18
         mat.InsertShader(bump_noise)
@@ -420,7 +443,7 @@ def _find_sun_light(doc):
 
 
 def _remove_clouds(doc):
-    """Удаляет все объекты, созданные Cloud Wizard (по наличию тега _Metaball)."""
+    """Удаляет все метаболы, созданные Cloud Wizard."""
     removed = 0
 
     def _walk(obj):
@@ -428,14 +451,8 @@ def _remove_clouds(doc):
         to_delete = []
         while obj:
             nxt = obj.GetNext()
-            # Ищем null-группы с дочерней метаболой
-            if obj.GetType() == c4d.Onull:
-                child = obj.GetDown()
-                while child:
-                    if child.GetType() == c4d.Ometaball:
-                        to_delete.append(obj)
-                        break
-                    child = child.GetNext()
+            if obj.GetType() == c4d.Ometaball:
+                to_delete.append(obj)
             obj = nxt
         for o in to_delete:
             o.Remove()
@@ -472,11 +489,13 @@ class CloudWizardDialog(c4d.gui.GeDialog):
         self.AddSeparatorH(0)
 
         # ── Основные параметры ───────────────────────────────────────────────
-        self.GroupBegin(ID_GRP_GENERAL, c4d.BFH_SCALEFIT, cols=4, rows=2)
+        self.GroupBegin(ID_GRP_GENERAL, c4d.BFH_SCALEFIT, cols=1, rows=1)
         self.GroupBorderSpace(8, 4, 8, 2)
-        self.GroupBorder(c4d.BORDER_GROUP_IN)
-        self.AddStaticText(0, c4d.BFH_LEFT | c4d.BFH_SCALEFIT, cols=4, name="Основные параметры")
+        self.AddStaticText(0, c4d.BFH_LEFT | c4d.BFH_SCALEFIT, name="Основные параметры:")
+        self.GroupEnd()
 
+        self.GroupBegin(ID_GRP_GENERAL, c4d.BFH_SCALEFIT, cols=4, rows=1)
+        self.GroupBorderSpace(8, 4, 8, 2)
         self.AddStaticText(ID_LBL_NAME, c4d.BFH_LEFT, initw=90, name="Имя:")
         self.AddEditText(ID_EDIT_NAME, c4d.BFH_SCALEFIT, initw=150)
         self.AddStaticText(ID_LBL_SEED, c4d.BFH_LEFT, initw=60, name="Seed:")
@@ -486,70 +505,76 @@ class CloudWizardDialog(c4d.gui.GeDialog):
         self.AddSeparatorH(0)
 
         # ── Форма ────────────────────────────────────────────────────────────
-        self.GroupBegin(ID_GRP_SHAPE, c4d.BFH_SCALEFIT, cols=4, rows=4)
+        self.GroupBegin(ID_GRP_SHAPE, c4d.BFH_SCALEFIT, cols=1, rows=1)
         self.GroupBorderSpace(8, 4, 8, 4)
-        self.GroupBorder(c4d.BORDER_GROUP_IN)
-        self.AddStaticText(0, c4d.BFH_LEFT | c4d.BFH_SCALEFIT, cols=4, name="Форма")
+        self.AddStaticText(0, c4d.BFH_LEFT | c4d.BFH_SCALEFIT, name="Форма:")
+        self.GroupEnd()
 
-        self.AddStaticText(ID_LBL_SCALE, c4d.BFH_LEFT, initw=90, name="Масштаб (м):")
-        self.AddEditNumberArrows(ID_EDIT_SCALE, c4d.BFH_LEFT, initw=80)
-        self.AddStaticText(ID_LBL_PUFF, c4d.BFH_LEFT, initw=80, name="Пышность:")
+        self.GroupBegin(ID_GRP_SHAPE, c4d.BFH_SCALEFIT, cols=2, rows=1)
+        self.GroupBorderSpace(8, 4, 8, 4)
+        self.AddStaticText(ID_LBL_SCALE, c4d.BFH_LEFT, initw=120, name="Масштаб (м):")
+        self.AddEditNumberArrows(ID_EDIT_SCALE, c4d.BFH_LEFT, initw=120)
+        self.AddStaticText(ID_LBL_PUFF, c4d.BFH_LEFT, initw=120, name="Пышность:")
         self.AddEditSlider(ID_EDIT_PUFF, c4d.BFH_SCALEFIT, initw=120)
 
-        self.AddStaticText(ID_LBL_SCALE_X, c4d.BFH_LEFT, initw=90, name="Ширина (X):")
+        self.AddStaticText(ID_LBL_SCALE_X, c4d.BFH_LEFT, initw=120, name="Ширина (X):")
         self.AddEditSlider(ID_EDIT_SCALE_X, c4d.BFH_SCALEFIT, initw=120)
-        self.AddStaticText(ID_LBL_SCALE_Y, c4d.BFH_LEFT, initw=80, name="Высота (Y):")
+        self.AddStaticText(ID_LBL_SCALE_Y, c4d.BFH_LEFT, initw=120, name="Высота (Y):")
         self.AddEditSlider(ID_EDIT_SCALE_Y, c4d.BFH_SCALEFIT, initw=120)
 
-        self.AddStaticText(ID_LBL_SCALE_Z, c4d.BFH_LEFT, initw=90, name="Глубина (Z):")
+        self.AddStaticText(ID_LBL_SCALE_Z, c4d.BFH_LEFT, initw=120, name="Глубина (Z):")
         self.AddEditSlider(ID_EDIT_SCALE_Z, c4d.BFH_SCALEFIT, initw=120)
-        self.AddStaticText(0, c4d.BFH_LEFT, initw=80, name="")
-        self.AddStaticText(0, c4d.BFH_LEFT, initw=120, name="")
         self.GroupEnd()
 
         self.AddSeparatorH(0)
 
         # ── Детали ───────────────────────────────────────────────────────────
-        self.GroupBegin(ID_GRP_DETAIL, c4d.BFH_SCALEFIT, cols=4, rows=3)
+        self.GroupBegin(ID_GRP_DETAIL, c4d.BFH_SCALEFIT, cols=1, rows=1)
         self.GroupBorderSpace(8, 4, 8, 4)
-        self.GroupBorder(c4d.BORDER_GROUP_IN)
-        self.AddStaticText(0, c4d.BFH_LEFT | c4d.BFH_SCALEFIT, cols=4, name="Детализация метаболы")
+        self.AddStaticText(0, c4d.BFH_LEFT | c4d.BFH_SCALEFIT, name="Детализация метаболы:")
+        self.GroupEnd()
 
-        self.AddStaticText(ID_LBL_BLOBS, c4d.BFH_LEFT, initw=90, name="Шариков:")
-        self.AddEditNumberArrows(ID_EDIT_BLOBS, c4d.BFH_LEFT, initw=70)
-        self.AddStaticText(ID_LBL_HULL, c4d.BFH_LEFT, initw=80, name="Hull (%):")
+        self.GroupBegin(ID_GRP_SHAPE, c4d.BFH_SCALEFIT, cols=2, rows=1)
+        self.GroupBorderSpace(8, 4, 8, 4)
+        self.AddStaticText(ID_LBL_BLOBS, c4d.BFH_LEFT, initw=120, name="Шариков:")
+        self.AddEditNumberArrows(ID_EDIT_BLOBS, c4d.BFH_LEFT, initw=120)
+        self.AddStaticText(ID_LBL_HULL, c4d.BFH_LEFT, initw=120, name="Hull (%):")
         self.AddEditSlider(ID_EDIT_HULL, c4d.BFH_SCALEFIT, initw=120)
 
-        self.AddStaticText(ID_LBL_SCATTER, c4d.BFH_LEFT, initw=90, name="Разброс:")
+        self.AddStaticText(ID_LBL_SCATTER, c4d.BFH_LEFT, initw=120, name="Разброс:")
         self.AddEditSlider(ID_EDIT_SCATTER, c4d.BFH_SCALEFIT, initw=120)
-        self.AddStaticText(ID_LBL_VARIANCE, c4d.BFH_LEFT, initw=80, name="Вариация:")
+        self.AddStaticText(ID_LBL_VARIANCE, c4d.BFH_LEFT, initw=120, name="Вариация:")
         self.AddEditSlider(ID_EDIT_VARIANCE, c4d.BFH_SCALEFIT, initw=120)
         self.GroupEnd()
 
         self.AddSeparatorH(0)
 
         # ── Материал ─────────────────────────────────────────────────────────
-        self.GroupBegin(ID_GRP_MAT, c4d.BFH_SCALEFIT, cols=4, rows=4)
+        self.GroupBegin(ID_GRP_MAT, c4d.BFH_SCALEFIT, cols=1, rows=1)
         self.GroupBorderSpace(8, 4, 8, 4)
-        self.GroupBorder(c4d.BORDER_GROUP_IN)
-        self.AddStaticText(0, c4d.BFH_LEFT | c4d.BFH_SCALEFIT, cols=4, name="Материал")
+        self.AddStaticText(0, c4d.BFH_LEFT | c4d.BFH_SCALEFIT, name="Материал:")
+        self.GroupEnd()
 
-        self.AddStaticText(ID_LBL_COLOR_MAIN, c4d.BFH_LEFT, initw=90, name="Основной цвет:")
+        self.GroupBegin(ID_GRP_SHAPE, c4d.BFH_SCALEFIT, cols=4, rows=1)
+        self.GroupBorderSpace(8, 4, 8, 4)
+        self.AddStaticText(ID_LBL_COLOR_MAIN, c4d.BFH_LEFT, initw=160, name="Основной цвет:")
         self.AddColorField(ID_COLOR_MAIN, c4d.BFH_LEFT, initw=120, inith=14)
-        self.AddStaticText(ID_LBL_COLOR_SHADOW, c4d.BFH_LEFT, initw=90, name="Цвет тени:")
+        self.AddStaticText(ID_LBL_COLOR_SHADOW, c4d.BFH_LEFT, initw=100, name="Цвет тени:")
         self.AddColorField(ID_COLOR_SHADOW, c4d.BFH_LEFT, initw=120, inith=14)
+        self.GroupEnd()
 
-        self.AddStaticText(ID_LBL_LUMI, c4d.BFH_LEFT, initw=90, name="Светимость (%):")
+        self.GroupBegin(ID_GRP_SHAPE, c4d.BFH_SCALEFIT, cols=2, rows=1)
+        self.GroupBorderSpace(8, 4, 8, 4)
+        self.AddStaticText(ID_LBL_LUMI, c4d.BFH_LEFT, initw=160, name="Светимость (%):")
         self.AddEditSlider(ID_EDIT_LUMI, c4d.BFH_SCALEFIT, initw=120)
-        self.AddStaticText(ID_LBL_TRANSP, c4d.BFH_LEFT, initw=90, name="Прозрачность (%):")
+        self.AddStaticText(ID_LBL_TRANSP, c4d.BFH_LEFT, initw=160, name="Прозрачность (%):")
         self.AddEditSlider(ID_EDIT_TRANSP, c4d.BFH_SCALEFIT, initw=120)
+        self.GroupEnd()
 
-        self.AddCheckbox(ID_CHK_NOISE, c4d.BFH_LEFT, initw=0, inith=0,
-                         name="Noise-шейдеры (Bump + Diffusion)")
-        self.AddStaticText(0, c4d.BFH_LEFT, name="")
-        self.AddCheckbox(ID_CHK_SSS, c4d.BFH_LEFT, initw=0, inith=0,
-                         name="Luminance-гало")
-        self.AddStaticText(0, c4d.BFH_LEFT, name="")
+        self.GroupBegin(ID_GRP_SHAPE, c4d.BFH_SCALEFIT, cols=2, rows=1)
+        self.GroupBorderSpace(8, 4, 8, 4)
+        self.AddCheckbox(ID_CHK_NOISE, c4d.BFH_LEFT, initw=0, inith=0, name="Noise")
+        self.AddCheckbox(ID_CHK_SSS, c4d.BFH_LEFT, initw=0, inith=0, name="Luminance")
         self.GroupEnd()
 
         self.AddSeparatorH(0)
@@ -579,15 +604,17 @@ class CloudWizardDialog(c4d.gui.GeDialog):
         self.AddSeparatorH(0)
 
         # ── Нижняя панель кнопок ─────────────────────────────────────────────
-        self.GroupBegin(ID_GRP_BOTTOM, c4d.BFH_SCALEFIT, cols=3, rows=2)
+        self.GroupBegin(ID_GRP_BOTTOM, c4d.BFH_SCALEFIT, cols=2, rows=2)
         self.GroupBorderSpace(8, 4, 8, 6)
 
-        self.AddButton(ID_BTN_GENERATE,  c4d.BFH_SCALEFIT, inith=24, name="⛅  Создать облако")
-        self.AddButton(ID_BTN_RANDOMIZE, c4d.BFH_SCALEFIT, inith=24, name="🎲  Случайные параметры")
-        self.AddButton(ID_BTN_CLEAR,     c4d.BFH_SCALEFIT, inith=24, name="🗑  Удалить все облака")
+        self.AddButton(ID_BTN_GENERATE,  c4d.BFH_SCALEFIT, inith=20, name="⛅ Создать облако")
+        self.AddButton(ID_BTN_CLEAR,     c4d.BFH_SCALEFIT, inith=20, name="⛔ Удалить все облака")
+        self.AddButton(ID_BTN_RANDOMIZE, c4d.BFH_SCALEFIT, inith=20, name="⇄ Случайные формы")
+        self.AddButton(ID_BTN_RAND_MAT,  c4d.BFH_SCALEFIT, inith=20, name="⇄ Случайный материал")
+
 
         self.AddStaticText(ID_LBL_STATUS, c4d.BFH_SCALEFIT | c4d.BFH_CENTER,
-                           cols=3, name="Готов к работе")
+                           name="Готов к работе")
         self.GroupEnd()
 
         return True
@@ -602,30 +629,31 @@ class CloudWizardDialog(c4d.gui.GeDialog):
         self.SetString(ID_EDIT_NAME, "Cloud_001")
 
         # Seed
-        self.SetInt32(ID_EDIT_SEED, 42, min=0, max=9999999)
+        self.SetInt32(ID_EDIT_SEED, 515627, min=0, max=9999999)
 
         # Масштаб
-        self.SetFloat(ID_EDIT_SCALE, 500.0, min=10.0, max=50000.0, step=10.0,
+        self.SetFloat(ID_EDIT_SCALE, 836.8843, min=10.0, max=50000.0, step=1.0,
                       format=c4d.FORMAT_METER)
 
         # Форма
-        self.SetFloat(ID_EDIT_SCALE_X, 1.0, min=0.1, max=5.0, step=0.05)
-        self.SetFloat(ID_EDIT_SCALE_Y, 1.0, min=0.1, max=5.0, step=0.05)
-        self.SetFloat(ID_EDIT_SCALE_Z, 1.0, min=0.1, max=5.0, step=0.05)
-        self.SetFloat(ID_EDIT_PUFF, 0.65, min=0.1, max=1.5, step=0.05)
+        self.SetFloat(ID_EDIT_PUFF,       0.55, min=0.1, max=1.5, step=0.05)
+        self.SetFloat(ID_EDIT_SCALE_X,  2.3287, min=0.1, max=5.0, step=0.05)
+        self.SetFloat(ID_EDIT_SCALE_Y,    0.65, min=0.1, max=5.0, step=0.05)
+        self.SetFloat(ID_EDIT_SCALE_Z,  1.0142, min=0.1, max=5.0, step=0.05)
+
 
         # Детали
-        self.SetInt32(ID_EDIT_BLOBS, 34, min=4, max=200)
-        self.SetFloat(ID_EDIT_HULL,     72.0, min=1.0, max=100.0, step=1.0)
-        self.SetFloat(ID_EDIT_SCATTER,   1.0, min=0.1, max=4.0,   step=0.05)
-        self.SetFloat(ID_EDIT_VARIANCE,  0.4, min=0.0, max=1.0,   step=0.05)
+        self.SetInt32(ID_EDIT_BLOBS,         34, min=4,   max=200)
+        self.SetFloat(ID_EDIT_HULL,          72, min=1.0, max=100.0, step=1.0)
+        self.SetFloat(ID_EDIT_SCATTER,        1, min=0.1, max=4.0,   step=0.05)
+        self.SetFloat(ID_EDIT_VARIANCE,  0.6316, min=0.0, max=1.0,   step=0.05)
 
         # Материал
-        self.SetColorField(ID_COLOR_MAIN,   c4d.Vector(0.97, 0.97, 1.00))
-        self.SetColorField(ID_COLOR_SHADOW, c4d.Vector(0.60, 0.67, 0.78))
+        self.SetColorField(ID_COLOR_MAIN,   c4d.Vector(0.97, 0.97, 1.00), 1.0, 1.0, 0)
+        self.SetColorField(ID_COLOR_SHADOW, c4d.Vector(0.60, 0.67, 0.78), 1.0, 1.0, 0)
         self.SetFloat(ID_EDIT_LUMI,   18.0, min=0.0, max=100.0, step=1.0)
         self.SetFloat(ID_EDIT_TRANSP,  0.0, min=0.0, max=100.0, step=1.0)
-        self.SetBool(ID_CHK_NOISE, True)
+        self.SetBool(ID_CHK_NOISE, False)
         self.SetBool(ID_CHK_SSS,   False)
 
         # Позиция
@@ -651,7 +679,11 @@ class CloudWizardDialog(c4d.gui.GeDialog):
             return True
 
         if widget_id == ID_BTN_RANDOMIZE:
-            self._randomize()
+            self._randomize_shape()
+            return True
+
+        if widget_id == ID_BTN_RAND_MAT:
+            self._randomize_material()
             return True
 
         if widget_id == ID_BTN_GENERATE:
@@ -676,65 +708,69 @@ class CloudWizardDialog(c4d.gui.GeDialog):
         p = CLOUD_PROFILES[cloud_type]
 
         self.SetInt32(ID_EDIT_BLOBS, p["blobs"])
-        self.SetFloat(ID_EDIT_HULL,    float(p["hull"]),    min=1.0, max=100.0)
-        self.SetFloat(ID_EDIT_SCATTER, p["scatter"],        min=0.1, max=4.0)
-        self.SetFloat(ID_EDIT_PUFF,    p["puff"],           min=0.1, max=1.5)
+        self.SetFloat(ID_EDIT_HULL,    float(p["hull"]),    min=1.0, max=100.0, step=1.0)
+        self.SetFloat(ID_EDIT_SCATTER, p["scatter"],        min=0.1, max=4.0,   step=0.05)
+        self.SetFloat(ID_EDIT_PUFF,    p["puff"],           min=0.1, max=1.5,   step=0.05)
 
         # Высота по профилю
         current_sy = p["sy"]
         self.SetFloat(ID_EDIT_SCALE_Y, min(4.9, max(0.1, current_sy)),
-                      min=0.1, max=5.0)
+                      min=0.1, max=5.0, step=0.05)
 
         # Особые цветовые настройки для типов
         if cloud_type == 1:   # Перистые — более прозрачные, холоднее
-            self.SetColorField(ID_COLOR_MAIN,   c4d.Vector(0.94, 0.96, 1.00))
-            self.SetColorField(ID_COLOR_SHADOW, c4d.Vector(0.70, 0.78, 0.90))
-            self.SetFloat(ID_EDIT_TRANSP, 35.0, min=0.0, max=100.0)
+            self.SetColorField(ID_COLOR_MAIN,   c4d.Vector(0.94, 0.96, 1.00), 1.0, 1.0, 0)
+            self.SetColorField(ID_COLOR_SHADOW, c4d.Vector(0.70, 0.78, 0.90), 1.0, 1.0, 0)
+            self.SetFloat(ID_EDIT_TRANSP, 35.0, min=0.0, max=100.0, step=1.0)
         elif cloud_type == 2:  # Грозовые — темнее
-            self.SetColorField(ID_COLOR_MAIN,   c4d.Vector(0.82, 0.84, 0.88))
-            self.SetColorField(ID_COLOR_SHADOW, c4d.Vector(0.28, 0.30, 0.36))
-            self.SetFloat(ID_EDIT_TRANSP, 0.0, min=0.0, max=100.0)
+            self.SetColorField(ID_COLOR_MAIN,   c4d.Vector(0.82, 0.84, 0.88), 1.0, 1.0, 0)
+            self.SetColorField(ID_COLOR_SHADOW, c4d.Vector(0.28, 0.30, 0.36), 1.0, 1.0, 0)
+            self.SetFloat(ID_EDIT_TRANSP, 0.0, min=0.0, max=100.0, step=1.0)
         else:
-            self.SetColorField(ID_COLOR_MAIN,   c4d.Vector(0.97, 0.97, 1.00))
-            self.SetColorField(ID_COLOR_SHADOW, c4d.Vector(0.60, 0.67, 0.78))
-            self.SetFloat(ID_EDIT_TRANSP, 0.0, min=0.0, max=100.0)
+            self.SetColorField(ID_COLOR_MAIN,   c4d.Vector(0.97, 0.97, 1.00), 1.0, 1.0, 0)
+            self.SetColorField(ID_COLOR_SHADOW, c4d.Vector(0.60, 0.67, 0.78), 1.0, 1.0, 0)
+            self.SetFloat(ID_EDIT_TRANSP, 0.0, min=0.0, max=100.0, step=1.0)
 
-    def _randomize(self):
-        """Случайная генерация всех параметров."""
+    def _randomize_shape(self):
+        """Случайная генерация параметров формы."""
         import time
         rng = random.Random(int(time.time() * 1000) % 9999999)
 
         new_seed = rng.randint(0, 9999999)
         self.SetInt32(ID_EDIT_SEED, new_seed)
         self.SetFloat(ID_EDIT_SCALE,
-                      rng.uniform(200.0, 1200.0), min=10.0, max=50000.0)
+                      rng.uniform(200.0, 1200.0), min=10.0, max=50000.0, step=10.0)
         self.SetFloat(ID_EDIT_SCALE_X,
-                      rng.uniform(0.5, 3.0), min=0.1, max=5.0)
+                      rng.uniform(0.5, 3.0), min=0.1, max=5.0, step=0.05)
         self.SetFloat(ID_EDIT_SCALE_Y,
-                      rng.uniform(0.3, 1.5), min=0.1, max=5.0)
+                      rng.uniform(0.3, 1.5), min=0.1, max=5.0, step=0.05)
         self.SetFloat(ID_EDIT_SCALE_Z,
-                      rng.uniform(0.5, 2.0), min=0.1, max=5.0)
+                      rng.uniform(0.5, 2.0), min=0.1, max=5.0, step=0.05)
         self.SetFloat(ID_EDIT_PUFF,
-                      rng.uniform(0.3, 1.2), min=0.1, max=1.5)
+                      rng.uniform(0.3, 1.2), min=0.1, max=1.5, step=0.05)
         self.SetInt32(ID_EDIT_BLOBS,    rng.randint(12, 80))
         self.SetFloat(ID_EDIT_HULL,
-                      rng.uniform(40.0, 90.0), min=1.0, max=100.0)
+                      rng.uniform(40.0, 90.0), min=1.0, max=100.0, step=1.0)
         self.SetFloat(ID_EDIT_SCATTER,
-                      rng.uniform(0.5, 2.5), min=0.1, max=4.0)
+                      rng.uniform(0.5, 2.5), min=0.1, max=4.0, step=0.05)
         self.SetFloat(ID_EDIT_VARIANCE,
-                      rng.uniform(0.1, 0.8), min=0.0, max=1.0)
-
-        # Цвет с лёгкой вариацией
-        wb = rng.uniform(0.88, 1.00)
-        self.SetColorField(ID_COLOR_MAIN, c4d.Vector(wb, wb, min(wb + 0.03, 1.0)))
-        sd = rng.uniform(0.45, 0.75)
-        self.SetColorField(ID_COLOR_SHADOW, c4d.Vector(sd, sd + 0.05, sd + 0.12))
-
-        self.SetFloat(ID_EDIT_LUMI,  rng.uniform(5.0, 35.0),  min=0.0, max=100.0)
-        self.SetFloat(ID_EDIT_TRANSP, rng.uniform(0.0, 15.0), min=0.0, max=100.0)
+                      rng.uniform(0.1, 0.8), min=0.0, max=1.0, step=0.05)
 
         self.SetString(ID_LBL_STATUS,
                        "Случайный seed: {}".format(new_seed))
+
+    def _randomize_material(self):
+        """Случайная генерация параметров материала."""
+        import time
+        rng = random.Random(int(time.time() * 1000) % 9999999)
+
+        wb = rng.uniform(0.88, 1.00)
+        self.SetColorField(ID_COLOR_MAIN, c4d.Vector(wb, wb, min(wb + 0.03, 1.0)), 1.0, 1.0, 0)
+        sd = rng.uniform(0.45, 0.75)
+        self.SetColorField(ID_COLOR_SHADOW, c4d.Vector(sd, sd + 0.05, sd + 0.12), 1.0, 1.0, 0)
+
+        self.SetFloat(ID_EDIT_LUMI,  rng.uniform(5.0, 35.0),  min=0.0, max=100.0, step=1.0)
+        self.SetFloat(ID_EDIT_TRANSP, rng.uniform(0.0, 15.0), min=0.0, max=100.0, step=1.0)
 
     def _collect_params(self):
         """Собирает все параметры из диалога в словарь."""
@@ -792,12 +828,6 @@ class CloudWizardDialog(c4d.gui.GeDialog):
                 else:
                     new_name = current_name + "_002"
                 self.SetString(ID_EDIT_NAME, new_name)
-
-                # Немного сдвигаем позицию, чтобы следующее облако не совпадало
-                cur_x = self.GetFloat(ID_EDIT_POS_X)
-                self.SetFloat(ID_EDIT_POS_X,
-                              cur_x + params["scale"] * 0.6,
-                              min=-100000.0, max=100000.0)
 
             self.SetString(ID_LBL_STATUS, msg)
 
