@@ -348,7 +348,7 @@ def build_brilliant(size, height, crown_h, girdle_h, segs, table_size, culet):
             culet_ring.append(_add(c4d.Vector(r_culet * math.cos(a),
                                                y_culet,
                                                r_culet * math.sin(a))))
-        culet_idx = None
+        culet_idx = _add(c4d.Vector(0.0, y_culet, 0.0))
 
     # Нижний рундист
     gird_b = [_add(c4d.Vector(r * math.cos(i / segs * 2.0 * math.pi),
@@ -369,6 +369,9 @@ def build_brilliant(size, height, crown_h, girdle_h, segs, table_size, culet):
                                   y_mid,
                                   r_mid * math.sin(i / segs * 2.0 * math.pi + math.pi / segs)))
                  for i in range(segs)]
+
+    # Центр площадки
+    table_center_idx = _add(c4d.Vector(0.0, y_table, 0.0))
 
     # Площадка
     table = [_add(c4d.Vector(r_table * math.cos(i / segs * 2.0 * math.pi),
@@ -395,11 +398,9 @@ def build_brilliant(size, height, crown_h, girdle_h, segs, table_size, culet):
             c = gird_b[i]
             d = gird_b[(i + 1) % n_cr]
             polys.append(_quad(a, b, c, d))
-        # Замыкающий веер маленького n-гона калеты (раньше отсутствовал —
-        # из-за этого на кончике камня была дырка при Калета (%) > 0).
-        culet_hub = culet_ring[0]
-        for i in range(1, n_cr - 1):
-            polys.append(_tri(culet_hub, culet_ring[i], culet_ring[i + 1]))
+        # Замыкающий веер маленького n-гона калеты от центральной точки
+        for i in range(n_cr):
+            polys.append(_tri(culet_idx, culet_ring[i], culet_ring[(i + 1) % n_cr]))
 
     # Рундист: тонкая полоса квадов
     # Обход развёрнут (hi, lo вместо lo, hi), чтобы ребро gird_b[i]→gird_b[i+1]
@@ -436,12 +437,11 @@ def build_brilliant(size, height, crown_h, girdle_h, segs, table_size, culet):
         # Квад со срезанными углами — стандартный бриллиант
         polys.append(_quad(hi_b, hi_a, ta, tb))
 
-    # Площадка: веер из первой вершины площадки
+    # Площадка: веер из центральной точки площадки
     # Обход развёрнут (table[i+1], table[i]), чтобы ребро table[i]→table[i+1]
     # было общим с короной верхней в противоположном направлении.
-    hub = table[0]
-    for i in range(1, segs - 1):
-        polys.append(_tri(hub, table[i + 1], table[i]))
+    for i in range(segs):
+        polys.append(_tri(table_center_idx, table[(i + 1) % segs], table[i]))
 
     return pts, polys
 
