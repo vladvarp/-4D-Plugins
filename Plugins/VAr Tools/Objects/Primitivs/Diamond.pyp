@@ -1456,7 +1456,7 @@ class DiamondObject(_MeshPrimitiveBase):
         # 4. Доля короны
         _add_in_group(op, grp_subid, _make_float_bc(
             "Высота короны (%)", 0.35, 0.05, 0.6,
-            unit=c4d.DESC_UNIT_NONE, step=0.01))
+            unit=c4d.DESC_UNIT_PERCENT, step=0.01))
 
         # 5. Толщина рундиста
         _add_in_group(op, grp_subid, _make_float_bc(
@@ -1470,12 +1470,12 @@ class DiamondObject(_MeshPrimitiveBase):
         # 7. Размер площадки
         _add_in_group(op, grp_subid, _make_float_bc(
             "Площадка (%)", 0.55, 0.05, 0.95,
-            unit=c4d.DESC_UNIT_NONE, step=0.01))
+            unit=c4d.DESC_UNIT_PERCENT, step=0.01))
 
         # 8. Размер калеты
         _add_in_group(op, grp_subid, _make_float_bc(
             "Калета (%)", 0.0, 0.0, 0.3,
-            unit=c4d.DESC_UNIT_NONE, step=0.005))
+            unit=c4d.DESC_UNIT_PERCENT, step=0.005))
 
         # 9. Ступени (для Изумруд / Ашер / Принцесса)
         _add_in_group(op, grp_subid, _make_int_bc(
