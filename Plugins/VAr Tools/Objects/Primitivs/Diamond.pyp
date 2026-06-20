@@ -14,7 +14,8 @@ Diamond — Cinema 4D ObjectData Plugin
   7 — Cushion   (Кушон / Подушка)
   8 — Asscher   (Ашер / Квадрат-ступени)
   9 — Heart     (Сердце)
- 10 — Rose      (Роза — старинная огранка)
+  10 — Rose      (Роза — старинная огранка)
+  11 — Trillion  (Триллион — треугольный)
 
 
 """
@@ -60,6 +61,7 @@ CUT_CUSHION    = 7
 CUT_ASSCHER    = 8
 CUT_HEART      = 9
 CUT_ROSE       = 10
+CUT_TRILLION   = 11
 
 
 
@@ -1457,6 +1459,108 @@ def build_rose(size, height, crown_h, girdle_h, segs, culet):
     return pts, polys
 
 
+def build_trillion(size, height, crown_h, girdle_h, segs, table_size, culet):
+    """
+    Огранка Триллион (Trillion / Trilliant) — треугольный камень.
+
+    Форма в плане: равносторонний треугольник.
+    Структура: павильон (веер к калете), рундист, корона (два яруса квадов),
+    площадка (веер от центра).
+    """
+
+    segs = max(12, segs)
+    if segs % 3 != 0:
+        segs = ((segs + 2) // 3) * 3
+
+    r       = size
+    r_table = r * max(0.15, min(0.9, table_size))
+    r_culet = r * max(0.0,  min(0.15, culet))
+
+    total_h  = max(1.0, height)
+    girdle   = max(0.5, girdle_h)
+    crown    = max(1.0, total_h * max(0.05, min(0.5, crown_h)))
+    pavilion = max(1.0, total_h - crown - girdle)
+
+    y_culet  = -(pavilion + girdle / 2.0)
+    y_gird_b = -girdle / 2.0
+    y_gird_t = +girdle / 2.0
+    y_table  = y_gird_t + crown
+
+    pts   = []
+    polys = []
+
+    def _add(v):
+        idx = len(pts)
+        pts.append(v)
+        return idx
+
+    def _tri_ring(radius, y):
+        """segs точек по равностороннему треугольнику."""
+        idxs = []
+        side_n = segs // 3
+        corners = []
+        for c in range(3):
+            a = math.pi / 2.0 + c * 2.0 * math.pi / 3.0
+            corners.append((radius * math.cos(a), radius * math.sin(a)))
+        for side in range(3):
+            v0 = corners[side]
+            v1 = corners[(side + 1) % 3]
+            for j in range(side_n):
+                t = float(j) / side_n
+                px = v0[0] + (v1[0] - v0[0]) * t
+                pz = v0[1] + (v1[1] - v0[1]) * t
+                idxs.append(_add(c4d.Vector(px, y, pz)))
+        return idxs
+
+    gird_b = _tri_ring(r, y_gird_b)
+    gird_t = _tri_ring(r, y_gird_t)
+    table  = _tri_ring(r_table, y_table)
+
+    # Калета
+    if r_culet < 0.5:
+        culet_idx  = _add(c4d.Vector(0.0, y_culet, 0.0))
+        culet_ring = None
+    else:
+        culet_ring = _tri_ring(r_culet, y_culet)
+        culet_idx  = _add(c4d.Vector(0.0, y_culet, 0.0))
+
+    # Павильон
+    if culet_ring is None:
+        polys += _fan(culet_idx, gird_b, 0)
+    else:
+        polys += _band(gird_b, culet_ring)
+        polys += _fan(culet_idx, culet_ring, 0)
+
+    # Рундист
+    polys += _band(gird_t, gird_b)
+
+    # Корона: два яруса квадов (как brilliant2)
+    r_mid  = r * 0.65
+    y_mid  = y_gird_t + crown * 0.45
+    crown_mid = _tri_ring(r_mid, y_mid)
+
+    for i in range(segs):
+        lo_a = gird_t[i]
+        lo_b = gird_t[(i + 1) % segs]
+        hi_a = crown_mid[i]
+        hi_b = crown_mid[(i + 1) % segs]
+        polys.append(_quad(lo_b, lo_a, hi_a, hi_b))
+
+    for i in range(segs):
+        hi_a = crown_mid[i]
+        hi_b = crown_mid[(i + 1) % segs]
+        ta   = table[i]
+        tb   = table[(i + 1) % segs]
+        polys.append(_quad(hi_b, hi_a, ta, tb))
+
+    # Площадка — веер от центра
+    table_center = _add(c4d.Vector(0.0, y_table, 0.0))
+    for i in range(segs):
+        polys.append(_tri(table_center, table[(i + 1) % segs], table[i]))
+
+    return pts, polys
+
+
 # ─── Диспетчер огранок ───────────────────────────────────────────────────────
 
 def build_diamond_mesh(cut, size, height, crown_h, girdle_h,
@@ -1488,6 +1592,8 @@ def build_diamond_mesh(cut, size, height, crown_h, girdle_h,
         return build_heart(size, height, crown_h, girdle_h, segs, table_size, culet)
     elif cut == CUT_ROSE:
         return build_rose(size, height, crown_h, girdle_h, segs, culet)
+    elif cut == CUT_TRILLION:
+        return build_trillion(size, height, crown_h, girdle_h, segs, table_size, culet)
 
     else:
         return build_brilliant(size, height, crown_h, girdle_h,
@@ -1576,6 +1682,7 @@ class DiamondObject(_MeshPrimitiveBase):
                 "Ашер (Квадрат-ступени)",
                 "Сердце",
                 "Роза (Старинная)",
+                "Триллион (Треугольный)",
             ]))
 
         # 2. Общий размер
