@@ -554,8 +554,24 @@ def build_princess(size, height, crown_h, girdle_h, table_size, culet, steps):
         # Веер треугольников к точке
         polys += _fan(culet_idx, prev_ring, 0)
     else:
-        polys += _band(prev_ring, culet_ring)
-        # Кольцо калеты → точка (если culet_ring — 4 точки)
+        # prev_ring — 8-точечное кольцо (углы + середины), culet_ring — 4-точечное
+        # (только углы), поэтому _band тут не подходит (разный размер колец,
+        # вызывал IndexError). Триангулируем стык вручную по тому же принципу,
+        # что и переход рундист(8)→корона(4) ниже: по 3 треугольника на сторону
+        # квадрата. Направление (b0,b1,c0)/(b1,c1,c0)/(b1,b2,c1) подобрано так,
+        # чтобы ребро prev_ring[i]→prev_ring[i+1] было общим с полосой павильона
+        # выше в противоположном направлении (иначе грань выворачивается).
+        for i in range(4):
+            b0 = prev_ring[i * 2]
+            b1 = prev_ring[i * 2 + 1]
+            b2 = prev_ring[(i * 2 + 2) % 8]
+            c0 = culet_ring[i]
+            c1 = culet_ring[(i + 1) % 4]
+            polys.append(_tri(b0, b1, c0))
+            polys.append(_tri(b1, c1, c0))
+            polys.append(_tri(b1, b2, c1))
+        # Кольцо калеты → точка (замыкающий веер маленького квадрата калеты;
+        # раньше отсутствовал — дырка на кончике камня при Калета (%) > 0).
         c4_idx = _add(c4d.Vector(0.0, y_culet, 0.0))
         polys += _fan(c4_idx, culet_ring, 0)
 
@@ -675,17 +691,25 @@ def build_emerald(size, height, crown_h, girdle_h, table_size, culet, steps):
         pav_rings.append(_oct_ring(srx, srz, cut_main, sy))
 
     # Полигоны: павильон
+    # Цепочка развёрнута (band(pr, prev) вместо band(prev, pr)), чтобы кольцо
+    # gird_b отдавало ребро gird_b[i+1]→gird_b[i] (противоположное направление
+    # относительно полосы рундиста ниже, которая использует gird_b[i]→gird_b[i+1]
+    # как «lo»-сторону) — иначе рёбра рундиста дублировались, а не сшивались.
     prev = gird_b
     for pr in pav_rings:
-        polys += _band(prev, pr)
+        polys += _band(pr, prev)
         prev = pr
 
     if culet_ring is None:
-        polys += _fan(culet_idx, prev, 0)
+        # Веер развёрнут (reversed(prev)), чтобы остаться согласованным с
+        # развёрнутой цепочкой павильона выше.
+        polys += _fan(culet_idx, list(reversed(prev)), 0)
     else:
-        polys += _band(prev, culet_ring)
+        polys += _band(culet_ring, prev)
         c4c = _add(c4d.Vector(0.0, y_culet, 0.0))
-        polys += _fan(c4c, culet_ring, 0)
+        # Веер развёрнут (reversed(culet_ring)), чтобы быть согласованным
+        # с направлением шва band(culet_ring, prev) выше.
+        polys += _fan(c4c, list(reversed(culet_ring)), 0)
 
     # Рундист
     polys += _band(gird_b, gird_t)
@@ -775,9 +799,26 @@ def build_marquise(size, height, crown_h, girdle_h, segs, table_size, culet):
     front_half = gird_b[:half]
     back_half  = gird_b[half:]
 
-    # Веер треугольников к кончикам
-    polys += _fan(tip_front_idx, list(reversed(front_half)), 0)
-    polys += _fan(tip_back_idx,  list(reversed(back_half)),  0)
+    # Веер треугольников к кончикам. closed=False (НЕ замкнутый): замкнутый
+    # веер рисовал паразитную диагональ через центр камня между первой и
+    # последней точкой полудуги (например gird_b[0]↔gird_b[half-1]) вместо
+    # настоящего рундист-ребра gird_b[half-1]↔gird_b[half] — из-за этого
+    # по бокам камня (точки экватора) были сквозные дырки.
+    polys += _fan(tip_front_idx, list(reversed(front_half)), 0, closed=False)
+    polys += _fan(tip_back_idx,  list(reversed(back_half)),  0, closed=False)
+
+    # Грани-мостики между кончиками: каждая полудуга-веер сама по себе не
+    # замкнута на боках камня (точки gird_b[0] и gird_b[half-1]/gird_b[half]),
+    # поэтому нужны 4 треугольника, соединяющие оба кончика через каждую из
+    # двух боковых точек рундиста — иначе там были дырки.
+    p_right_top = gird_b[0]
+    p_left_top  = gird_b[half - 1]
+    p_left_bot  = gird_b[half]
+    p_right_bot = gird_b[-1]
+    polys.append(_tri(tip_front_idx, p_left_bot, p_left_top))
+    polys.append(_tri(tip_back_idx,  p_right_top, p_right_bot))
+    polys.append(_tri(tip_back_idx,  p_left_bot, tip_front_idx))
+    polys.append(_tri(tip_front_idx, p_right_top, tip_back_idx))
 
     # Рундист
     polys += _band(gird_b, gird_t)
@@ -865,18 +906,35 @@ def build_pear(size, height, crown_h, girdle_h, segs, table_size, culet):
     half_b = segs - half_f
     front_arc = gird_b[half_f:half_b]  # верхняя дуга
 
-    polys += _fan(tip_idx, front_arc, 0)
+    # Веер развёрнут (reversed) и НЕ замкнут (closed=False): раньше веер не был
+    # развёрнут (давал то же направление gird_b[i]→gird_b[i+1], что и полоса
+    # рундиста ниже — рёбра дублировались) и был замкнут (рисовал паразитную
+    # диагональ через центр камня вместо настоящих рёбер рундиста на стыках
+    # дуг) — оба дефекта давали дырки/наложения по периметру павильона.
+    polys += _fan(tip_idx, list(reversed(front_arc)), 0, closed=False)
 
     # Нижняя дуга → к калете
     bottom_arc = gird_b[half_b:] + gird_b[:half_f]
     if r_culet < 0.5:
         culet_idx = _add(c4d.Vector(0.0, y_culet, -rz * 0.5))
-        polys += _fan(culet_idx, list(reversed(bottom_arc)), 0)
+        polys += _fan(culet_idx, list(reversed(bottom_arc)), 0, closed=False)
     else:
         culet_ring = _pear_ring(r_culet, r_culet * 1.6, y_culet)
         polys += _band(bottom_arc, culet_ring)
         c4c = _add(c4d.Vector(0.0, y_culet, 0.0))
         polys += _fan(c4c, culet_ring, 0)
+
+    # Грани-мостики между кончиком и калетой на двух стыках дуг (там, где
+    # front_arc и bottom_arc сходятся на боках камня) — без них там были дырки,
+    # т.к. ни один из вееров не покрывает сами стыковые рёбра рундиста.
+    seamA_before = gird_b[half_f - 1]
+    seamA_first  = gird_b[half_f]
+    seamB_last   = gird_b[half_b - 1]
+    seamB_after  = gird_b[half_b % segs]
+    polys.append(_tri(tip_idx, seamB_after, seamB_last))
+    polys.append(_tri(culet_idx, seamA_first, seamA_before))
+    polys.append(_tri(culet_idx, seamB_after, tip_idx))
+    polys.append(_tri(tip_idx, seamA_first, culet_idx))
 
     # Рундист
     polys += _band(gird_b, gird_t)
@@ -1136,17 +1194,25 @@ def build_asscher(size, height, crown_h, girdle_h, table_size, culet, steps):
         sy  = _lerp(y_gird_b, y_culet, t)
         pav_rings.append(_asscher_ring(srx, srz, sy))
 
+    # Цепочка павильона развёрнута (band(pr, prev) вместо band(prev, pr)), чтобы
+    # кольцо gird_b отдавало ребро gird_b[i+1]→gird_b[i] (противоположное полосе
+    # рундиста ниже, которая использует gird_b[i]→gird_b[i+1] как «lo»-сторону) —
+    # иначе рёбра рундиста дублировались, а не сшивались.
     prev = gird_b
     for pr in pav_rings:
-        polys += _band(prev, pr)
+        polys += _band(pr, prev)
         prev = pr
 
     if culet_ring is None:
-        polys += _fan(culet_idx, prev, 0)
+        # Веер развёрнут (reversed(prev)), чтобы остаться согласованным с
+        # развёрнутой цепочкой павильона выше.
+        polys += _fan(culet_idx, list(reversed(prev)), 0)
     else:
-        polys += _band(prev, culet_ring)
+        polys += _band(culet_ring, prev)
         c4c = _add(c4d.Vector(0.0, y_culet, 0.0))
-        polys += _fan(c4c, culet_ring, 0)
+        # Веер развёрнут (reversed(culet_ring)), чтобы быть согласованным
+        # с направлением шва band(culet_ring, prev) выше.
+        polys += _fan(c4c, list(reversed(culet_ring)), 0)
 
     # Рундист
     polys += _band(gird_b, gird_t)
