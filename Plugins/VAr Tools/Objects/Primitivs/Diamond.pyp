@@ -851,8 +851,8 @@ def build_marquise(size, height, crown_h, girdle_h, segs, table_size, culet):
     # последней точкой полудуги (например gird_b[0]↔gird_b[half-1]) вместо
     # настоящего рундист-ребра gird_b[half-1]↔gird_b[half] — из-за этого
     # по бокам камня (точки экватора) были сквозные дырки.
-    polys += _fan(tip_front_idx, list(reversed(front_half)), 0, closed=False)
-    polys += _fan(tip_back_idx,  list(reversed(back_half)),  0, closed=False)
+    polys += _fan(tip_front_idx, front_half, 0, closed=False)
+    polys += _fan(tip_back_idx,  back_half,  0, closed=False)
 
     # Грани-мостики между кончиками: каждая полудуга-веер сама по себе не
     # замкнута на боках камня (точки gird_b[0] и gird_b[half-1]/gird_b[half]),
@@ -862,21 +862,21 @@ def build_marquise(size, height, crown_h, girdle_h, segs, table_size, culet):
     p_left_top  = gird_b[half - 1]
     p_left_bot  = gird_b[half]
     p_right_bot = gird_b[-1]
-    polys.append(_tri(tip_front_idx, p_left_bot, p_left_top))
-    polys.append(_tri(tip_back_idx,  p_right_top, p_right_bot))
-    polys.append(_tri(tip_back_idx,  p_left_bot, tip_front_idx))
-    polys.append(_tri(tip_front_idx, p_right_top, tip_back_idx))
+    polys.append(_tri(tip_front_idx, p_left_top, p_left_bot))
+    polys.append(_tri(tip_back_idx,  p_right_bot, p_right_top))
+    polys.append(_tri(tip_back_idx,  tip_front_idx, p_left_bot))
+    polys.append(_tri(tip_front_idx, tip_back_idx, p_right_top))
 
     # Рундист
-    polys += _band(gird_b, gird_t)
+    polys += _band(gird_t, gird_b)
 
     # Корона → площадка
-    polys += _band(gird_t, table)
+    polys += _band(table, gird_t)
 
-    # Площадка (веер)
-    hub = table[0]
-    for i in range(1, segs - 1):
-        polys.append(_tri(hub, table[i], table[i + 1]))
+    # Площадка (веер от центра)
+    table_center = _add(c4d.Vector(0.0, y_table, 0.0))
+    for i in range(segs):
+        polys.append(_tri(table_center, table[(i + 1) % segs], table[i]))
 
     return pts, polys
 
