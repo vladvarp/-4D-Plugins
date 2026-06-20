@@ -1114,30 +1114,42 @@ function applyCarousel3D(id, index) {
     const dots = el.querySelectorAll('.md-photo-carousel-dot');
     const counter = el.querySelector('.md-photo-carousel-counter');
     track.dataset.current = index;
+    const total = slides.length;
 
     slides.forEach((slide, i) => {
-        const offset = i - index;
+        let offset = i - index;
+        if (offset > total / 2) offset -= total;
+        if (offset < -total / 2) offset += total;
         const absOffset = Math.abs(offset);
 
         if (offset === 0) {
-            slide.style.transform = 'translateX(0) translateZ(0) scale(1)';
+            slide.style.transform = 'translateZ(0) rotateY(0deg) scale(1)';
             slide.style.opacity = '1';
-            slide.style.zIndex = slides.length;
-        } else {
+            slide.style.zIndex = '5';
+            slide.style.filter = 'none';
+        } else if (absOffset === 1) {
             const sign = offset > 0 ? 1 : -1;
-            const tx = sign * (60 + absOffset * 10);
-            const tz = -120 * absOffset;
-            const sc = Math.max(0.55, 1 - absOffset * 0.18);
-            const op = Math.max(0.25, 1 - absOffset * 0.35);
-            slide.style.transform = `translateX(${tx}%) translateZ(${tz}px) scale(${sc})`;
-            slide.style.opacity = op;
-            slide.style.zIndex = slides.length - absOffset;
+            slide.style.transform = `translateX(${sign * 62}%) translateZ(-180px) rotateY(${sign * -45}deg) scale(0.65)`;
+            slide.style.opacity = '0.7';
+            slide.style.zIndex = '4';
+            slide.style.filter = 'brightness(0.7)';
+        } else if (absOffset === 2) {
+            const sign = offset > 0 ? 1 : -1;
+            slide.style.transform = `translateX(${sign * 90}%) translateZ(-350px) rotateY(${sign * -60}deg) scale(0.4)`;
+            slide.style.opacity = '0.3';
+            slide.style.zIndex = '3';
+            slide.style.filter = 'brightness(0.4)';
+        } else {
+            slide.style.transform = `translateZ(-500px) scale(0)`;
+            slide.style.opacity = '0';
+            slide.style.zIndex = '0';
+            slide.style.filter = 'none';
         }
         slide.classList.toggle('active', i === index);
     });
 
     dots.forEach((d, i) => d.classList.toggle('active', i === index));
-    if (counter) counter.textContent = `${index + 1} / ${slides.length}`;
+    if (counter) counter.textContent = `${index + 1} / ${total}`;
 }
 
 function slideCarousel(id, dir) {
