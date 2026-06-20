@@ -450,6 +450,11 @@ function renderMarkdown(markdown) {
         return saveBlock(`<div class="changelog">${entries.join('')}</div>`);
     });
 
+    // Фотокарусель: :::::::photo -n[Title] -sWxH
+    html = html.replace(/:::::::(photo(?:_\w+)?)\s*(?:-n\[([^\]]*)\])?\s*(?:-s(\d+)[x*](\d+))?\n([\s\S]*?):::::::/g, (_, type, title, w, h, content) => {
+        return saveBlock(renderPhotoCarousel(type, title, w, h, content));
+    });
+
     // Экранируем HTML в исходном тексте для безопасности
     // НО: сохраняем блоки кода отдельно, чтобы не сломать их
     const codeBlocks = [];
@@ -615,6 +620,10 @@ function renderInlineContent(text) {
         return `<div class="callout callout-${type}"><span class="callout-icon">${icons[type]}</span><div class="callout-content">${renderInlineContent(content.trim())}</div></div>`;
     });
 
+    html = html.replace(/:::::::(photo(?:_\w+)?)\s*(?:-n\[([^\]]*)\])?\s*(?:-s(\d+)[x*](\d+))?\n([\s\S]*?):::::::/g, (_, type, title, w, h, content) => {
+        return renderPhotoCarousel(type, title, w, h, content);
+    });
+
     html = html.replace(/^####\s+(.+)$/gm, '<h4>$1</h4>');
     html = html.replace(/^###\s+(.+)$/gm, '<h4>$1</h4>');
     html = html.replace(/^##\s+(.+)$/gm, '<h4>$1</h4>');
@@ -750,6 +759,20 @@ function renderInlineSyntax(html) {
         return `<img class="md-ico" src="${escapeHtml(src)}" width="24" height="24" alt="" loading="lazy" style="width:36px;height:36px;object-fit:contain;vertical-align:middle;display:inline-block;border-radius:0;">`;
     });
 
+    // Фотоальбом кнопка: [[photo: -n'Name' -p'path1','path2']]
+    html = html.replace(/\[\[photo:\s*([\s\S]*?)\]\]/g, (_, args) => {
+        const nameMatch = args.match(/-n['"]([^'"]*)['"]/);
+        const name = nameMatch ? nameMatch[1] : 'Галерея';
+        const pMatch = args.match(/-p([\s\S]*?)$/);
+        let photos = [];
+        if (pMatch) {
+            photos = pMatch[1].match(/'([^']*)'/g)?.map(p => p.replace(/^'|'$/g, '')) || [];
+        }
+        if (photos.length === 0) return '';
+        const photosJson = JSON.stringify(photos).replace(/"/g, '&quot;');
+        return `<button class="md-photo-btn" data-photos="${photosJson}" onclick="openPhotoModal(this)">${escapeHtml(name)}</button>`;
+    });
+
     return html;
 }
 
@@ -819,6 +842,7 @@ function initTocHighlight() {
 
 function initMdComponents(root = document) {
     initMdTabs(root);
+    initPhotoCarousels(root);
     // Инициализируем кнопки копирования внутри динамически загруженного контента
     root.querySelectorAll('.copy-btn').forEach(btn => {
         if (!btn.dataset.initialized) {
@@ -940,4 +964,170 @@ function showPluginError(title, message) {
             <a href="index.html" class="btn btn-secondary" style="margin-top:16px">← Вернуться к плагинам</a>
         </div>
     `;
+}
+
+/* ========================================
+   Фотоальбом: карусель (блоковый)
+   ======================================== */
+
+function renderPhotoCarousel(type, title, w, h, content) {
+    const photos = [];
+    const photoRegex = /\[\[p:'([^']+)'\]\]/g;
+    let m;
+    while ((m = photoRegex.exec(content)) !== null) {
+        photos.push(m[1]);
+    }
+    if (photos.length === 0) return '';
+
+    const id = 'pc-' + Math.random().toString(36).substr(2, 9);
+    const width = parseInt(w) || 400;
+    const height = parseInt(h) || 300;
+
+    let out = `<div class="md-photo-carousel" id="${id}" style="width:${width}px;max-width:100%">`;
+    if (title) {
+        out += `<div class="md-photo-carousel-title">${escapeHtml(title)}</div>`;
+    }
+    out += `<div class="md-photo-carousel-viewport" style="height:${height}px">`;
+    out += `<div class="md-photo-carousel-track" data-current="0">`;
+    photos.forEach(p => {
+        out += `<div class="md-photo-carousel-slide"><img src="${escapeHtml(p)}" alt="" loading="lazy"></div>`;
+    });
+    out += `</div>`;
+    if (photos.length > 1) {
+        out += `<button class="md-photo-carousel-prev" onclick="slideCarousel('${id}',-1)">&#8249;</button>`;
+        out += `<button class="md-photo-carousel-next" onclick="slideCarousel('${id}',1)">&#8250;</button>`;
+        out += `<div class="md-photo-carousel-dots">`;
+        photos.forEach((_, i) => {
+            out += `<button class="md-photo-carousel-dot${i === 0 ? ' active' : ''}" onclick="goToSlide('${id}',${i})"></button>`;
+        });
+        out += `</div>`;
+    }
+    out += `<div class="md-photo-carousel-counter">1 / ${photos.length}</div>`;
+    out += `</div></div>`;
+    return out;
+}
+
+/* ========================================
+   Фотоальбом: модальное окно (кнопка)
+   ======================================== */
+
+function openPhotoModal(btn) {
+    const photos = JSON.parse(btn.dataset.photos || '[]');
+    if (photos.length === 0) return;
+
+    let modal = document.getElementById('md-photo-modal-global');
+    if (!modal) {
+        modal = document.createElement('div');
+        modal.id = 'md-photo-modal-global';
+        modal.className = 'md-photo-modal';
+        modal.innerHTML = `
+            <div class="md-photo-modal-overlay"></div>
+            <div class="md-photo-modal-content">
+                <button class="md-photo-modal-close">&times;</button>
+                <img class="md-photo-modal-img" src="" alt="">
+                <button class="md-photo-modal-prev">&#8249;</button>
+                <button class="md-photo-modal-next">&#8250;</button>
+                <div class="md-photo-modal-counter"></div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+        modal.querySelector('.md-photo-modal-overlay').addEventListener('click', closePhotoModal);
+        modal.querySelector('.md-photo-modal-close').addEventListener('click', closePhotoModal);
+        modal.querySelector('.md-photo-modal-prev').addEventListener('click', () => slidePhotoModal(-1));
+        modal.querySelector('.md-photo-modal-next').addEventListener('click', () => slidePhotoModal(1));
+
+        let touchStartX = 0;
+        modal.addEventListener('touchstart', (e) => { touchStartX = e.touches[0].clientX; }, { passive: true });
+        modal.addEventListener('touchend', (e) => {
+            const diff = touchStartX - e.changedTouches[0].clientX;
+            if (Math.abs(diff) > 50) slidePhotoModal(diff > 0 ? 1 : -1);
+        }, { passive: true });
+    }
+
+    modal._photos = photos;
+    modal._current = 0;
+    modal.classList.add('active');
+    document.body.style.overflow = 'hidden';
+    updatePhotoModal();
+
+    modal._keyHandler = (e) => {
+        if (!modal.classList.contains('active')) {
+            document.removeEventListener('keydown', modal._keyHandler);
+            return;
+        }
+        if (e.key === 'Escape') closePhotoModal();
+        if (e.key === 'ArrowLeft') slidePhotoModal(-1);
+        if (e.key === 'ArrowRight') slidePhotoModal(1);
+    };
+    document.addEventListener('keydown', modal._keyHandler);
+}
+
+function closePhotoModal() {
+    const modal = document.getElementById('md-photo-modal-global');
+    if (!modal) return;
+    modal.classList.remove('active');
+    document.body.style.overflow = '';
+    if (modal._keyHandler) {
+        document.removeEventListener('keydown', modal._keyHandler);
+    }
+}
+
+function slidePhotoModal(dir) {
+    const modal = document.getElementById('md-photo-modal-global');
+    if (!modal || !modal._photos) return;
+    modal._current = (modal._current + dir + modal._photos.length) % modal._photos.length;
+    updatePhotoModal();
+}
+
+function updatePhotoModal() {
+    const modal = document.getElementById('md-photo-modal-global');
+    if (!modal || !modal._photos) return;
+    modal.querySelector('.md-photo-modal-img').src = modal._photos[modal._current];
+    modal.querySelector('.md-photo-modal-counter').textContent = `${modal._current + 1} / ${modal._photos.length}`;
+}
+
+/* ========================================
+   Фотокарусель: навигация
+   ======================================== */
+
+function slideCarousel(id, dir) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    const track = el.querySelector('.md-photo-carousel-track');
+    const slides = track.children;
+    const dots = el.querySelectorAll('.md-photo-carousel-dot');
+    const counter = el.querySelector('.md-photo-carousel-counter');
+    let current = parseInt(track.dataset.current || '0');
+    current = (current + dir + slides.length) % slides.length;
+    track.dataset.current = current;
+    track.style.transform = `translateX(-${current * 100}%)`;
+    dots.forEach((d, i) => d.classList.toggle('active', i === current));
+    if (counter) counter.textContent = `${current + 1} / ${slides.length}`;
+}
+
+function goToSlide(id, index) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    const track = el.querySelector('.md-photo-carousel-track');
+    const dots = el.querySelectorAll('.md-photo-carousel-dot');
+    const counter = el.querySelector('.md-photo-carousel-counter');
+    track.dataset.current = index;
+    track.style.transform = `translateX(-${index * 100}%)`;
+    dots.forEach((d, i) => d.classList.toggle('active', i === index));
+    if (counter) counter.textContent = `${index + 1} / ${track.children.length}`;
+}
+
+function initPhotoCarousels(root = document) {
+    root.querySelectorAll('.md-photo-carousel').forEach(carousel => {
+        if (carousel.dataset.initialized) return;
+        carousel.dataset.initialized = 'true';
+        const viewport = carousel.querySelector('.md-photo-carousel-viewport');
+        if (!viewport) return;
+        let startX = 0;
+        viewport.addEventListener('touchstart', (e) => { startX = e.touches[0].clientX; }, { passive: true });
+        viewport.addEventListener('touchend', (e) => {
+            const diff = startX - e.changedTouches[0].clientX;
+            if (Math.abs(diff) > 50) slideCarousel(carousel.id, diff > 0 ? 1 : -1);
+        }, { passive: true });
+    });
 }

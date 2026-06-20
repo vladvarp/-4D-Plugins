@@ -1391,8 +1391,256 @@ img {
 }
 
 /* ========================================
-   Инлайн-элементы: badge, button, kbd
-======================================== */
+   Фотоальбом: кнопка и модальное окно
+   ======================================== */
+.md-photo-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 20px;
+    margin: 8px 0;
+    border-radius: var(--radius-md);
+    font-size: 14px;
+    font-weight: 600;
+    color: #000;
+    background: var(--color-accent);
+    border: none;
+    cursor: pointer;
+    font-family: var(--font-body);
+    transition: background var(--transition), box-shadow var(--transition);
+}
+
+.md-photo-btn:hover {
+    background: var(--color-cyan);
+    box-shadow: 0 0 16px rgba(0, 229, 255, 0.25);
+}
+
+.md-photo-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s ease;
+}
+
+.md-photo-modal.active {
+    opacity: 1;
+    pointer-events: all;
+}
+
+.md-photo-modal-overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.92);
+    backdrop-filter: blur(8px);
+}
+
+.md-photo-modal-content {
+    position: relative;
+    max-width: 90vw;
+    max-height: 90vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.md-photo-modal-content img {
+    max-width: 90vw;
+    max-height: 85vh;
+    object-fit: contain;
+    border-radius: var(--radius-md);
+    border: none;
+    margin: 0;
+}
+
+.md-photo-modal-close {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: white;
+    font-size: 24px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10;
+    transition: background var(--transition);
+}
+
+.md-photo-modal-close:hover {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+.md-photo-modal-prev,
+.md-photo-modal-next {
+    position: fixed;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: white;
+    font-size: 28px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10;
+    transition: background var(--transition);
+}
+
+.md-photo-modal-prev:hover,
+.md-photo-modal-next:hover {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+.md-photo-modal-prev { left: 20px; }
+.md-photo-modal-next { right: 20px; }
+
+.md-photo-modal-counter {
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-family: var(--font-mono);
+    font-size: 13px;
+    color: rgba(255, 255, 255, 0.6);
+    z-index: 10;
+}
+
+/* ========================================
+   Фотокарусель
+   ======================================== */
+.md-photo-carousel {
+    margin: 24px 0;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    overflow: hidden;
+}
+
+.md-photo-carousel-title {
+    padding: 14px 18px;
+    font-family: var(--font-display);
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--color-text);
+    border-bottom: 1px solid var(--color-border);
+}
+
+.md-photo-carousel-viewport {
+    position: relative;
+    overflow: hidden;
+}
+
+.md-photo-carousel-track {
+    display: flex;
+    height: 100%;
+    transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.md-photo-carousel-slide {
+    min-width: 100%;
+    height: 100%;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #000;
+}
+
+.md-photo-carousel-slide img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border: none;
+    margin: 0;
+    border-radius: 0;
+}
+
+.md-photo-carousel-prev,
+.md-photo-carousel-next {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: rgba(0, 0, 0, 0.5);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: white;
+    font-size: 20px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 5;
+    transition: background var(--transition);
+    backdrop-filter: blur(4px);
+}
+
+.md-photo-carousel-prev:hover,
+.md-photo-carousel-next:hover {
+    background: rgba(0, 0, 0, 0.7);
+}
+
+.md-photo-carousel-prev { left: 10px; }
+.md-photo-carousel-next { right: 10px; }
+
+.md-photo-carousel-dots {
+    position: absolute;
+    bottom: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 6px;
+    z-index: 5;
+}
+
+.md-photo-carousel-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.3);
+    border: none;
+    cursor: pointer;
+    padding: 0;
+    transition: background var(--transition), transform var(--transition);
+}
+
+.md-photo-carousel-dot.active {
+    background: white;
+    transform: scale(1.2);
+}
+
+.md-photo-carousel-dot:hover {
+    background: rgba(255, 255, 255, 0.6);
+}
+
+.md-photo-carousel-counter {
+    position: absolute;
+    bottom: 10px;
+    right: 14px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: rgba(255, 255, 255, 0.5);
+    z-index: 5;
+}
+
+/* ========================================
+    Инлайн-элементы: badge, button, kbd
+   ======================================== */
 .md-badge {
     display: inline-flex;
     align-items: center;

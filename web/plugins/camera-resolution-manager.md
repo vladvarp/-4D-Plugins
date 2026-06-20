@@ -15,7 +15,12 @@ github: https://github.com/vladvarp/-4D-Plugins
 ---
 
 ## О плагине
-[[ico:'image/CameraResolution/CameraResolution.png'-334]]
+
+:::::::photo -s500*250
+[[p:'image/CameraResolution/CameraResolution.png']]
+[[p:'image/CameraResolution/CameraResolution.png']]
+[[p:'image/CameraResolution/CameraResolution.png']]
+:::::::
 Camera Resolution Manager — инструмент для тех, кто работает со сценами, содержащими несколько камер с разными форматами вывода. Вместо того чтобы каждый раз лезть в настройки рендера и вручную вбивать ширину и высоту, плагин позволяет заранее привязать нужное разрешение к каждой камере и переключаться между ними в один клик.
 
 Данные хранятся прямо в User Data объекта камеры, поэтому разрешение не теряется при сохранении сцены и корректно работает в команде — любой, кто откроет файл с установленным плагином, увидит те же настройки.

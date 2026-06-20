@@ -57,6 +57,8 @@
                         <li><a href="#tabs">Вкладки</a></li>
                         <li><a href="#steps">Пошаговые инструкции</a></li>
                         <li><a href="#video">Видео</a></li>
+                        <li><a href="#photo-album">Фотоальбом (кнопка)</a></li>
+                        <li><a href="#photo-carousel">Фотокарусель</a></li>
                         <li><a href="#inline-elements">Инлайн-элементы</a></li>
                         <li><a href="#images-ico">Изображения и значки</a></li>
                         <li><a href="#features">Сетка фич</a></li>
@@ -542,6 +544,105 @@ https://www.youtube.com/watch?v=dQw4w9WgXcQ
                         <p>Поддерживаются форматы URL: <code>youtube.com/watch?v=</code>, <code>youtu.be/</code>, <code>vimeo.com/</code>.</p>
                     </section>
 
+                    <!-- Фотоальбом (кнопка) -->
+                    <section id="photo-album">
+                        <h2>Фотоальбом (кнопка)</h2>
+                        <p>
+                            Кнопка, при нажатии на которую открывается полноэкранное модальное окно с фотоальбомом.
+                            Поддерживает пролистывание клавишами <kbd class="md-kbd">←</kbd> <kbd class="md-kbd">→</kbd> и свайпами на мобильных устройствах.
+                        </p>
+
+                        <h3>Параметры</h3>
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Параметр</th>
+                                    <th>Формат</th>
+                                    <th>Описание</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td><code>-n</code></td>
+                                    <td><code>-n'Название'</code></td>
+                                    <td>Текст кнопки (по умолчанию «Галерея»)</td>
+                                </tr>
+                                <tr>
+                                    <td><code>-p</code></td>
+                                    <td><code>-p'путь1','путь2',...</code></td>
+                                    <td>Список путей к фото в одинарных кавычках через запятую</td>
+                                </tr>
+                            </tbody>
+                        </table>
+
+                        <div class="code-example">
+                            <div class="code-example-header">
+                                <span class="code-example-label">Синтаксис фотоальбома</span>
+                                <button class="copy-btn">Копировать</button>
+                            </div>
+                            <pre><code>[[photo: -n'Галерея' -p'photo/photo1.png','photo/photo2.png','photo/photo3.png','photo/photo4.png']]</code></pre>
+                        </div>
+
+                        <div class="callout callout-info">
+                            <span class="callout-icon">ℹ️</span>
+                            <div class="callout-content">
+                                <p>Кнопка работает внутри текста, таблиц и любых других блоков. В модальном окне используются клавиши <kbd class="md-kbd">←</kbd> <kbd class="md-kbd">→</kbd> для навигации и <kbd class="md-kbd">Esc</kbd> для закрытия.</p>
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- Фотокарусель -->
+                    <section id="photo-carousel">
+                        <h2>Фотокарусель</h2>
+                        <p>
+                            Панель с каруселью фотографий внутри. Каждая фотография отображается поочерёдно
+                            с возможностью навигации кнопками, точками или свайпами.
+                        </p>
+
+                        <h3>Параметры</h3>
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Параметр</th>
+                                    <th>Формат</th>
+                                    <th>Описание</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td><code>-n</code></td>
+                                    <td><code>-n[Заголовок]</code></td>
+                                    <td>Заголовок панели (необязательный). Если не задан — панель без заголовка</td>
+                                </tr>
+                                <tr>
+                                    <td><code>-s</code></td>
+                                    <td><code>-sШирина*Высота</code></td>
+                                    <td>Размер панели в пикселях (например, <code>-s300*500</code>). Панель адаптируется к ширине контейнера</td>
+                                </tr>
+                            </tbody>
+                        </table>
+
+                        <div class="code-example">
+                            <div class="code-example-header">
+                                <span class="code-example-label">Синтаксис фотокарусели</span>
+                                <button class="copy-btn">Копировать</button>
+                            </div>
+                            <pre><code>:::::::photo -n[Галерея] -s300*400
+[[p:'photo/photo1.png']]
+[[p:'photo/photo2.png']]
+[[p:'photo/photo3.png']]
+[[p:'photo/photo4.png']]
+:::::::</code></pre>
+                        </div>
+
+                        <div class="callout callout-info">
+                            <span class="callout-icon">ℹ️</span>
+                            <div class="callout-content">
+                                <p>Изображения автоматически заполняют область карусели (<code>object-fit: cover</code>), поэтому карусель выглядит хорошо при любых соотношениях сторон. На мобильных устройствах поддерживается свайп-навигация.</p>
+                            </div>
+                        </div>
+                    </section>
+
                     <!-- Инлайн-элементы -->
                     <section id="inline-elements">
                         <h2>Инлайн-элементы</h2>
@@ -869,6 +970,16 @@ github: https://github.com/user/repo
 2. Открой плагин из меню
 3. Нажми **Apply**
 ::::
+
+## Галерея
+
+[[photo: -n'Галерея' -p'photo/screenshot1.png','photo/screenshot2.png','photo/screenshot3.png']]
+
+:::::photo -n[Скриншоты] -s400*300
+[[p:'photo/screenshot1.png']]
+[[p:'photo/screenshot2.png']]
+[[p:'photo/screenshot3.png']]
+:::::::
 
 ## Параметры
 
