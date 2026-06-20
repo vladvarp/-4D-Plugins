@@ -514,7 +514,7 @@ class CloudWizardDialog(c4d.gui.GeDialog):
 
         self.GroupBegin(ID_GRP_SHAPE, c4d.BFH_SCALEFIT, cols=2, rows=1)
         self.GroupBorderSpace(8, 4, 8, 4)
-        self.AddStaticText(ID_LBL_SCALE, c4d.BFH_LEFT, initw=120, name="Масштаб (м):")
+        self.AddStaticText(ID_LBL_SCALE, c4d.BFH_LEFT, initw=120, name="Масштаб:")
         self.AddEditNumberArrows(ID_EDIT_SCALE, c4d.BFH_LEFT, initw=120)
         self.AddStaticText(ID_LBL_PUFF, c4d.BFH_LEFT, initw=120, name="Пышность:")
         self.AddEditSlider(ID_EDIT_PUFF, c4d.BFH_SCALEFIT, initw=120)
@@ -619,10 +619,11 @@ class CloudWizardDialog(c4d.gui.GeDialog):
         self.AddButton(ID_BTN_CLEAR,     c4d.BFH_SCALEFIT, inith=20, name="⛔ Удалить все облака")
         self.AddButton(ID_BTN_RANDOMIZE, c4d.BFH_SCALEFIT, inith=20, name="⇄ Случайные формы")
         self.AddButton(ID_BTN_RAND_MAT,  c4d.BFH_SCALEFIT, inith=20, name="⇄ Случайный материал")
+        self.GroupEnd()
 
-
-        self.AddStaticText(ID_LBL_STATUS, c4d.BFH_SCALEFIT | c4d.BFH_CENTER,
-                           name="Готов к работе")
+        self.GroupBegin(ID_GRP_BOTTOM, c4d.BFH_SCALEFIT, cols=1, rows=2)
+        self.GroupBorderSpace(8, 4, 8, 6)
+        self.AddStaticText(ID_LBL_STATUS, c4d.BFH_SCALEFIT | c4d.BFH_CENTER, name="Готов к работе")
         self.GroupEnd()
 
         return True
