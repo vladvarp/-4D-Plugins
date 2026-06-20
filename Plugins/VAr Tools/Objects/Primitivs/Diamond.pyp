@@ -559,23 +559,34 @@ def build_princess(size, height, crown_h, girdle_h, table_size, culet, steps):
         c4_idx = _add(c4d.Vector(0.0, y_culet, 0.0))
         polys += _fan(c4_idx, culet_ring, 0)
 
-    # Рундист: gird_b(8) → gird_t(4): чередуем квады и треугольники
+    # Рундист → корона: правильная триангуляция стыка 8-точечного gird_b
+    # с 4-точечным gird_t. Раньше тут не хватало диагонального треугольника
+    # между gird_t[i] и gird_t[i+1] (как «верхняя звезда» у бриллианта) —
+    # из-за этого по периметру рундиста были сквозные дырки. Теперь строим
+    # полную полосу из трёх треугольников на каждую сторону квадрата:
+    # gird_t[i] → gird_b[2i] → gird_b[2i+1] → gird_t[i+1] → gird_b[2i+2].
     # gird_b: [0=R-mid, 1=RF, 2=F-mid, 3=LF, 4=L-mid, 5=LB, 6=B-mid, 7=RB]
     # gird_t: [0=RF, 1=LF, 2=LB, 3=RB]
     for i in range(4):
-        # Каждый угол верхнего рундиста связывает 3 точки нижнего
-        lo0 = gird_b[i * 2]         # середина стороны
-        lo1 = gird_b[i * 2 + 1]     # угол
-        lo2 = gird_b[(i * 2 + 2) % 8]  # следующая середина
-        hi  = gird_t[i]
-        polys.append(_tri(lo0, lo1, hi))
-        polys.append(_tri(lo1, lo2, hi))
+        b0 = gird_b[i * 2]            # середина стороны
+        b1 = gird_b[i * 2 + 1]        # угол
+        b2 = gird_b[(i * 2 + 2) % 8]  # следующая середина
+        t0 = gird_t[i]
+        t1 = gird_t[(i + 1) % 4]
+        polys.append(_tri(t0, b1, b0))
+        polys.append(_tri(t0, t1, b1))
+        polys.append(_tri(t1, b2, b1))
 
     # Корона: gird_t(4) → table(4) (простые квады)
-    polys += _band(gird_t, table)
+    # Обход развёрнут (table, gird_t вместо gird_t, table), чтобы ребро
+    # gird_t[i]→gird_t[i+1] было общим с триангуляцией рундиста выше
+    # в противоположном направлении (иначе грань выворачивается).
+    polys += _band(table, gird_t)
 
     # Площадка
-    polys.append(_quad(table[0], table[1], table[2], table[3]))
+    # Обход развёрнут (по часовой относительно исходного), чтобы ребро
+    # table[i]→table[i+1] было общим с короной в противоположном направлении.
+    polys.append(_quad(table[3], table[2], table[1], table[0]))
 
     return pts, polys
 
