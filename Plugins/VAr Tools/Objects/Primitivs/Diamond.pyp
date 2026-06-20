@@ -1046,7 +1046,7 @@ def build_oval(size, height, crown_h, girdle_h, segs, table_size, culet):
         culet_ring = None
     else:
         culet_ring = _oval_ring(r_culet, r_culet * 1.5, y_culet)
-        culet_idx  = None
+        culet_idx  = _add(c4d.Vector(0.0, y_culet, 0.0))
 
     gird_b   = _oval_ring(rx, rz, y_gird_b)
     gird_t   = _oval_ring(rx, rz, y_gird_t)
@@ -1060,6 +1060,7 @@ def build_oval(size, height, crown_h, girdle_h, segs, table_size, culet):
         polys += _fan(culet_idx, gird_b, 0)
     else:
         polys += _band(gird_b, culet_ring)
+        polys += _fan(culet_idx, culet_ring, 0)
 
     # Рундист
     polys += _band(gird_t, gird_b)
@@ -1146,7 +1147,7 @@ def build_cushion(size, height, crown_h, girdle_h, segs, table_size, culet):
         culet_ring = None
     else:
         culet_ring = _cushion_ring(r_culet, y_culet)
-        culet_idx  = None
+        culet_idx  = _add(c4d.Vector(0.0, y_culet, 0.0))
 
     gird_b    = _cushion_ring(r, y_gird_b)
     gird_t    = _cushion_ring(r, y_gird_t)
@@ -1159,6 +1160,7 @@ def build_cushion(size, height, crown_h, girdle_h, segs, table_size, culet):
         polys += _fan(culet_idx, gird_b, 0)
     else:
         polys += _band(gird_b, culet_ring)
+        polys += _fan(culet_idx, culet_ring, 0)
 
     # Рундист
     polys += _band(gird_t, gird_b)
@@ -1364,7 +1366,7 @@ def build_heart(size, height, crown_h, girdle_h, segs, table_size, culet):
         culet_ring = None
     else:
         culet_ring = _heart_ring(r_culet, y_culet)
-        culet_idx  = None
+        culet_idx  = _add(c4d.Vector(0.0, y_culet, 0.0))
 
     gird_b    = _heart_ring(r, y_gird_b)
     gird_t    = _heart_ring(r, y_gird_t)
@@ -1377,6 +1379,7 @@ def build_heart(size, height, crown_h, girdle_h, segs, table_size, culet):
         polys += _fan(culet_idx, gird_b, 0)
     else:
         polys += _band(gird_b, culet_ring)
+        polys += _fan(culet_idx, culet_ring, 0)
 
     # Рундист
     polys += _band(gird_t, gird_b)
