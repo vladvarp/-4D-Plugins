@@ -2,7 +2,8 @@
    Общие утилиты и инициализация
 ======================================== */
 
-// Ждём загрузки DOM перед инициализацией
+const modalBlocks = {};
+
 document.addEventListener('DOMContentLoaded', () => {
     initPage();
 });
@@ -388,6 +389,11 @@ function renderMarkdown(markdown) {
         blockSlots.push(html);
         return `%%BLOCK_${idx}%%`;
     };
+
+    html = html.replace(/<mdc-n'([^']+)'-s(\d+)\*(\d+)>([\s\S]*?)<\/mdc>/g, (_, id, w, h, content) => {
+        modalBlocks[id] = { w: parseInt(w), h: parseInt(h), raw: content };
+        return '';
+    });
 
     // Раскрывающийся блок (развёрнут по умолчанию): ::::details-open
     html = html.replace(/::::details-open\n([\s\S]*?)::::/g, (_, content) => {
@@ -782,6 +788,77 @@ function renderInlineSyntax(html) {
         return `<button class="md-photo-btn" data-photos="${photosJson}" onclick="openPhotoModal(this)">${escapeHtml(name)}</button>`;
     });
 
+    // Кнопка модального окна: [[mdb:'label'-n'id'-sW]]
+    html = html.replace(/\[\[mdb:'([^']+)'-n'([^']+)'(?:-s(\d+))?\]\]/g, (_, label, id, w) => {
+        const safeId = escapeHtml(id);
+        const style = w ? ` style="width:${parseInt(w)}px"` : '';
+        return `<button class="md-modal-btn"${style} onclick="openModal('${safeId}')">${escapeHtml(label)}</button>`;
+    });
+
+    // Пробелы: [[ "N" ]] — N пробелов
+    html = html.replace(/\[\[\s*"(\d+)"\s*\]\]/g, (_, n) => {
+        return '&nbsp;'.repeat(parseInt(n));
+    });
+
+    // Галочка: [[biil:-c1-r1]]
+    html = html.replace(/\[\[biil:-c([01])-r([01])\]\]/g, (_, checked, clickable) => {
+        const id = 'chk-' + Math.random().toString(36).substr(2, 6);
+        const cAttr = checked === '1' ? ' checked' : '';
+        const dAttr = clickable === '0' ? ' disabled' : '';
+        return `<label class="md-biil${clickable === '0' ? ' md-biil-static' : ''}"><input type="checkbox" id="${id}"${cAttr}${dAttr}><span class="md-biil-mark"></span></label>`;
+    });
+
+    // Выпадающий список: [[ddl:'a','b','c'-s150-p1]]
+    html = html.replace(/\[\[ddl:((?:'[^']*'(?:,\s*'[^']*')*))(?:-s(\d+))?(?:-p(\d+))?\]\]/g, (_, itemsStr, w, selected) => {
+        const options = itemsStr.match(/'([^']*)'/g)?.map(o => o.replace(/^'|'$/g, '')) || [];
+        const id = 'ddl-' + Math.random().toString(36).substr(2, 6);
+        const style = w ? ` style="width:${parseInt(w)}px"` : '';
+        const selIdx = selected ? parseInt(selected) - 1 : 0;
+        const optsHtml = options.map((o, i) => `<option value="${i}"${i === selIdx ? ' selected' : ''}>${escapeHtml(o)}</option>`).join('');
+        return `<select class="md-ddl" id="${id}"${style}>${optsHtml}</select>`;
+    });
+
+    // Цвет: [[color: #0A0A0F -s30*90 -c]]
+    html = html.replace(/\[\[color:\s*#([0-9a-fA-F]{6})(?:\s+-s(\d+)[*\/,\-](\d+))?\s*(-c)?\]\]/g, (_, hex, w, h, showCode) => {
+        const id = 'clr-' + Math.random().toString(36).substr(2, 6);
+        const width = w ? parseInt(w) : 30;
+        const height = h ? parseInt(h) : 30;
+        const hexHtml = showCode ? `<span class="md-color-hex">#${hex}</span>` : '';
+        return `<span class="md-color-wrap"><input type="color" class="md-color" id="${id}" value="#${hex}" style="width:${width}px;height:${height}px">${hexHtml}</span>`;
+    });
+
+    // Поле ввода: [[tif:'value'-t'0'-p'%'-s150-sc300-d0/100-st0,5]]
+    html = html.replace(/\[\[tif:'([^']*)'(?:-t'([^']*)')?(?:-p'([^']*)')?(?:-s(\d+))?(?:-sc(\d*))?(?:-d(-?[\d.,]+\/-?[\d.,]+))?(?:-st([\d.,]+))?\]\]/g, (_, value, type, suffix, w, scW, range, step) => {
+        const id = 'tif-' + Math.random().toString(36).substr(2, 6);
+        let inputType = 'text';
+        let pattern = '';
+        let inputMode = '';
+        if (type === '0') { inputType = 'number'; inputMode = 'numeric'; pattern = '[0-9]*'; }
+        else if (type && /[\d.,]+\/[\d.,]+/.test(type)) { inputType = 'number'; inputMode = 'decimal'; }
+        else if (type && /^\d+,\d+$/.test(type)) { inputType = 'number'; inputMode = 'decimal'; }
+        else if (type && /^\d+\.\d+$/.test(type)) { inputType = 'number'; inputMode = 'decimal'; }
+
+        const typeAttr = inputType === 'number' ? ` type="number" inputmode="${inputMode}"` : ` type="text"`;
+        const style = w ? ` style="width:${parseInt(w)}px"` : '';
+        const suffixHtml = suffix ? `<span class="md-tif-suffix">${escapeHtml(suffix)}</span>` : '';
+
+        let sliderHtml = '';
+        if (scW !== undefined) {
+            let min = 0, max = 100, stepVal = 1;
+            if (range) {
+                const parts = range.split('/');
+                min = parseFloat(parts[0].replace(',', '.'));
+                max = parseFloat(parts[1].replace(',', '.'));
+            }
+            if (step) stepVal = parseFloat(step.replace(',', '.'));
+            const sliderWidth = scW ? ` width:${parseInt(scW)}px` : '';
+            sliderHtml = `<input type="range" class="md-tif-slider" id="${id}-slider" min="${min}" max="${max}" step="${stepVal}" value="${escapeHtml(value)}"${sliderWidth ? ` style="${sliderWidth.trim()}"` : ''}>`;
+        }
+
+        const suffixPos = suffix ? suffixHtml : '';
+        return `<span class="md-tif-wrap"><input${typeAttr} class="md-tif" id="${id}" value="${escapeHtml(value)}"${style}>${suffixPos}${sliderHtml}</span>`;
+    });
+
     return html;
 }
 
@@ -853,6 +930,8 @@ function initMdComponents(root = document) {
     initMdTabs(root);
     initPhotoCarousels(root);
     initLevelingSliders(root);
+    initTifSliders(root);
+    initColorPickers(root);
     // Инициализируем кнопки копирования внутри динамически загруженного контента
     root.querySelectorAll('.copy-btn').forEach(btn => {
         if (!btn.dataset.initialized) {
@@ -888,9 +967,50 @@ function initMdTabs(root) {
     });
 }
 
+function initTifSliders(root = document) {
+    root.querySelectorAll('.md-tif-wrap').forEach(wrap => {
+        if (wrap.dataset.initialized) return;
+        const input = wrap.querySelector('.md-tif');
+        const slider = wrap.querySelector('.md-tif-slider');
+        if (!input || !slider) return;
+        wrap.dataset.initialized = 'true';
+
+        const min = parseFloat(slider.min);
+        const max = parseFloat(slider.max);
+        const step = parseFloat(slider.step) || 1;
+
+        const syncFromSlider = () => { input.value = slider.value; };
+        const syncFromInput = () => {
+            let v = parseFloat(input.value);
+            if (isNaN(v)) return;
+            v = Math.round(v / step) * step;
+            v = Math.max(min, Math.min(max, v));
+            slider.value = v;
+        };
+
+        slider.addEventListener('input', syncFromSlider);
+        slider.addEventListener('change', syncFromSlider);
+        input.addEventListener('input', syncFromInput);
+        input.addEventListener('change', syncFromInput);
+    });
+}
+
+function initColorPickers(root = document) {
+    root.querySelectorAll('.md-color-wrap').forEach(wrap => {
+        if (wrap.dataset.initialized) return;
+        const picker = wrap.querySelector('.md-color');
+        const hex = wrap.querySelector('.md-color-hex');
+        if (!picker) return;
+        wrap.dataset.initialized = 'true';
+        if (hex) {
+            picker.addEventListener('input', () => { hex.textContent = picker.value; });
+        }
+    });
+}
+
 /* ========================================
    Кнопки копирования кода
-======================================== */
+   ======================================== */
 
 function initCopyButtons() {
     // Назначаем обработчики всем кнопкам копирования
@@ -1110,6 +1230,118 @@ function updatePhotoModal() {
     if (!modal || !modal._photos) return;
     modal.querySelector('.md-photo-modal-img').src = modal._photos[modal._current];
     modal.querySelector('.md-photo-modal-counter').textContent = `${modal._current + 1} / ${modal._photos.length}`;
+}
+
+/* ========================================
+    Модальные окна (modal blocks)
+    ======================================== */
+
+function openModal(id) {
+    const data = modalBlocks[id];
+    if (!data) return;
+
+    let overlay = document.getElementById('md-modal-overlay');
+    if (!overlay) {
+        overlay = document.createElement('div');
+        overlay.id = 'md-modal-overlay';
+        overlay.className = 'md-modal';
+        overlay.innerHTML = `
+            <div class="md-modal-backdrop"></div>
+            <div class="md-modal-dialog">
+                <div class="md-modal-titlebar">
+                    <div class="md-modal-titlebar-left"></div>
+                    <div class="md-modal-titlebar-right">
+                        <div class="md-modal-help" style="display:none">
+                            <span class="md-modal-help-icon">?</span>
+                            <div class="md-modal-help-tooltip"></div>
+                        </div>
+                        <button class="md-modal-close">&times;</button>
+                    </div>
+                </div>
+                <div class="md-modal-body"></div>
+            </div>
+        `;
+        document.body.appendChild(overlay);
+        overlay.querySelector('.md-modal-backdrop').addEventListener('click', closeModal);
+        overlay.querySelector('.md-modal-close').addEventListener('click', closeModal);
+    }
+
+    if (overlay._keyHandler) {
+        document.removeEventListener('keydown', overlay._keyHandler);
+    }
+
+    const dialog = overlay.querySelector('.md-modal-dialog');
+    dialog.style.width = data.w + 'px';
+    dialog.style.maxWidth = '90vw';
+    dialog.style.maxHeight = '85vh';
+
+    const raw = data.raw;
+
+    let icon = '', title = '', tagline = '', body = raw;
+    const lines = raw.split('\n');
+    let bodyStart = 0;
+    let lastHeaderIdx = -1;
+
+    for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+        if (line.trim() === '') continue;
+        const iconMatch = line.match(/^icon:\s*(.+)/);
+        const titleMatch = line.match(/^title:\s*(.+)/);
+        const taglineMatch = line.match(/^tagline:\s*(.+)/);
+        if (iconMatch) { icon = iconMatch[1].trim(); lastHeaderIdx = i; }
+        else if (titleMatch) { title = titleMatch[1].trim(); lastHeaderIdx = i; }
+        else if (taglineMatch) { tagline = taglineMatch[1].trim(); lastHeaderIdx = i; }
+        else { bodyStart = i; break; }
+    }
+    if (lastHeaderIdx >= 0 && bodyStart <= lastHeaderIdx) bodyStart = lastHeaderIdx + 1;
+
+    body = lines.slice(bodyStart).join('\n').trim();
+
+    const titlebarLeft = overlay.querySelector('.md-modal-titlebar-left');
+    let iconHtml = '';
+    if (icon) {
+        if (isImagePath(icon)) {
+            iconHtml = `<img class="md-modal-icon" src="${escapeHtml(icon)}" alt="" width="32" height="32">`;
+        } else {
+            iconHtml = `<span class="md-modal-icon-text">${escapeHtml(icon)}</span>`;
+        }
+    }
+    titlebarLeft.innerHTML = `${iconHtml}${title ? `<span class="md-modal-title">${escapeHtml(title)}</span>` : ''}`;
+
+    const helpEl = overlay.querySelector('.md-modal-help');
+    const tooltipEl = overlay.querySelector('.md-modal-help-tooltip');
+    if (tagline) {
+        helpEl.style.display = '';
+        tooltipEl.textContent = tagline;
+    } else {
+        helpEl.style.display = 'none';
+    }
+
+    const bodyEl = overlay.querySelector('.md-modal-body');
+    bodyEl.innerHTML = body ? renderMarkdown(body) : '';
+    initMdComponents(bodyEl);
+
+    overlay.classList.add('active');
+    document.body.style.overflow = 'hidden';
+
+    overlay._keyHandler = (e) => {
+        if (!overlay.classList.contains('active')) {
+            document.removeEventListener('keydown', overlay._keyHandler);
+            return;
+        }
+        if (e.key === 'Escape') closeModal();
+    };
+    document.addEventListener('keydown', overlay._keyHandler);
+}
+
+function closeModal() {
+    const overlay = document.getElementById('md-modal-overlay');
+    if (!overlay) return;
+    overlay.classList.remove('active');
+    document.body.style.overflow = '';
+    if (overlay._keyHandler) {
+        document.removeEventListener('keydown', overlay._keyHandler);
+    }
 }
 
 /* ========================================

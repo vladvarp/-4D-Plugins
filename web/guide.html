@@ -51,20 +51,77 @@
                         <li><a href="#frontmatter">Frontmatter</a></li>
                         <li><a href="#required-fields">Обязательные поля</a></li>
                         <li><a href="#optional-fields">Необязательные поля</a></li>
-                        <li><a href="#markdown-basics">Базовый Markdown</a></li>
+                        <li><a href="#markdown-basics">Базовый Markdown</a>
+                            <ul>
+                                <li><a href="#md-headings">Заголовки</a></li>
+                                <li><a href="#md-formatting">Текстовое форматирование</a></li>
+                                <li><a href="#md-lists">Списки</a></li>
+                                <li><a href="#md-quotes">Цитаты и линия</a></li>
+                                <li><a href="#md-code">Блоки кода</a></li>
+                                <li><a href="#md-images">Изображения</a></li>
+                            </ul>
+                        </li>
                         <li><a href="#callouts">Блоки callout</a></li>
-                        <li><a href="#details">Раскрывающиеся блоки</a></li>
+                        <li><a href="#details">Раскрывающиеся блоки</a>
+                            <ul>
+                                <li><a href="#details-open">Развёрнутый</a></li>
+                                <li><a href="#details-closed">Свёрнутый</a></li>
+                            </ul>
+                        </li>
                         <li><a href="#tabs">Вкладки</a></li>
                         <li><a href="#steps">Пошаговые инструкции</a></li>
                         <li><a href="#video">Видео</a></li>
-                        <li><a href="#photo-album">Фотоальбом (кнопка)</a></li>
-                        <li><a href="#photo-carousel">Фотокарусель</a></li>
-                        <li><a href="#leveling">Сравнение фото</a></li>
-                        <li><a href="#inline-elements">Инлайн-элементы</a></li>
-                        <li><a href="#images-ico">Изображения и значки</a></li>
+                        <li><a href="#photo-album">Фотоальбом (кнопка)</a>
+                            <ul>
+                                <li><a href="#photo-album-params">Параметры</a></li>
+                            </ul>
+                        </li>
+                        <li><a href="#photo-carousel">Фотокарусель</a>
+                            <ul>
+                                <li><a href="#carousel-params">Параметры</a></li>
+                            </ul>
+                        </li>
+                        <li><a href="#leveling">Сравнение фото</a>
+                            <ul>
+                                <li><a href="#leveling-params">Параметры</a></li>
+                                <li><a href="#leveling-two">Два фото</a></li>
+                                <li><a href="#leveling-three">Три фото</a></li>
+                            </ul>
+                        </li>
+                        <li><a href="#inline-elements">Инлайн-элементы</a>
+                            <ul>
+                                <li><a href="#inline-badge">Бейджи</a></li>
+                                <li><a href="#inline-button">Кнопки-ссылки</a></li>
+                                <li><a href="#inline-kbd">Клавиши</a></li>
+                                <li><a href="#inline-spaces">Пробелы</a></li>
+                                <li><a href="#inline-biil">Галочки</a></li>
+                                <li><a href="#inline-ddl">Выпадающий список</a></li>
+                                <li><a href="#inline-tif">Поле ввода</a></li>
+                                <li><a href="#inline-color">Выбор цвета</a></li>
+                            </ul>
+                        </li>
+                        <li><a href="#modal-windows">Модальные окна</a>
+                            <ul>
+                                <li><a href="#modal-syntax">Синтаксис</a></li>
+                                <li><a href="#modal-btn-params">Параметры кнопки</a></li>
+                                <li><a href="#modal-content-params">Параметры содержимого</a></li>
+                                <li><a href="#modal-header">Шапка</a></li>
+                            </ul>
+                        </li>
+                        <li><a href="#images-ico">Изображения и значки</a>
+                            <ul>
+                                <li><a href="#ico-syntax">Синтаксис</a></li>
+                                <li><a href="#ico-inline">В тексте</a></li>
+                                <li><a href="#ico-blocks">В заголовках и блоках</a></li>
+                            </ul>
+                        </li>
                         <li><a href="#features">Сетка фич</a></li>
                         <li><a href="#changelog">История изменений</a></li>
-                        <li><a href="#tables">Таблицы</a></li>
+                        <li><a href="#tables">Таблицы</a>
+                            <ul>
+                                <li><a href="#tables-empty">Пустые ячейки</a></li>
+                            </ul>
+                        </li>
                         <li><a href="#full-example">Полный пример</a></li>
                     </ul>
                 </aside>
@@ -272,7 +329,7 @@ github: https://github.com/username/scatter-pro
                         <h2>Базовый Markdown</h2>
                         <p>После frontmatter пишется обычный Markdown-контент.</p>
 
-                        <h3>Заголовки</h3>
+                        <h3 id="md-headings">Заголовки</h3>
                         <div class="code-example">
                             <div class="code-example-header">
                                 <span class="code-example-label">Синтаксис заголовков</span>
@@ -284,7 +341,7 @@ github: https://github.com/username/scatter-pro
 #### Заголовок H4 (мелкий)</code></pre>
                         </div>
 
-                        <h3>Текстовое форматирование</h3>
+                        <h3 id="md-formatting">Текстовое форматирование</h3>
                         <div class="code-example">
                             <div class="code-example-header">
                                 <span class="code-example-label">Форматирование текста</span>
@@ -297,7 +354,7 @@ github: https://github.com/username/scatter-pro
 [Текст ссылки](https://example.com)</code></pre>
                         </div>
 
-                        <h3>Списки</h3>
+                        <h3 id="md-lists">Списки</h3>
                         <div class="code-example">
                             <div class="code-example-header">
                                 <span class="code-example-label">Ненумерованный и нумерованный списки</span>
@@ -312,7 +369,7 @@ github: https://github.com/username/scatter-pro
 3. Шаг третий</code></pre>
                         </div>
 
-                        <h3>Цитаты и горизонтальная линия</h3>
+                        <h3 id="md-quotes">Цитаты и горизонтальная линия</h3>
                         <div class="code-example">
                             <div class="code-example-header">
                                 <span class="code-example-label">Цитата и разделитель</span>
@@ -323,7 +380,7 @@ github: https://github.com/username/scatter-pro
 ---</code></pre>
                         </div>
 
-                        <h3>Блоки кода</h3>
+                        <h3 id="md-code">Блоки кода</h3>
                         <div class="code-example">
                             <div class="code-example-header">
                                 <span class="code-example-label">Блок кода с подсветкой языка</span>
@@ -338,7 +395,7 @@ def main():
 ```</code></pre>
                         </div>
 
-                        <h3>Изображения</h3>
+                        <h3 id="md-images">Изображения</h3>
                         <div class="code-example">
                             <div class="code-example-header">
                                 <span class="code-example-label">Вставка изображения</span>
@@ -395,7 +452,7 @@ def main():
                             Первая строка — заголовок, остальное — содержимое (поддерживается базовый Markdown).
                         </p>
 
-                        <h3>Развёрнутый по умолчанию</h3>
+                        <h3 id="details-open">Развёрнутый по умолчанию</h3>
                         <div class="code-example">
                             <div class="code-example-header">
                                 <span class="code-example-label">Синтаксис ::::details-open</span>
@@ -419,7 +476,7 @@ def main():
                             </div>
                         </details>
 
-                        <h3>Свёрнутый по умолчанию</h3>
+                        <h3 id="details-closed">Свёрнутый по умолчанию</h3>
                         <div class="code-example">
                             <div class="code-example-header">
                                 <span class="code-example-label">Синтаксис ::::details</span>
@@ -550,10 +607,10 @@ https://www.youtube.com/watch?v=dQw4w9WgXcQ
                         <h2>Фотоальбом (кнопка)</h2>
                         <p>
                             Кнопка, при нажатии на которую открывается полноэкранное модальное окно с фотоальбомом.
-                            Поддерживает пролистывание клавишами <kbd class="md-kbd">←</kbd> <kbd class="md-kbd">→</kbd> и свайпами на мобильных устройствах.
+                            Поддерживает пролистывание клавишами <kbd class="md-kbd">←</kbd> <kbd class="md-kbd">→</kbd>                             и свайпами на мобильных устройствах.
                         </p>
 
-                        <h3>Параметры</h3>
+                        <h3 id="photo-album-params">Параметры</h3>
                         <table>
                             <thead>
                                 <tr>
@@ -600,7 +657,7 @@ https://www.youtube.com/watch?v=dQw4w9WgXcQ
                             с возможностью навигации кнопками, точками или свайпами.
                         </p>
 
-                        <h3>Параметры</h3>
+                        <h3 id="carousel-params">Параметры</h3>
                         <table>
                             <thead>
                                 <tr>
@@ -652,7 +709,7 @@ https://www.youtube.com/watch?v=dQw4w9WgXcQ
                             Идеально подходит для показа «до/после», этапов обработки и сравнения вариантов.
                         </p>
 
-                        <h3>Параметры</h3>
+                        <h3 id="leveling-params">Параметры</h3>
                         <table>
                             <thead>
                                 <tr>
@@ -680,7 +737,7 @@ https://www.youtube.com/watch?v=dQw4w9WgXcQ
                             </tbody>
                         </table>
 
-                        <h3>Сравнение двух фото</h3>
+                        <h3 id="leveling-two">Сравнение двух фото</h3>
                         <div class="code-example">
                             <div class="code-example-header">
                                 <span class="code-example-label">Синтаксис: 2 фото</span>
@@ -692,7 +749,7 @@ https://www.youtube.com/watch?v=dQw4w9WgXcQ
 ===</code></pre>
                         </div>
 
-                        <h3>Сравнение трёх фото</h3>
+                        <h3 id="leveling-three">Сравнение трёх фото</h3>
                         <div class="code-example">
                             <div class="code-example-header">
                                 <span class="code-example-label">Синтаксис: 3 фото</span>
@@ -718,7 +775,7 @@ https://www.youtube.com/watch?v=dQw4w9WgXcQ
                         <h2>Инлайн-элементы</h2>
                         <p>Специальные элементы внутри текста — бейджи, кнопки и клавиши.</p>
 
-                        <h3>Бейджи</h3>
+                        <h3 id="inline-badge">Бейджи</h3>
                         <p>Метки статуса: <code>[[badge:текст]]</code> или <code>[[badge:тип|текст]]</code>.</p>
                         <p>
                             Типы: <code>new</code>, <code>beta</code>, <code>deprecated</code>, <code>pro</code>, <code>default</code>.
@@ -740,7 +797,7 @@ https://www.youtube.com/watch?v=dQw4w9WgXcQ
                             <span class="md-badge md-badge-pro">Pro</span>
                         </p>
 
-                        <h3>Кнопки-ссылки</h3>
+                        <h3 id="inline-button">Кнопки-ссылки</h3>
                         <p>Выделенная кнопка в тексте: <code>[[button:Текст|url]]</code></p>
                         <div class="code-example">
                             <div class="code-example-header">
@@ -751,7 +808,7 @@ https://www.youtube.com/watch?v=dQw4w9WgXcQ
                         </div>
                         <p>Превью: <a href="#" class="md-button" onclick="return false">PDF-руководство</a></p>
 
-                        <h3>Клавиши</h3>
+                        <h3 id="inline-kbd">Клавиши</h3>
                         <p>Отображение сочетаний клавиш: <code>[[kbd:Ctrl+Shift+S]]</code></p>
                         <div class="code-example">
                             <div class="code-example-header">
@@ -765,6 +822,298 @@ https://www.youtube.com/watch?v=dQw4w9WgXcQ
                             Превью:
                             <kbd class="md-kbd">Ctrl</kbd><span class="md-kbd-sep">+</span><kbd class="md-kbd">Shift</kbd><span class="md-kbd-sep">+</span><kbd class="md-kbd">P</kbd>
                         </p>
+
+                        <h3 id="inline-spaces">Пробелы</h3>
+                        <p>Фиксированное количество пробелов: <code>[["N"]]</code>, где <code>N</code> — число пробелов.</p>
+                        <div class="code-example">
+                            <div class="code-example-header">
+                                <span class="code-example-label">Синтаксис пробелов</span>
+                                <button class="copy-btn">Копировать</button>
+                            </div>
+                            <pre><code>Слово[["3"]]ещё одно слово
+Текст[["10"]]другой текст</code></pre>
+                        </div>
+                        <p>Полезно для точного выравнивания текста, когда обычные пробелы схлопываются в HTML.</p>
+
+                        <h3 id="inline-biil">Галочки</h3>
+                        <p>Декоративная или интерактивная галочка: <code>[[biil:-cСОСТОЯНИЕ-рИнтерактивность]]</code></p>
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Параметр</th>
+                                    <th>Формат</th>
+                                    <th>Описание</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td><code>-c</code></td>
+                                    <td><code>-c0</code> / <code>-c1</code></td>
+                                    <td>Состояние: <code>0</code> — выключена, <code>1</code> — включена</td>
+                                </tr>
+                                <tr>
+                                    <td><code>-r</code></td>
+                                    <td><code>-r0</code> / <code>-r1</code></td>
+                                    <td>Интерактивность: <code>0</code> — не кликабельная (декоративная), <code>1</code> — кликабельная</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                        <div class="code-example">
+                            <div class="code-example-header">
+                                <span class="code-example-label">Синтаксис галочек</span>
+                                <button class="copy-btn">Копировать</button>
+                            </div>
+                            <pre><code>[[biil:-c1-r1]] Включённая кликабельная
+[[biil:-c0-r1]] Выключённая кликабельная
+[[biil:-c1-r0]] Включённая декоративная</code></pre>
+                        </div>
+
+                        <h3 id="inline-ddl">Выпадающий список</h3>
+                        <p>Выбор из списка значений: <code>[[ddl:'а','б','в'-sШИРИНА-pНОМЕР]]</code></p>
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Параметр</th>
+                                    <th>Формат</th>
+                                    <th>Описание</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>значения</td>
+                                    <td><code>'знач1','знач2',...</code></td>
+                                    <td>Элементы списка через запятую в одинарных кавычках</td>
+                                </tr>
+                                <tr>
+                                    <td><code>-s</code></td>
+                                    <td><code>-sШИРИНА</code></td>
+                                    <td>Ширина списка в пикселях (необязательный)</td>
+                                </tr>
+                                <tr>
+                                    <td><code>-p</code></td>
+                                    <td><code>-pНОМЕР</code></td>
+                                    <td>Номер активного пункта по умолчанию (необязательный, нумерация с 1). По умолчанию — первый</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                        <div class="code-example">
+                            <div class="code-example-header">
+                                <span class="code-example-label">Синтаксис списка</span>
+                                <button class="copy-btn">Копировать</button>
+                            </div>
+                            <pre><code>[[ddl:'Первый','Второй','Третий'-s150-p2]]
+[[ddl:'Windows','macOS','Linux'-p3]]</code></pre>
+                        </div>
+
+                        <h3 id="inline-tif">Поле ввода</h3>
+                        <p>Текстовое или числовое поле: <code>[[tif:'значение'-параметры]]</code></p>
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Параметр</th>
+                                    <th>Формат</th>
+                                    <th>Описание</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>значение</td>
+                                    <td><code>'текст'</code></td>
+                                    <td>Значение по умолчанию</td>
+                                </tr>
+                                <tr>
+                                    <td><code>-t</code></td>
+                                    <td><code>-t'0'</code> / <code>-t'0,0'</code></td>
+                                    <td>Тип: <code>'0'</code> — целое число, <code>'0,0'</code> или <code>'0.0'</code> — с плавающей запятой, без параметра — любой текст</td>
+                                </tr>
+                                <tr>
+                                    <td><code>-p</code></td>
+                                    <td><code>-p'ед.изм.'</code></td>
+                                    <td>Суффикс (текст справа от поля)</td>
+                                </tr>
+                                <tr>
+                                    <td><code>-s</code></td>
+                                    <td><code>-sШИРИНА</code></td>
+                                    <td>Ширина поля в пикселях</td>
+                                </tr>
+                                <tr>
+                                    <td><code>-sc</code></td>
+                                    <td><code>-sc</code> / <code>-scШИРИНА</code></td>
+                                    <td>Добавляет ползунок справа от поля. Число после <code>-sc</code> — ширина ползунка</td>
+                                </tr>
+                                <tr>
+                                    <td><code>-d</code></td>
+                                    <td><code>-dМИНИМУМ/МАКСИМУМ</code></td>
+                                    <td>Диапазон ползунка (например, <code>-d0/100</code>)</td>
+                                </tr>
+                                <tr>
+                                    <td><code>-st</code></td>
+                                    <td><code>-stШАГ</code></td>
+                                    <td>Шаг ползунка (например, <code>-st0,5</code> или <code>-st0.5</code>)</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                        <div class="code-example">
+                            <div class="code-example-header">
+                                <span class="code-example-label">Синтаксис полей ввода</span>
+                                <button class="copy-btn">Копировать</button>
+                            </div>
+                            <pre><code>[[tif:'50'-t'0'-p'%'-s80]]
+[[tif:'3.14'-t'0,0'-s100]]
+[[tif:'50'-t'0'-p'%'-s80-sc200-d0/100-st1]]
+[[tif:'текст'-s150]]</code></pre>
+                        </div>
+
+                        <h3 id="inline-color">Выбор цвета</h3>
+                        <p>Цветовой пипер: <code>[[color: #HEX-параметры]]</code></p>
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Параметр</th>
+                                    <th>Формат</th>
+                                    <th>Описание</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>цвет</td>
+                                    <td><code>#RRGGBB</code></td>
+                                    <td>Цвет по умолчанию в HEX</td>
+                                </tr>
+                                <tr>
+                                    <td><code>-s</code></td>
+                                    <td><code>-sШ*В</code></td>
+                                    <td>Размер квадрата в пикселях. Разделитель: <code>*</code>, <code>/</code>, <code>,</code> или <code>-</code></td>
+                                </tr>
+                                <tr>
+                                    <td><code>-c</code></td>
+                                    <td><code>-c</code></td>
+                                    <td>Показать HEX-код справа от квадрата</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                        <div class="code-example">
+                            <div class="code-example-header">
+                                <span class="code-example-label">Синтаксис выбора цвета</span>
+                                <button class="copy-btn">Копировать</button>
+                            </div>
+                            <pre><code>[[color: #0A0A0F -s30*30]]
+[[color: #FF5733 -s30/90 -c]]
+[[color: #3498db -s60,30]]
+[[color: #3498db -c]]</code></pre>
+                        </div>
+                    </section>
+
+                    <!-- Модальные окна -->
+                    <section id="modal-windows">
+                        <h2>Модальные окна</h2>
+                        <p>
+                            Модальные окна позволяют скрыть большой контент за кнопкой и показывать его
+                            во всплывающем окне по клику. Содержимое поддерживает весь Markdown-синтаксис,
+                            включая заголовки, списки, таблицы, код, а также шапку с иконкой, названием и описанием.
+                        </p>
+
+                        <h3 id="modal-syntax">Синтаксис</h3>
+                        <p>Модальное окно состоит из двух частей:</p>
+                        <ol>
+                            <li><strong>Кнопка</strong> — <code>[[mdb:'Название кнопки'-n'ID'-sШ]]</code></li>
+                            <li><strong>Содержимое</strong> — блок <code>&lt;mdc-n'ID'-sШ*В&gt; ... &lt;/mdc&gt;</code></li>
+                        </ol>
+
+                        <h3 id="modal-btn-params">Параметры кнопки</h3>
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Параметр</th>
+                                    <th>Формат</th>
+                                    <th>Описание</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td><code>n</code></td>
+                                    <td><code>-n'ID'</code></td>
+                                    <td>Уникальный идентификатор модального окна (связывает кнопку и содержимое)</td>
+                                </tr>
+                                <tr>
+                                    <td><code>s</code></td>
+                                    <td><code>-sШирина</code></td>
+                                    <td>Ширина кнопки в пикселях (необязательный). Например, <code>-s90</code></td>
+                                </tr>
+                            </tbody>
+                        </table>
+
+                        <h3 id="modal-content-params">Параметры содержимого</h3>
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Параметр</th>
+                                    <th>Формат</th>
+                                    <th>Описание</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td><code>n</code></td>
+                                    <td><code>-n'ID'</code></td>
+                                    <td>Идентификатор (должен совпадать с кнопкой)</td>
+                                </tr>
+                                <tr>
+                                    <td><code>s</code></td>
+                                    <td><code>-sШирина*Высота</code></td>
+                                    <td>Размер окна в пикселях (например, <code>-s400*500</code>). Высота — максимальная, окно может быть меньше если контент короче</td>
+                                </tr>
+                            </tbody>
+                        </table>
+
+                        <h3 id="modal-header">Шапка модального окна</h3>
+                        <p>
+                            В начале содержимого можно указать необязательные поля <code>icon</code>, <code>title</code>,
+                            <code>tagline</code> — они отобразятся в шапке окна. Эти поля парсятся из первых строк блока
+                            и не попадают в тело контента.
+                        </p>
+
+                        <div class="code-example">
+                            <div class="code-example-header">
+                                <span class="code-example-label">Пример модального окна</span>
+                                <button class="copy-btn">Копировать</button>
+                            </div>
+                            <pre><code>[[mdb:'Открыть описание'-n'window_1'-s120]]
+
+Содержимое может быть где угодно в документе:
+
+&lt;mdc-n'window_1'-s400*500&gt;
+icon: ico/ObjectRenamerPRO.png
+title: Object Renamer PRO
+tagline: Плавающая немодальная панель для пакетного переименования.
+
+## Описание
+
+Подробное описание плагина с **жирным** текстом и списками:
+
+- Пункт первый
+- Пункт второй
+- Пункт третий
+
+### Настройки
+
+| Параметр | Тип    | Описание          |
+|----------|--------|-------------------|
+| prefix   | string | Префикс имени     |
+| suffix   | string | Суффикс имени     |
+
+:::tip
+Используй модальные окна для доп. информации, которая не нужна на основной странице.
+:::
+&lt;/mdc&gt;</code></pre>
+                        </div>
+
+                        <div class="callout callout-info">
+                            <span class="callout-icon">ℹ️</span>
+                            <div class="callout-content">
+                                <p>Блок <code>&lt;mdc&gt;</code> может находиться в любом месте документа — он не отображается на странице, а только хранит содержимое. Поле <code>tagline</code> отображается как тултип при наведении на кнопку <code>?</code> в шапке окна. Модальное окно закрывается клавишей <kbd class="md-kbd">Esc</kbd> или кликом по фону.</p>
+                            </div>
+                        </div>
                     </section>
 
                     <!-- Изображения и значки (ico) -->
@@ -776,7 +1125,7 @@ https://www.youtube.com/watch?v=dQw4w9WgXcQ
                             <code>x</code> или <code>*</code>.
                         </p>
 
-                        <h3>Синтаксис</h3>
+                        <h3 id="ico-syntax">Синтаксис</h3>
                         <div class="code-example">
                             <div class="code-example-header">
                                 <span class="code-example-label">Форматы [[ico:...]]</span>
@@ -821,7 +1170,7 @@ https://www.youtube.com/watch?v=dQw4w9WgXcQ
                             </div>
                         </div>
 
-                        <h3>Использование в тексте</h3>
+                        <h3 id="ico-inline">Использование в тексте</h3>
                         <p>Иконку можно вставить прямо в строку — она выровняется по базовой линии текста:</p>
                         <div class="code-example">
                             <div class="code-example-header">
@@ -832,7 +1181,7 @@ https://www.youtube.com/watch?v=dQw4w9WgXcQ
 Фото [[ico:'plugins/photo.png'-120]] вписано пропорционально.</code></pre>
                         </div>
 
-                        <h3>Использование в заголовках и блоках</h3>
+                        <h3 id="ico-blocks">Использование в заголовках и блоках</h3>
                         <p>Работает внутри любых блоков — callout, steps, tabs, details, features и т.д.:</p>
                         <div class="code-example">
                             <div class="code-example-header">
@@ -931,7 +1280,7 @@ https://www.youtube.com/watch?v=dQw4w9WgXcQ
 | min_scale      | float   | 0.8          | Минимальный масштаб объекта      |</code></pre>
                         </div>
 
-                        <h3>Пустые ячейки</h3>
+                        <h3 id="tables-empty">Пустые ячейки</h3>
                         <p>
                             Если в ячейке стоит только символ <code>-</code>, она отображается как пустая.
                             Удобно для ячеек без значения:
@@ -1056,6 +1405,10 @@ github: https://github.com/user/repo
 [[lv:'photo/after.png']] -d[После]
 ===
 
+## Модальное окно
+
+[[mdb:'Подробнее о плагине'-n'about']]
+
 ## Параметры
 
 | Параметр | Тип    | Описание                     |
@@ -1066,6 +1419,24 @@ github: https://github.com/user/repo
 :::warning
 Не забудь сохранить сцену перед применением плагина к большим объектам.
 :::
+
+&lt;mdc-n'about'-s450*500&gt;
+icon: ✦
+title: О плагине
+tagline: Подробное описание возможностей и совместимости.
+
+Этот плагин создан для ускорения повседневной работы в Cinema 4D.
+
+### Совместимость
+
+- Cinema 4D R21 — R2024
+- Windows и macOS
+- Все рендереры
+
+:::tip
+Для получения обновлений подписывайся на GitHub-репозиторий.
+:::
+&lt;/mdc&gt;
 
 ## История изменений
 
