@@ -24,7 +24,7 @@ _NOISE_DENTS           = getattr(c4d, 'SLA_NOISE_NOISE_DENTS',           3)
 # ─── ID ───────────────────────────────────────────────────────────────────────
 PLUGIN_ID     = 1069028
 PLUGIN_NAME   = "Cloud Wizard"
-PLUGIN_NAME_V = "Cloud Wizard v1.8"
+PLUGIN_NAME_V = "Cloud Wizard v1.8.1"
 PLUGIN_HELP   = "Процедурная генерация облаков в сцене"
 
 # ─── ID виджетов ──────────────────────────────────────────────────────────────
@@ -482,7 +482,7 @@ class CloudWizardDialog(c4d.gui.GeDialog):
         # ── Тип облака ──────────────────────────────────────────────────────
         self.GroupBegin(ID_GRP_TYPE, c4d.BFH_SCALEFIT, cols=2, rows=1)
         self.GroupBorderSpace(8, 6, 8, 4)
-        self.AddStaticText(ID_LBL_TYPE, c4d.BFH_LEFT, initw=90, name="Тип облака:")
+        self.AddStaticText(ID_LBL_TYPE, c4d.BFH_LEFT, initw=100, name="Тип облака:")
         self.AddComboBox(ID_COMBO_TYPE, c4d.BFH_SCALEFIT, initw=200)
         for i, name in enumerate(CLOUD_TYPES):
             self.AddChild(ID_COMBO_TYPE, i, name)
