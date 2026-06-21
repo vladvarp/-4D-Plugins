@@ -124,6 +124,17 @@ Floor Generator — процедурный генератор напольных
 | Разброс ширины | — | ✅ | — | — |
 ::::
 
+===photo -s500*400
+[[p:'image/FloorGenerator/1.png']]
+[[p:'image/FloorGenerator/5.png']]
+[[p:'image/FloorGenerator/2.png']]
+[[p:'image/FloorGenerator/6.png']]
+[[p:'image/FloorGenerator/3.png']]
+[[p:'image/FloorGenerator/7.png']]
+[[p:'image/FloorGenerator/4.png']]
+[[p:'image/FloorGenerator/8.png']]
+===
+
 ### Параметры UV
 
 ::::details
@@ -140,6 +151,36 @@ Floor Generator — процедурный генератор напольных
 | Смещение X | Диапазон рандомного смещения по X |
 | Смещение Y | Диапазон рандомного смещения по Y |
 | Сид смещения | Зерно генератора для рандома смещения UV |
+::::
+
+::::details-open
+Рандомизация
+
+===leveling -n[Шеврон] -s600*400
+[[lv:'image/FloorGenerator/ШевронБР.png']] -d[Без]
+[[lv:'image/FloorGenerator/ШевронСР.png']] -d[Рандомизация]
+===
+
+===leveling -n[Паркет] -s600*400
+[[lv:'image/FloorGenerator/ПаркетБР.png']] -d[Без]
+[[lv:'image/FloorGenerator/ПаркетСР.png']] -d[Рандомизация]
+[[lv:'image/FloorGenerator/ПаркетСиРазброс.png']] -d[Ранд. + Разброс]
+===
+
+===leveling -n[Паркет #2] -s600*400
+[[lv:'image/FloorGenerator/Паркет2БР.png']] -d[Без]
+[[lv:'image/FloorGenerator/Паркет2СР.png']] -d[Рандомизация]
+===
+
+===leveling -n[Соты] -s600*400
+[[lv:'image/FloorGenerator/СотыБР.png']] -d[Без]
+[[lv:'image/FloorGenerator/СотыСР.png']] -d[Рандомизация]
+===
+
+===leveling -n[Ёлка] -s600*400
+[[lv:'image/FloorGenerator/ЕлкаБР.png']] -d[Без]
+[[lv:'image/FloorGenerator/ЕлкаСР.png']] -d[Рандомизация]
+===
 ::::
 
 ## Ограничения

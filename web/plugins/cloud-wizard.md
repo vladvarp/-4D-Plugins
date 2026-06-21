@@ -15,14 +15,14 @@ github: https://github.com/vladvarp/-4D-Plugins
 ---
 
 ## О плагине
-:::::::photo -s400*300
+===photo -s400*300
 [[p:'image/CloudWizard/1.png']]
 [[p:'image/CloudWizard/2.png']]
 [[p:'image/CloudWizard/3.png']]
 [[p:'image/CloudWizard/4.png']]
 [[p:'image/CloudWizard/5.png']]
 [[p:'image/CloudWizard/6.png']]
-:::::::
+===
 Cloud Wizard — процедурный генератор облаков для Cinema 4D. Создаёт кучевые и перистые облака с помощью метабол и шумовых материалов.
 
 Плагин автоматически расставляет шарики метаболы внутри эллипсоида, подбирает профиль формы и опционально генерирует материал с шумами, рассеянием и подповерхностным свечением.
@@ -31,9 +31,9 @@ Cloud Wizard — процедурный генератор облаков для
 Плагин доступен через меню Extensions → Cloud Wizard. Не требует привязки к объектам — создаёт готовую группу в сцене.
 :::
 
-:::::::photo -s300*700
+===photo -s300*700
 [[p:'image/CloudWizard/CloudWizard.png']]
-:::::::
+===
 
 ## Возможности
 

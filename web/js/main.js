@@ -450,9 +450,14 @@ function renderMarkdown(markdown) {
         return saveBlock(`<div class="changelog">${entries.join('')}</div>`);
     });
 
-    // Фотокарусель: :::::::photo -n[Title] -sWxH
-    html = html.replace(/:::::::(photo(?:_\w+)?)\s*(?:-n\[([^\]]*)\])?\s*(?:-s(\d+)[x*](\d+))?\n([\s\S]*?):::::::/g, (_, type, title, w, h, content) => {
-        return saveBlock(renderPhotoCarousel(type, title, w, h, content));
+    // Фотокарусель: ===photo -n[Title] -sWxH ===
+    html = html.replace(/===photo(?:_\w+)?\s*(?:-n\[([^\]]*)\])?\s*(?:-s(\d+)[x*](\d+))?\n([\s\S]*?)===/g, (_, title, w, h, content) => {
+        return saveBlock(renderPhotoCarousel('photo', title, w, h, content));
+    });
+
+    // Сравнение фото: ===leveling -n[Title] -sWxH ===
+    html = html.replace(/===leveling\s*(?:-n\[([^\]]*)\])?\s*(?:-s(\d+)[x*](\d+))?\n([\s\S]*?)===/g, (_, title, w, h, content) => {
+        return saveBlock(renderLeveling(title || 'Сравнение', parseInt(w) || 600, parseInt(h) || 400, content));
     });
 
     // Экранируем HTML в исходном тексте для безопасности
@@ -620,8 +625,12 @@ function renderInlineContent(text) {
         return `<div class="callout callout-${type}"><span class="callout-icon">${icons[type]}</span><div class="callout-content">${renderInlineContent(content.trim())}</div></div>`;
     });
 
-    html = html.replace(/:::::::(photo(?:_\w+)?)\s*(?:-n\[([^\]]*)\])?\s*(?:-s(\d+)[x*](\d+))?\n([\s\S]*?):::::::/g, (_, type, title, w, h, content) => {
-        return renderPhotoCarousel(type, title, w, h, content);
+    html = html.replace(/===photo(?:_\w+)?\s*(?:-n\[([^\]]*)\])?\s*(?:-s(\d+)[x*](\d+))?\n([\s\S]*?)===/g, (_, title, w, h, content) => {
+        return renderPhotoCarousel('photo', title, w, h, content);
+    });
+
+    html = html.replace(/===leveling\s*(?:-n\[([^\]]*)\])?\s*(?:-s(\d+)[x*](\d+))?\n([\s\S]*?)===/g, (_, title, w, h, content) => {
+        return renderLeveling(title || 'Сравнение', parseInt(w) || 600, parseInt(h) || 400, content);
     });
 
     html = html.replace(/^####\s+(.+)$/gm, '<h4>$1</h4>');
@@ -843,6 +852,7 @@ function initTocHighlight() {
 function initMdComponents(root = document) {
     initMdTabs(root);
     initPhotoCarousels(root);
+    initLevelingSliders(root);
     // Инициализируем кнопки копирования внутри динамически загруженного контента
     root.querySelectorAll('.copy-btn').forEach(btn => {
         if (!btn.dataset.initialized) {
@@ -1192,5 +1202,156 @@ function initPhotoCarousels(root = document) {
         }, { passive: true });
 
         applyCarousel3D(id, 0);
+    });
+}
+
+/* ========================================
+   Сравнение фото (leveling)
+   ======================================== */
+
+function renderLeveling(title, w, h, content) {
+    const photos = [];
+    const photoRegex = /\[\[lv:'([^']+)'\]\]\s*(?:-d\[([^\]]*)\])?/g;
+    let m;
+    while ((m = photoRegex.exec(content)) !== null) {
+        photos.push({ src: m[1], desc: m[2] || '' });
+    }
+    if (photos.length < 2 || photos.length > 3) return '';
+
+    const id = 'lv-' + Math.random().toString(36).substr(2, 9);
+    const count = photos.length;
+    const dividerPositions = [];
+
+    if (count === 2) {
+        dividerPositions.push(50);
+    } else {
+        dividerPositions.push(33.33);
+        dividerPositions.push(66.67);
+    }
+
+    let out = `<div class="md-leveling" id="${id}" style="width:${w}px;max-width:100%">`;
+    out += `<div class="md-leveling-title">${escapeHtml(title)}</div>`;
+    out += `<div class="md-leveling-viewport" style="height:${h}px" data-count="${count}">`;
+
+    photos.forEach((photo, i) => {
+        let clipStyle = '';
+        if (count === 2) {
+            if (i === 0) clipStyle = `clip-path:inset(0 ${100 - dividerPositions[0]}% 0 0)`;
+            else clipStyle = `clip-path:inset(0 0 0 ${dividerPositions[0]}%)`;
+        } else {
+            if (i === 0) clipStyle = `clip-path:inset(0 ${100 - dividerPositions[0]}% 0 0)`;
+            else if (i === 1) clipStyle = `clip-path:inset(0 ${100 - dividerPositions[1]}% 0 ${dividerPositions[0]}%)`;
+            else clipStyle = `clip-path:inset(0 0 0 ${dividerPositions[1]}%)`;
+        }
+
+        let capLeft = '';
+        if (count === 2) {
+            if (i === 0) capLeft = 'left:12px';
+            else capLeft = 'right:12px;left:auto';
+        } else {
+            if (i === 0) capLeft = 'left:12px';
+            else if (i === 1) capLeft = 'left:50%;transform:translateX(-50%)';
+            else capLeft = 'right:12px;left:auto';
+        }
+
+        out += `<div class="md-leveling-img" data-index="${i}" style="${clipStyle}">`;
+        out += `<img src="${escapeHtml(photo.src)}" alt="" loading="lazy" draggable="false">`;
+        if (photo.desc) {
+            out += `<div class="md-leveling-caption" style="${capLeft}">${escapeHtml(photo.desc)}</div>`;
+        }
+        out += `</div>`;
+    });
+
+    dividerPositions.forEach((pos, i) => {
+        out += `<div class="md-leveling-divider" data-index="${i}" style="left:${pos}%">`;
+        out += `<div class="md-leveling-handle"></div>`;
+        out += `</div>`;
+    });
+
+    out += `</div></div>`;
+    return out;
+}
+
+function initLevelingSliders(root = document) {
+    root.querySelectorAll('.md-leveling').forEach(el => {
+        if (el.dataset.initialized) return;
+        el.dataset.initialized = 'true';
+
+        const viewport = el.querySelector('.md-leveling-viewport');
+        const count = parseInt(viewport.dataset.count) || 2;
+        const dividers = Array.from(el.querySelectorAll('.md-leveling-divider'));
+        const imgs = Array.from(el.querySelectorAll('.md-leveling-img'));
+
+        const getPositions = () => dividers.map(d => parseFloat(d.style.left));
+        const setPositions = (positions) => {
+            const n = dividers.length;
+            for (let i = 0; i < n; i++) {
+                const pos = positions[i];
+                dividers[i].style.left = pos + '%';
+            }
+
+            if (count === 2) {
+                const p0 = positions[0];
+                imgs[0].style.clipPath = `inset(0 ${100 - p0}% 0 0)`;
+                imgs[1].style.clipPath = `inset(0 0 0 ${p0}%)`;
+            } else {
+                const p0 = positions[0];
+                const p1 = positions[1];
+                imgs[0].style.clipPath = `inset(0 ${100 - p0}% 0 0)`;
+                imgs[1].style.clipPath = `inset(0 ${100 - p1}% 0 ${p0}%)`;
+                imgs[2].style.clipPath = `inset(0 0 0 ${p1}%)`;
+            }
+        };
+
+        dividers.forEach((divider, i) => {
+            const onMove = (clientX) => {
+                const rect = viewport.getBoundingClientRect();
+                let pos = ((clientX - rect.left) / rect.width) * 100;
+                pos = Math.max(5, Math.min(95, pos));
+
+                const positions = getPositions();
+                const minGap = 5;
+
+                if (i > 0) {
+                    pos = Math.max(positions[i - 1] + minGap, pos);
+                }
+                if (i < positions.length - 1) {
+                    pos = Math.min(positions[i + 1] - minGap, pos);
+                }
+
+                positions[i] = pos;
+                setPositions(positions);
+            };
+
+            divider.addEventListener('mousedown', (e) => {
+                e.preventDefault();
+                viewport.classList.add('dragging');
+
+                const mousemove = (e) => onMove(e.clientX);
+                const mouseup = () => {
+                    viewport.classList.remove('dragging');
+                    document.removeEventListener('mousemove', mousemove);
+                    document.removeEventListener('mouseup', mouseup);
+                };
+
+                document.addEventListener('mousemove', mousemove);
+                document.addEventListener('mouseup', mouseup);
+            });
+
+            divider.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                viewport.classList.add('dragging');
+
+                const touchmove = (e) => onMove(e.touches[0].clientX);
+                const touchend = () => {
+                    viewport.classList.remove('dragging');
+                    document.removeEventListener('touchmove', touchmove);
+                    document.removeEventListener('touchend', touchend);
+                };
+
+                document.addEventListener('touchmove', touchmove);
+                document.addEventListener('touchend', touchend);
+            }, { passive: false });
+        });
     });
 }

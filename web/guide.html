@@ -59,6 +59,7 @@
                         <li><a href="#video">Видео</a></li>
                         <li><a href="#photo-album">Фотоальбом (кнопка)</a></li>
                         <li><a href="#photo-carousel">Фотокарусель</a></li>
+                        <li><a href="#leveling">Сравнение фото</a></li>
                         <li><a href="#inline-elements">Инлайн-элементы</a></li>
                         <li><a href="#images-ico">Изображения и значки</a></li>
                         <li><a href="#features">Сетка фич</a></li>
@@ -627,18 +628,87 @@ https://www.youtube.com/watch?v=dQw4w9WgXcQ
                                 <span class="code-example-label">Синтаксис фотокарусели</span>
                                 <button class="copy-btn">Копировать</button>
                             </div>
-                            <pre><code>:::::::photo -n[Галерея] -s300*400
+                            <pre><code>===photo -n[Галерея] -s300*400
 [[p:'photo/photo1.png']]
 [[p:'photo/photo2.png']]
 [[p:'photo/photo3.png']]
 [[p:'photo/photo4.png']]
-:::::::</code></pre>
+===</code></pre>
                         </div>
 
                         <div class="callout callout-info">
                             <span class="callout-icon">ℹ️</span>
                             <div class="callout-content">
                                 <p>Изображения автоматически заполняют область карусели (<code>object-fit: cover</code>), поэтому карусель выглядит хорошо при любых соотношениях сторон. Карусель использует 3D-эффект — соседние фотографии видны на переднем плане с уменьшением и прозрачностью. Нажатие на любую фотографию открывает полноэкранный просмотр именно с неё. На мобильных устройствах поддерживается свайп-навигация.</p>
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- Сравнение фото -->
+                    <section id="leveling">
+                        <h2>Сравнение фото</h2>
+                        <p>
+                            Блок для интерактивного сравнения 2–3 фотографий с перетаскиваемыми разделителями.
+                            Идеально подходит для показа «до/после», этапов обработки и сравнения вариантов.
+                        </p>
+
+                        <h3>Параметры</h3>
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Параметр</th>
+                                    <th>Формат</th>
+                                    <th>Описание</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td><code>-n</code></td>
+                                    <td><code>-n[Заголовок]</code></td>
+                                    <td>Заголовок блока (по умолчанию «Сравнение»)</td>
+                                </tr>
+                                <tr>
+                                    <td><code>-s</code></td>
+                                    <td><code>-sШирина*Высота</code></td>
+                                    <td>Размер блока в пикселях (например, <code>-s600*400</code>)</td>
+                                </tr>
+                                <tr>
+                                    <td><code>-d</code></td>
+                                    <td><code>-d[Подпись]</code></td>
+                                    <td>Подпись под фотографией (отображается поверх изображения)</td>
+                                </tr>
+                            </tbody>
+                        </table>
+
+                        <h3>Сравнение двух фото</h3>
+                        <div class="code-example">
+                            <div class="code-example-header">
+                                <span class="code-example-label">Синтаксис: 2 фото</span>
+                                <button class="copy-btn">Копировать</button>
+                            </div>
+                            <pre><code>===leveling -n[До и после] -s600*400
+[[lv:'photo/before.png']] -d[До]
+[[lv:'photo/after.png']] -d[После]
+===</code></pre>
+                        </div>
+
+                        <h3>Сравнение трёх фото</h3>
+                        <div class="code-example">
+                            <div class="code-example-header">
+                                <span class="code-example-label">Синтаксис: 3 фото</span>
+                                <button class="copy-btn">Копировать</button>
+                            </div>
+                            <pre><code>===leveling -n[Этапы обработки] -s600*400
+[[lv:'photo/step1.png']] -d[Без обработки]
+[[lv:'photo/step2.png']] -d[Средняя]
+[[lv:'photo/step3.png']] -d[Финальная]
+===</code></pre>
+                        </div>
+
+                        <div class="callout callout-info">
+                            <span class="callout-icon">ℹ️</span>
+                            <div class="callout-content">
+                                <p>Поддерживается от 2 до 3 фотографий. Разделители перетаскиваются мышью (или пальцем на мобильных устройствах). Подписи отображаются поверх изображений и автоматически позиционируются по центру каждой секции.</p>
                             </div>
                         </div>
                     </section>
@@ -975,11 +1045,16 @@ github: https://github.com/user/repo
 
 [[photo: -n'Галерея' -p'photo/screenshot1.png','photo/screenshot2.png','photo/screenshot3.png']]
 
-:::::photo -n[Скриншоты] -s400*300
+===photo -n[Скриншоты] -s400*300
 [[p:'photo/screenshot1.png']]
 [[p:'photo/screenshot2.png']]
 [[p:'photo/screenshot3.png']]
-:::::::
+===
+
+===leveling -n[Сравнение] -s600*400
+[[lv:'photo/before.png']] -d[До]
+[[lv:'photo/after.png']] -d[После]
+===
 
 ## Параметры
 
