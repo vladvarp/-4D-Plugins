@@ -37,7 +37,7 @@ import tempfile
 # ══════════════════════════════════════════════════════════════════════════════
 
 ID_FLOORGEN   = 1068969
-NAME_FLOORGEN = "Floor Generator v2.7"
+NAME_FLOORGEN = "Floor Generator v2.7.1"
 
 # ══════════════════════════════════════════════════════════════════════════════
 #  Паттерны
@@ -1656,7 +1656,7 @@ def _build_floor(op):
 # ══════════════════════════════════════════════════════════════════════════════
 
 def _create_userdata(op):
-    g1 = _add_group(op, "Паттерн")
+    g1 = _add_group(op, "Паттерн (P) (P1) (P2)")
     _add_in_group(op, g1, _cycle_bc("Тип", DEF_PATTERN, PAT_NAMES))
     _add_in_group(op, g1, _float_bc("Ширина плитки", DEF_TILE_W, 1.0, 10000.0))
     _add_in_group(op, g1, _float_bc("Длина плитки", DEF_TILE_H, 1.0, 10000.0))
@@ -1672,7 +1672,7 @@ def _create_userdata(op):
     _add_in_group(op, g1, _float_bc("Разброс ширины", DEF_PARQ_RAND_W,
                   0.0, 100.0, c4d.DESC_UNIT_REAL, 1.0))
 
-    g2 = _add_group(op, "Толщина и фаска")
+    g2 = _add_group(op, "Толщина и фаска (S)")
     _add_in_group(op, g2, _float_bc("Толщина", DEF_THICKNESS, 0.001, 1000.0))
     _add_in_group(op, g2, _float_bc("Фаска", DEF_BEVEL, 0.0, 100.0))
 

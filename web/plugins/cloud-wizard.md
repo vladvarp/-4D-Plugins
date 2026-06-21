@@ -15,7 +15,7 @@ github: https://github.com/vladvarp/-4D-Plugins
 ---
 
 ## О плагине
-:::::::photo -s600*400
+:::::::photo -s400*300
 [[p:'image/CloudWizard/1.png']]
 [[p:'image/CloudWizard/2.png']]
 [[p:'image/CloudWizard/3.png']]
