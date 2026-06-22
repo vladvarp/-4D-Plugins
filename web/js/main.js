@@ -788,11 +788,12 @@ function renderInlineSyntax(html) {
         return `<button class="md-photo-btn" data-photos="${photosJson}" onclick="openPhotoModal(this)">${escapeHtml(name)}</button>`;
     });
 
-    // Кнопка модального окна: [[mdb:'label'-n'id'-sW]]
-    html = html.replace(/\[\[mdb:'([^']+)'-n'([^']+)'(?:-s(\d+))?\]\]/g, (_, label, id, w) => {
+    // Кнопка модального окна: [[mdb:'label'-n'id'-sW-bN]]
+    html = html.replace(/\[\[mdb:'([^']+)'-n'([^']+)'(?:-s(\d+))?(?:-b([1-9]))?\]\]/g, (_, label, id, w, btnStyle) => {
         const safeId = escapeHtml(id);
         const style = w ? ` style="width:${parseInt(w)}px"` : '';
-        return `<button class="md-modal-btn"${style} onclick="openModal('${safeId}')">${escapeHtml(label)}</button>`;
+        const cls = btnStyle ? `md-modal-btn-b${btnStyle}` : 'md-modal-btn';
+        return `<button class="${cls}"${style} onclick="openModal('${safeId}')">${escapeHtml(label)}</button>`;
     });
 
     // Пробелы: [[ "N" ]] — N пробелов
