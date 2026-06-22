@@ -15,7 +15,7 @@ github: https://github.com/vladvarp/-4D-Plugins
 ---
 
 ## О плагине
-===photo -s750*400
+===photo -s750*400 -c2  -asc1000 -asp1000
 [[p:'image/CloudWizard/1.png']]
 [[p:'image/CloudWizard/2.png']]
 [[p:'image/CloudWizard/3.png']]
@@ -182,7 +182,7 @@ X: [[tif:'0'-t'0'-p'cm'-s80]] Y: [[tif:'1500'-t'0'-p'cm'-s80]] Z: [[tif:'0'-t'0'
 
 ::::details
 Скриншот
-===photo -s300*700
+===photo -s300*700 -c2
 [[p:'image/CloudWizard/CloudWizard.png']]
 ===
 ::::

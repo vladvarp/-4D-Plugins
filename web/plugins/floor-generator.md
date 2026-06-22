@@ -124,7 +124,7 @@ Floor Generator — процедурный генератор напольных
 | Разброс ширины | — | ✅ | — | — |
 ::::
 
-===photo -s700*500
+===photo -s700*500 -c2 -asc1000 -asp1000
 [[p:'image/FloorGenerator/1.png']]
 [[p:'image/FloorGenerator/5.png']]
 [[p:'image/FloorGenerator/2.png']]
@@ -156,28 +156,28 @@ Floor Generator — процедурный генератор напольных
 ::::details-open
 Рандомизация
 
-===leveling -n[Шеврон] -s750*400
+===leveling -n[Шеврон] -s750*400 -c2 -asc1000 -asp1000
 [[lv:'image/FloorGenerator/ШевронБР.png']] -d[Без]
 [[lv:'image/FloorGenerator/ШевронСР.png']] -d[Рандомизация]
 ===
 
-===leveling -n[Паркет] -s750*400
+===leveling -n[Паркет] -s750*400 -c2 -asc1000 -asp1000
 [[lv:'image/FloorGenerator/ПаркетБР.png']] -d[Без]
 [[lv:'image/FloorGenerator/ПаркетСР.png']] -d[Рандомизация]
 [[lv:'image/FloorGenerator/ПаркетСиРазброс.png']] -d[Ранд. + Разброс]
 ===
 
-===leveling -n[Паркет #2] -s750*400
+===leveling -n[Паркет #2] -s750*400 -c2 -asc1000 -asp1000
 [[lv:'image/FloorGenerator/Паркет2БР.png']] -d[Без]
 [[lv:'image/FloorGenerator/Паркет2СР.png']] -d[Рандомизация]
 ===
 
-===leveling -n[Соты] -s750*400
+===leveling -n[Соты] -s750*400 -c2 -asc1000 -asp1000
 [[lv:'image/FloorGenerator/СотыБР.png']] -d[Без]
 [[lv:'image/FloorGenerator/СотыСР.png']] -d[Рандомизация]
 ===
 
-===leveling -n[Ёлка] -s750*400
+===leveling -n[Ёлка] -s750*400 -c2 -asc1000 -asp1000
 [[lv:'image/FloorGenerator/ЕлкаБР.png']] -d[Без]
 [[lv:'image/FloorGenerator/ЕлкаСР.png']] -d[Рандомизация]
 ===
