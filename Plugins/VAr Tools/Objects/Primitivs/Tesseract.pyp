@@ -23,7 +23,7 @@ import tempfile
 # ══════════════════════════════════════════════════════════════════════════════
 
 ID_TESSERACT = 1068993
-NAME_TESSERACT = "Tesseract v1.4"
+NAME_TESSERACT = "Tesseract v1.5"
 
 # ══════════════════════════════════════════════════════════════════════════════
 #  Description-based parameter IDs
@@ -166,7 +166,7 @@ def _setup_description(description):
                              c4d.DescID(c4d.DescLevel(TS_GRP_CORE, c4d.DTYPE_GROUP, 0)))
     description.SetParameter(c4d.DescID(c4d.DescLevel(TS_DISPLAY, c4d.DTYPE_LONG, 0)),
                              _cycle_bc("Отображение", DEFAULT_DISPLAY,
-                                       ["Каркас", "Рёбра + Вершины", "Ячейки", "Всё"]),
+                                       ["Каркас (K)", "Рёбра (K) + Вершины (P)", "Ячейки (C)", "Всё"]),
                              c4d.DescID(c4d.DescLevel(TS_GRP_CORE, c4d.DTYPE_GROUP, 0)))
 
     bc = c4d.GetCustomDataTypeDefault(c4d.DTYPE_GROUP)
@@ -254,19 +254,19 @@ def _setup_description(description):
                              bc, c4d.ID_LISTHEAD)
 
     description.SetParameter(c4d.DescID(c4d.DescLevel(TS_EDGE_RADIUS, c4d.DTYPE_REAL, 0)),
-                             _float_bc("Радиус рёбер", DEFAULT_EDGE_RADIUS, 0.1, 100.0),
+                             _float_bc("Радиус рёбер (K)", DEFAULT_EDGE_RADIUS, 0.1, 100.0),
                              c4d.DescID(c4d.DescLevel(TS_GRP_VIS, c4d.DTYPE_GROUP, 0)))
     description.SetParameter(c4d.DescID(c4d.DescLevel(TS_EDGE_SEGS, c4d.DTYPE_LONG, 0)),
-                             _int_bc("Сегменты рёбер", DEFAULT_EDGE_SEGS, 3, 16),
+                             _int_bc("Сегменты рёбер (K)", DEFAULT_EDGE_SEGS, 3, 16),
                              c4d.DescID(c4d.DescLevel(TS_GRP_VIS, c4d.DTYPE_GROUP, 0)))
     description.SetParameter(c4d.DescID(c4d.DescLevel(TS_VERTEX_RADIUS, c4d.DTYPE_REAL, 0)),
-                             _float_bc("Радиус вершин", DEFAULT_VERTEX_RADIUS, 0.1, 200.0),
+                             _float_bc("Радиус вершин (P)", DEFAULT_VERTEX_RADIUS, 0.1, 200.0),
                              c4d.DescID(c4d.DescLevel(TS_GRP_VIS, c4d.DTYPE_GROUP, 0)))
     description.SetParameter(c4d.DescID(c4d.DescLevel(TS_VERTEX_SEGS, c4d.DTYPE_LONG, 0)),
-                             _int_bc("Сегменты вершин", DEFAULT_VERTEX_SEGS, 3, 16),
+                             _int_bc("Сегменты вершин (P)", DEFAULT_VERTEX_SEGS, 3, 16),
                              c4d.DescID(c4d.DescLevel(TS_GRP_VIS, c4d.DTYPE_GROUP, 0)))
     description.SetParameter(c4d.DescID(c4d.DescLevel(TS_SHOW_CELLS, c4d.DTYPE_BOOL, 0)),
-                             _bool_bc("Показать ячейки", DEFAULT_SHOW_CELLS),
+                             _bool_bc("Показать ячейки (C)", DEFAULT_SHOW_CELLS),
                              c4d.DescID(c4d.DescLevel(TS_GRP_VIS, c4d.DTYPE_GROUP, 0)))
 
 
@@ -511,6 +511,19 @@ def _add_phong_tag(obj, angle_deg=45.0):
         tag[c4d.PHONGTAG_PHONG_USEEDGES]   = True
 
 
+def _apply_selection_tag(obj, selection_name):
+    n_polys = obj.GetPolygonCount()
+    if n_polys == 0:
+        return
+    tag = obj.MakeTag(c4d.Tpolygonselection)
+    if tag is None:
+        return
+    tag.SetName(selection_name)
+    sel = tag.GetBaseSelect()
+    for pi in range(n_polys):
+        sel.Select(pi)
+
+
 # ══════════════════════════════════════════════════════════════════════════════
 #  Генератор тессеракта
 # ══════════════════════════════════════════════════════════════════════════════
@@ -603,6 +616,7 @@ def _build_tesseract(op):
                 edge_obj.SetPolygon(i, pl)
             edge_obj.Message(c4d.MSG_UPDATE)
             _add_phong_tag(edge_obj, 60.0)
+            _apply_selection_tag(edge_obj, "K")
             edge_obj.InsertUnder(root)
 
     # ── Вершины ──────────────────────────────────────────────────────────
@@ -620,6 +634,7 @@ def _build_tesseract(op):
                     v_obj.SetPolygon(i, pl)
                 v_obj.Message(c4d.MSG_UPDATE)
                 _add_phong_tag(v_obj, 45.0)
+                _apply_selection_tag(v_obj, "P")
                 v_obj.InsertUnder(root)
 
     # ── Ячейки (грани кубов) ────────────────────────────────────────────
@@ -722,6 +737,7 @@ def _build_tesseract(op):
                 c_obj.Message(c4d.MSG_UPDATE)
 
                 _add_phong_tag(c_obj, 80.0)
+                _apply_selection_tag(c_obj, "C")
                 c_obj.InsertUnder(root)
 
     return root
