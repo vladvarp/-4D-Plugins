@@ -23,47 +23,46 @@ import tempfile
 # ══════════════════════════════════════════════════════════════════════════════
 
 ID_TESSERACT = 1068993
-NAME_TESSERACT = "Tesseract v1.3"
+NAME_TESSERACT = "Tesseract v1.4"
 
 # ══════════════════════════════════════════════════════════════════════════════
-#  UserData SubID — строго фиксированы
+#  Description-based parameter IDs
 # ══════════════════════════════════════════════════════════════════════════════
 
-# Группа «Основные»
-UD_G_CORE    = 1
-TS_SIZE      = 2    # размер гиперкуба (float)
-TS_PROJ_DIST = 3    # расстояние проекции (float)
-TS_DISPLAY   = 4    # режим отображения (cycle)
+# Group IDs
+TS_GRP_CORE = 2000
+TS_GRP_ROT = 2001
+TS_GRP_ANIM = 2002
+TS_GRP_VIS = 2003
 
-# Группа «Поворот 4D»
-UD_G_ROT     = 5
-TS_ROT_XY    = 6    # угол поворота XY (float, °)
-TS_ROT_XZ    = 7    # угол поворота XZ (float, °)
-TS_ROT_XW    = 8    # угол поворота XW (float, °)
-TS_ROT_YZ    = 9    # угол поворота YZ (float, °)
-TS_ROT_YW    = 10   # угол поворота YW (float, °)
-TS_ROT_ZW    = 11   # угол поворота ZW (float, °)
+# Parameter IDs
+TS_SIZE = 2100
+TS_PROJ_DIST = 2101
+TS_DISPLAY = 2102
 
-# Группа «Автовращение»
-UD_G_ANIM    = 12
-TS_AUTO_ROT  = 13   # галочка авто-вращения
-TS_SPEED_XY  = 14   # скорость XY
-TS_SPEED_XZ  = 15
-TS_SPEED_XW  = 16
-TS_SPEED_YZ  = 17
-TS_SPEED_YW  = 18
-TS_SPEED_ZW  = 19
-TS_ANIM_PHASE = 20  # фаза (для анимации извне)
+TS_ROT_XY = 2110
+TS_ROT_XZ = 2111
+TS_ROT_XW = 2112
+TS_ROT_YZ = 2113
+TS_ROT_YW = 2114
+TS_ROT_ZW = 2115
 
-# Группа «Визуал»
-UD_G_VIS     = 21
-TS_EDGE_RADIUS = 22  # радиус рёбер-трубок (float)
-TS_EDGE_SEGS   = 23  # сегменты окружности рёбер (int)
-TS_VERTEX_RADIUS = 24  # радиус вершин (float)
-TS_VERTEX_SEGS   = 25  # сегменты окружности вершин (int)
-TS_SHOW_CELLS    = 26  # показывать ячейки (bool)
+TS_AUTO_ROT = 2120
+TS_SPEED_XY = 2121
+TS_SPEED_XZ = 2122
+TS_SPEED_XW = 2123
+TS_SPEED_YZ = 2124
+TS_SPEED_YW = 2125
+TS_SPEED_ZW = 2126
+TS_ANIM_PHASE = 2127
 
-# Первый параметр данных (проверка инициализации)
+TS_EDGE_RADIUS = 2130
+TS_EDGE_SEGS = 2131
+TS_VERTEX_RADIUS = 2132
+TS_VERTEX_SEGS = 2133
+TS_SHOW_CELLS = 2134
+
+# First parameter for initialization check
 TS_FIRST_PARAM = TS_SIZE
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -97,53 +96,8 @@ DEFAULT_VERTEX_SEGS   = 8
 DEFAULT_SHOW_CELLS    = False
 
 # ══════════════════════════════════════════════════════════════════════════════
-#  UserData helpers
+#  Description helpers
 # ══════════════════════════════════════════════════════════════════════════════
-
-def _ud_descid(op, uid):
-    for descid, bc in op.GetUserDataContainer():
-        if descid[1].id == uid:
-            return descid, bc
-    return None, None
-
-
-def _ud_get(op, uid, default=None):
-    did, _ = _ud_descid(op, uid)
-    if did is not None:
-        val = op[did]
-        if val is not None:
-            return val
-    return default
-
-
-def _ud_set(op, uid, value):
-    did, _ = _ud_descid(op, uid)
-    if did is not None:
-        op[did] = value
-
-
-def _ud_exists(op, uid):
-    did, _ = _ud_descid(op, uid)
-    return did is not None
-
-
-def _add_group(op, name):
-    bc = c4d.GetCustomDatatypeDefault(c4d.DTYPE_GROUP)
-    bc[c4d.DESC_NAME]       = name
-    bc[c4d.DESC_SHORT_NAME] = name
-    bc[c4d.DESC_TITLEBAR]   = 1
-    bc[c4d.DESC_DEFAULT]    = 1
-    did = op.AddUserData(bc)
-    return did[1].id
-
-
-def _add_in_group(op, grp_subid, bc):
-    bc[c4d.DESC_PARENTGROUP] = c4d.DescID(
-        c4d.DescLevel(c4d.ID_USERDATA, c4d.DTYPE_SUBCONTAINER, 0),
-        c4d.DescLevel(grp_subid, c4d.DTYPE_GROUP, 0)
-    )
-    return op.AddUserData(bc)
-
 
 def _float_bc(name, default, minval, maxval, unit=c4d.DESC_UNIT_METER, step=1.0):
     bc = c4d.GetCustomDatatypeDefault(c4d.DTYPE_REAL)
@@ -191,6 +145,129 @@ def _cycle_bc(name, default, items):
         cyc[i] = label
     bc[c4d.DESC_CYCLE] = cyc
     return bc
+
+
+def _setup_description(description):
+    if not description:
+        return
+
+    bc = c4d.GetCustomDataTypeDefault(c4d.DTYPE_GROUP)
+    bc[c4d.DESC_NAME]    = "Основные"
+    bc[c4d.DESC_COLUMNS] = 1
+    bc[c4d.DESC_DEFAULT] = 1
+    description.SetParameter(c4d.DescID(c4d.DescLevel(TS_GRP_CORE, c4d.DTYPE_GROUP, 0)),
+                             bc, c4d.ID_LISTHEAD)
+
+    description.SetParameter(c4d.DescID(c4d.DescLevel(TS_SIZE, c4d.DTYPE_REAL, 0)),
+                             _float_bc("Размер", DEFAULT_SIZE, 10.0, 5000.0),
+                             c4d.DescID(c4d.DescLevel(TS_GRP_CORE, c4d.DTYPE_GROUP, 0)))
+    description.SetParameter(c4d.DescID(c4d.DescLevel(TS_PROJ_DIST, c4d.DTYPE_REAL, 0)),
+                             _float_bc("Расстояние проекции", DEFAULT_PROJ_DIST, 50.0, 10000.0),
+                             c4d.DescID(c4d.DescLevel(TS_GRP_CORE, c4d.DTYPE_GROUP, 0)))
+    description.SetParameter(c4d.DescID(c4d.DescLevel(TS_DISPLAY, c4d.DTYPE_LONG, 0)),
+                             _cycle_bc("Отображение", DEFAULT_DISPLAY,
+                                       ["Каркас", "Рёбра + Вершины", "Ячейки", "Всё"]),
+                             c4d.DescID(c4d.DescLevel(TS_GRP_CORE, c4d.DTYPE_GROUP, 0)))
+
+    bc = c4d.GetCustomDataTypeDefault(c4d.DTYPE_GROUP)
+    bc[c4d.DESC_NAME]    = "Поворот 4D"
+    bc[c4d.DESC_COLUMNS] = 1
+    bc[c4d.DESC_DEFAULT] = 1
+    description.SetParameter(c4d.DescID(c4d.DescLevel(TS_GRP_ROT, c4d.DTYPE_GROUP, 0)),
+                             bc, c4d.ID_LISTHEAD)
+
+    description.SetParameter(c4d.DescID(c4d.DescLevel(TS_ROT_XY, c4d.DTYPE_REAL, 0)),
+                             _float_bc("Поворот XY", DEFAULT_ROT_XY,
+                                       math.radians(-360.0), math.radians(360.0),
+                                       unit=c4d.DESC_UNIT_DEGREE, step=math.radians(1.0)),
+                             c4d.DescID(c4d.DescLevel(TS_GRP_ROT, c4d.DTYPE_GROUP, 0)))
+    description.SetParameter(c4d.DescID(c4d.DescLevel(TS_ROT_XZ, c4d.DTYPE_REAL, 0)),
+                             _float_bc("Поворот XZ", DEFAULT_ROT_XZ,
+                                       math.radians(-360.0), math.radians(360.0),
+                                       unit=c4d.DESC_UNIT_DEGREE, step=math.radians(1.0)),
+                             c4d.DescID(c4d.DescLevel(TS_GRP_ROT, c4d.DTYPE_GROUP, 0)))
+    description.SetParameter(c4d.DescID(c4d.DescLevel(TS_ROT_XW, c4d.DTYPE_REAL, 0)),
+                             _float_bc("Поворот XW", DEFAULT_ROT_XW,
+                                       math.radians(-360.0), math.radians(360.0),
+                                       unit=c4d.DESC_UNIT_DEGREE, step=math.radians(1.0)),
+                             c4d.DescID(c4d.DescLevel(TS_GRP_ROT, c4d.DTYPE_GROUP, 0)))
+    description.SetParameter(c4d.DescID(c4d.DescLevel(TS_ROT_YZ, c4d.DTYPE_REAL, 0)),
+                             _float_bc("Поворот YZ", DEFAULT_ROT_YZ,
+                                       math.radians(-360.0), math.radians(360.0),
+                                       unit=c4d.DESC_UNIT_DEGREE, step=math.radians(1.0)),
+                             c4d.DescID(c4d.DescLevel(TS_GRP_ROT, c4d.DTYPE_GROUP, 0)))
+    description.SetParameter(c4d.DescID(c4d.DescLevel(TS_ROT_YW, c4d.DTYPE_REAL, 0)),
+                             _float_bc("Поворот YW", DEFAULT_ROT_YW,
+                                       math.radians(-360.0), math.radians(360.0),
+                                       unit=c4d.DESC_UNIT_DEGREE, step=math.radians(1.0)),
+                             c4d.DescID(c4d.DescLevel(TS_GRP_ROT, c4d.DTYPE_GROUP, 0)))
+    description.SetParameter(c4d.DescID(c4d.DescLevel(TS_ROT_ZW, c4d.DTYPE_REAL, 0)),
+                             _float_bc("Поворот ZW", DEFAULT_ROT_ZW,
+                                       math.radians(-360.0), math.radians(360.0),
+                                       unit=c4d.DESC_UNIT_DEGREE, step=math.radians(1.0)),
+                             c4d.DescID(c4d.DescLevel(TS_GRP_ROT, c4d.DTYPE_GROUP, 0)))
+
+    bc = c4d.GetCustomDataTypeDefault(c4d.DTYPE_GROUP)
+    bc[c4d.DESC_NAME]    = "Автовращение"
+    bc[c4d.DESC_COLUMNS] = 1
+    bc[c4d.DESC_DEFAULT] = 1
+    description.SetParameter(c4d.DescID(c4d.DescLevel(TS_GRP_ANIM, c4d.DTYPE_GROUP, 0)),
+                             bc, c4d.ID_LISTHEAD)
+
+    description.SetParameter(c4d.DescID(c4d.DescLevel(TS_AUTO_ROT, c4d.DTYPE_BOOL, 0)),
+                             _bool_bc("Включить", DEFAULT_AUTO_ROT),
+                             c4d.DescID(c4d.DescLevel(TS_GRP_ANIM, c4d.DTYPE_GROUP, 0)))
+    description.SetParameter(c4d.DescID(c4d.DescLevel(TS_SPEED_XY, c4d.DTYPE_REAL, 0)),
+                             _float_bc("Скорость XY", DEFAULT_SPEED_XY, -5.0, 5.0,
+                                       unit=c4d.DESC_UNIT_FLOAT, step=0.1),
+                             c4d.DescID(c4d.DescLevel(TS_GRP_ANIM, c4d.DTYPE_GROUP, 0)))
+    description.SetParameter(c4d.DescID(c4d.DescLevel(TS_SPEED_XZ, c4d.DTYPE_REAL, 0)),
+                             _float_bc("Скорость XZ", DEFAULT_SPEED_XZ, -5.0, 5.0,
+                                       unit=c4d.DESC_UNIT_FLOAT, step=0.1),
+                             c4d.DescID(c4d.DescLevel(TS_GRP_ANIM, c4d.DTYPE_GROUP, 0)))
+    description.SetParameter(c4d.DescID(c4d.DescLevel(TS_SPEED_XW, c4d.DTYPE_REAL, 0)),
+                             _float_bc("Скорость XW", DEFAULT_SPEED_XW, -5.0, 5.0,
+                                       unit=c4d.DESC_UNIT_FLOAT, step=0.1),
+                             c4d.DescID(c4d.DescLevel(TS_GRP_ANIM, c4d.DTYPE_GROUP, 0)))
+    description.SetParameter(c4d.DescID(c4d.DescLevel(TS_SPEED_YZ, c4d.DTYPE_REAL, 0)),
+                             _float_bc("Скорость YZ", DEFAULT_SPEED_YZ, -5.0, 5.0,
+                                       unit=c4d.DESC_UNIT_FLOAT, step=0.1),
+                             c4d.DescID(c4d.DescLevel(TS_GRP_ANIM, c4d.DTYPE_GROUP, 0)))
+    description.SetParameter(c4d.DescID(c4d.DescLevel(TS_SPEED_YW, c4d.DTYPE_REAL, 0)),
+                             _float_bc("Скорость YW", DEFAULT_SPEED_YW, -5.0, 5.0,
+                                       unit=c4d.DESC_UNIT_FLOAT, step=0.1),
+                             c4d.DescID(c4d.DescLevel(TS_GRP_ANIM, c4d.DTYPE_GROUP, 0)))
+    description.SetParameter(c4d.DescID(c4d.DescLevel(TS_SPEED_ZW, c4d.DTYPE_REAL, 0)),
+                             _float_bc("Скорость ZW", DEFAULT_SPEED_ZW, -5.0, 5.0,
+                                       unit=c4d.DESC_UNIT_FLOAT, step=0.1),
+                             c4d.DescID(c4d.DescLevel(TS_GRP_ANIM, c4d.DTYPE_GROUP, 0)))
+    description.SetParameter(c4d.DescID(c4d.DescLevel(TS_ANIM_PHASE, c4d.DTYPE_REAL, 0)),
+                             _float_bc("Фаза", DEFAULT_ANIM_PHASE, -10000.0, 10000.0,
+                                       unit=c4d.DESC_UNIT_FLOAT, step=0.01),
+                             c4d.DescID(c4d.DescLevel(TS_GRP_ANIM, c4d.DTYPE_GROUP, 0)))
+
+    bc = c4d.GetCustomDataTypeDefault(c4d.DTYPE_GROUP)
+    bc[c4d.DESC_NAME]    = "Визуал"
+    bc[c4d.DESC_COLUMNS] = 1
+    bc[c4d.DESC_DEFAULT] = 1
+    description.SetParameter(c4d.DescID(c4d.DescLevel(TS_GRP_VIS, c4d.DTYPE_GROUP, 0)),
+                             bc, c4d.ID_LISTHEAD)
+
+    description.SetParameter(c4d.DescID(c4d.DescLevel(TS_EDGE_RADIUS, c4d.DTYPE_REAL, 0)),
+                             _float_bc("Радиус рёбер", DEFAULT_EDGE_RADIUS, 0.1, 100.0),
+                             c4d.DescID(c4d.DescLevel(TS_GRP_VIS, c4d.DTYPE_GROUP, 0)))
+    description.SetParameter(c4d.DescID(c4d.DescLevel(TS_EDGE_SEGS, c4d.DTYPE_LONG, 0)),
+                             _int_bc("Сегменты рёбер", DEFAULT_EDGE_SEGS, 3, 16),
+                             c4d.DescID(c4d.DescLevel(TS_GRP_VIS, c4d.DTYPE_GROUP, 0)))
+    description.SetParameter(c4d.DescID(c4d.DescLevel(TS_VERTEX_RADIUS, c4d.DTYPE_REAL, 0)),
+                             _float_bc("Радиус вершин", DEFAULT_VERTEX_RADIUS, 0.1, 200.0),
+                             c4d.DescID(c4d.DescLevel(TS_GRP_VIS, c4d.DTYPE_GROUP, 0)))
+    description.SetParameter(c4d.DescID(c4d.DescLevel(TS_VERTEX_SEGS, c4d.DTYPE_LONG, 0)),
+                             _int_bc("Сегменты вершин", DEFAULT_VERTEX_SEGS, 3, 16),
+                             c4d.DescID(c4d.DescLevel(TS_GRP_VIS, c4d.DTYPE_GROUP, 0)))
+    description.SetParameter(c4d.DescID(c4d.DescLevel(TS_SHOW_CELLS, c4d.DTYPE_BOOL, 0)),
+                             _bool_bc("Показать ячейки", DEFAULT_SHOW_CELLS),
+                             c4d.DescID(c4d.DescLevel(TS_GRP_VIS, c4d.DTYPE_GROUP, 0)))
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -442,31 +519,31 @@ def _build_tesseract(op):
     """Строит тессеракт и возвращает иерархию объектов (Null-контейнер)."""
 
     # ── Параметры ────────────────────────────────────────────────────────
-    size        = max(10.0, float(_ud_get(op, TS_SIZE, DEFAULT_SIZE)))
-    proj_dist   = max(50.0, float(_ud_get(op, TS_PROJ_DIST, DEFAULT_PROJ_DIST)))
-    display     = int(_ud_get(op, TS_DISPLAY, DEFAULT_DISPLAY))
+    size        = max(10.0, float(op[TS_SIZE]))
+    proj_dist   = max(50.0, float(op[TS_PROJ_DIST]))
+    display     = int(op[TS_DISPLAY])
 
-    rot_xy = float(_ud_get(op, TS_ROT_XY, DEFAULT_ROT_XY))
-    rot_xz = float(_ud_get(op, TS_ROT_XZ, DEFAULT_ROT_XZ))
-    rot_xw = float(_ud_get(op, TS_ROT_XW, DEFAULT_ROT_XW))
-    rot_yz = float(_ud_get(op, TS_ROT_YZ, DEFAULT_ROT_YZ))
-    rot_yw = float(_ud_get(op, TS_ROT_YW, DEFAULT_ROT_YW))
-    rot_zw = float(_ud_get(op, TS_ROT_ZW, DEFAULT_ROT_ZW))
+    rot_xy = float(op[TS_ROT_XY])
+    rot_xz = float(op[TS_ROT_XZ])
+    rot_xw = float(op[TS_ROT_XW])
+    rot_yz = float(op[TS_ROT_YZ])
+    rot_yw = float(op[TS_ROT_YW])
+    rot_zw = float(op[TS_ROT_ZW])
 
-    auto_rot   = bool(_ud_get(op, TS_AUTO_ROT, DEFAULT_AUTO_ROT))
-    speed_xy   = float(_ud_get(op, TS_SPEED_XY, DEFAULT_SPEED_XY))
-    speed_xz   = float(_ud_get(op, TS_SPEED_XZ, DEFAULT_SPEED_XZ))
-    speed_xw   = float(_ud_get(op, TS_SPEED_XW, DEFAULT_SPEED_XW))
-    speed_yz   = float(_ud_get(op, TS_SPEED_YZ, DEFAULT_SPEED_YZ))
-    speed_yw   = float(_ud_get(op, TS_SPEED_YW, DEFAULT_SPEED_YW))
-    speed_zw   = float(_ud_get(op, TS_SPEED_ZW, DEFAULT_SPEED_ZW))
-    phase      = float(_ud_get(op, TS_ANIM_PHASE, DEFAULT_ANIM_PHASE))
+    auto_rot   = bool(op[TS_AUTO_ROT])
+    speed_xy   = float(op[TS_SPEED_XY])
+    speed_xz   = float(op[TS_SPEED_XZ])
+    speed_xw   = float(op[TS_SPEED_XW])
+    speed_yz   = float(op[TS_SPEED_YZ])
+    speed_yw   = float(op[TS_SPEED_YW])
+    speed_zw   = float(op[TS_SPEED_ZW])
+    phase      = float(op[TS_ANIM_PHASE])
 
-    edge_r     = max(0.5, float(_ud_get(op, TS_EDGE_RADIUS, DEFAULT_EDGE_RADIUS)))
-    edge_segs  = max(3, int(_ud_get(op, TS_EDGE_SEGS, DEFAULT_EDGE_SEGS)))
-    vert_r     = max(1.0, float(_ud_get(op, TS_VERTEX_RADIUS, DEFAULT_VERTEX_RADIUS)))
-    vert_segs  = max(3, int(_ud_get(op, TS_VERTEX_SEGS, DEFAULT_VERTEX_SEGS)))
-    show_cells = bool(_ud_get(op, TS_SHOW_CELLS, DEFAULT_SHOW_CELLS))
+    edge_r     = max(0.5, float(op[TS_EDGE_RADIUS]))
+    edge_segs  = max(3, int(op[TS_EDGE_SEGS]))
+    vert_r     = max(1.0, float(op[TS_VERTEX_RADIUS]))
+    vert_segs  = max(3, int(op[TS_VERTEX_SEGS]))
+    show_cells = bool(op[TS_SHOW_CELLS])
 
     # ── Автовращение: добавляем фазу к углам ────────────────────────────
     if auto_rot:
@@ -651,115 +728,10 @@ def _build_tesseract(op):
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-#  UserData: создание интерфейса
+#  Description: создание интерфейса
 # ══════════════════════════════════════════════════════════════════════════════
 
-def _create_userdata(op):
-    # SubID=1 → «Основные»
-    g_core = _add_group(op, "Основные")
-    _add_in_group(op, g_core, _float_bc(
-        "Размер", DEFAULT_SIZE, 10.0, 5000.0))
-    _add_in_group(op, g_core, _float_bc(
-        "Расстояние проекции", DEFAULT_PROJ_DIST, 50.0, 10000.0))
-    _add_in_group(op, g_core, _cycle_bc(
-        "Отображение", DEFAULT_DISPLAY,
-        ["Каркас", "Рёбра + Вершины", "Ячейки", "Всё"]))
 
-    # SubID=5 → «Поворот 4D»
-    # Все значения min/max/step в радианах (DESC_UNIT_DEGREE хранит радианы)
-    g_rot = _add_group(op, "Поворот 4D")
-    _add_in_group(op, g_rot, _float_bc(
-        "Поворот XY", DEFAULT_ROT_XY,
-        math.radians(-360.0), math.radians(360.0),
-        unit=c4d.DESC_UNIT_DEGREE, step=math.radians(1.0)))
-    _add_in_group(op, g_rot, _float_bc(
-        "Поворот XZ", DEFAULT_ROT_XZ,
-        math.radians(-360.0), math.radians(360.0),
-        unit=c4d.DESC_UNIT_DEGREE, step=math.radians(1.0)))
-    _add_in_group(op, g_rot, _float_bc(
-        "Поворот XW", DEFAULT_ROT_XW,
-        math.radians(-360.0), math.radians(360.0),
-        unit=c4d.DESC_UNIT_DEGREE, step=math.radians(1.0)))
-    _add_in_group(op, g_rot, _float_bc(
-        "Поворот YZ", DEFAULT_ROT_YZ,
-        math.radians(-360.0), math.radians(360.0),
-        unit=c4d.DESC_UNIT_DEGREE, step=math.radians(1.0)))
-    _add_in_group(op, g_rot, _float_bc(
-        "Поворот YW", DEFAULT_ROT_YW,
-        math.radians(-360.0), math.radians(360.0),
-        unit=c4d.DESC_UNIT_DEGREE, step=math.radians(1.0)))
-    _add_in_group(op, g_rot, _float_bc(
-        "Поворот ZW", DEFAULT_ROT_ZW,
-        math.radians(-360.0), math.radians(360.0),
-        unit=c4d.DESC_UNIT_DEGREE, step=math.radians(1.0)))
-
-    # SubID=12 → «Автовращение»
-    g_anim = _add_group(op, "Автовращение")
-    _add_in_group(op, g_anim, _bool_bc(
-        "Включить", DEFAULT_AUTO_ROT))
-    _add_in_group(op, g_anim, _float_bc(
-        "Скорость XY", DEFAULT_SPEED_XY, -5.0, 5.0,
-        unit=c4d.DESC_UNIT_FLOAT, step=0.1))
-    _add_in_group(op, g_anim, _float_bc(
-        "Скорость XZ", DEFAULT_SPEED_XZ, -5.0, 5.0,
-        unit=c4d.DESC_UNIT_FLOAT, step=0.1))
-    _add_in_group(op, g_anim, _float_bc(
-        "Скорость XW", DEFAULT_SPEED_XW, -5.0, 5.0,
-        unit=c4d.DESC_UNIT_FLOAT, step=0.1))
-    _add_in_group(op, g_anim, _float_bc(
-        "Скорость YZ", DEFAULT_SPEED_YZ, -5.0, 5.0,
-        unit=c4d.DESC_UNIT_FLOAT, step=0.1))
-    _add_in_group(op, g_anim, _float_bc(
-        "Скорость YW", DEFAULT_SPEED_YW, -5.0, 5.0,
-        unit=c4d.DESC_UNIT_FLOAT, step=0.1))
-    _add_in_group(op, g_anim, _float_bc(
-        "Скорость ZW", DEFAULT_SPEED_ZW, -5.0, 5.0,
-        unit=c4d.DESC_UNIT_FLOAT, step=0.1))
-    _add_in_group(op, g_anim, _float_bc(
-        "Фаза", DEFAULT_ANIM_PHASE, -10000.0, 10000.0,
-        unit=c4d.DESC_UNIT_FLOAT, step=0.01))
-
-    # SubID=21 → «Визуал»
-    g_vis = _add_group(op, "Визуал")
-    _add_in_group(op, g_vis, _float_bc(
-        "Радиус рёбер", DEFAULT_EDGE_RADIUS, 0.1, 100.0))
-    _add_in_group(op, g_vis, _int_bc(
-        "Сегменты рёбер", DEFAULT_EDGE_SEGS, 3, 16))
-    _add_in_group(op, g_vis, _float_bc(
-        "Радиус вершин", DEFAULT_VERTEX_RADIUS, 0.1, 200.0))
-    _add_in_group(op, g_vis, _int_bc(
-        "Сегменты вершин", DEFAULT_VERTEX_SEGS, 3, 16))
-    _add_in_group(op, g_vis, _bool_bc(
-        "Показать ячейки", DEFAULT_SHOW_CELLS))
-
-
-
-def _set_defaults(op):
-    _ud_set(op, TS_SIZE,        DEFAULT_SIZE)
-    _ud_set(op, TS_PROJ_DIST,   DEFAULT_PROJ_DIST)
-    _ud_set(op, TS_DISPLAY,     DEFAULT_DISPLAY)
-
-    _ud_set(op, TS_ROT_XY,      DEFAULT_ROT_XY)
-    _ud_set(op, TS_ROT_XZ,      DEFAULT_ROT_XZ)
-    _ud_set(op, TS_ROT_XW,      DEFAULT_ROT_XW)
-    _ud_set(op, TS_ROT_YZ,      DEFAULT_ROT_YZ)
-    _ud_set(op, TS_ROT_YW,      DEFAULT_ROT_YW)
-    _ud_set(op, TS_ROT_ZW,      DEFAULT_ROT_ZW)
-
-    _ud_set(op, TS_AUTO_ROT,    DEFAULT_AUTO_ROT)
-    _ud_set(op, TS_SPEED_XY,    DEFAULT_SPEED_XY)
-    _ud_set(op, TS_SPEED_XZ,    DEFAULT_SPEED_XZ)
-    _ud_set(op, TS_SPEED_XW,    DEFAULT_SPEED_XW)
-    _ud_set(op, TS_SPEED_YZ,    DEFAULT_SPEED_YZ)
-    _ud_set(op, TS_SPEED_YW,    DEFAULT_SPEED_YW)
-    _ud_set(op, TS_SPEED_ZW,    DEFAULT_SPEED_ZW)
-    _ud_set(op, TS_ANIM_PHASE,  DEFAULT_ANIM_PHASE)
-
-    _ud_set(op, TS_EDGE_RADIUS,   DEFAULT_EDGE_RADIUS)
-    _ud_set(op, TS_EDGE_SEGS,     DEFAULT_EDGE_SEGS)
-    _ud_set(op, TS_VERTEX_RADIUS, DEFAULT_VERTEX_RADIUS)
-    _ud_set(op, TS_VERTEX_SEGS,   DEFAULT_VERTEX_SEGS)
-    _ud_set(op, TS_SHOW_CELLS,    DEFAULT_SHOW_CELLS)
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -771,25 +743,40 @@ class TesseractObject(c4d.plugins.ObjectData):
 
     OBJECT_NAME = "Tesseract"
 
-    def _ensure_ud(self, op):
-        if not _ud_exists(op, TS_FIRST_PARAM):
-            _create_userdata(op)
-            _set_defaults(op)
-
     def Init(self, op, isload=False):
         if not isload:
             op.SetName(self.OBJECT_NAME)
-        self._ensure_ud(op)
+            op[TS_SIZE] = DEFAULT_SIZE
+            op[TS_PROJ_DIST] = DEFAULT_PROJ_DIST
+            op[TS_DISPLAY] = DEFAULT_DISPLAY
+            op[TS_ROT_XY] = DEFAULT_ROT_XY
+            op[TS_ROT_XZ] = DEFAULT_ROT_XZ
+            op[TS_ROT_XW] = DEFAULT_ROT_XW
+            op[TS_ROT_YZ] = DEFAULT_ROT_YZ
+            op[TS_ROT_YW] = DEFAULT_ROT_YW
+            op[TS_ROT_ZW] = DEFAULT_ROT_ZW
+            op[TS_AUTO_ROT] = DEFAULT_AUTO_ROT
+            op[TS_SPEED_XY] = DEFAULT_SPEED_XY
+            op[TS_SPEED_XZ] = DEFAULT_SPEED_XZ
+            op[TS_SPEED_XW] = DEFAULT_SPEED_XW
+            op[TS_SPEED_YZ] = DEFAULT_SPEED_YZ
+            op[TS_SPEED_YW] = DEFAULT_SPEED_YW
+            op[TS_SPEED_ZW] = DEFAULT_SPEED_ZW
+            op[TS_ANIM_PHASE] = DEFAULT_ANIM_PHASE
+            op[TS_EDGE_RADIUS] = DEFAULT_EDGE_RADIUS
+            op[TS_EDGE_SEGS] = DEFAULT_EDGE_SEGS
+            op[TS_VERTEX_RADIUS] = DEFAULT_VERTEX_RADIUS
+            op[TS_VERTEX_SEGS] = DEFAULT_VERTEX_SEGS
+            op[TS_SHOW_CELLS] = DEFAULT_SHOW_CELLS
         return True
 
     def GetVirtualObjects(self, op, hh):
-        self._ensure_ud(op)
         return _build_tesseract(op)
 
     def GetDDescription(self, op, description, flags):
-        if not description.LoadDescription(op.GetType()):
+        if not description.LoadDescription("Obase"):
             return False, flags
-        self._ensure_ud(op)
+        _setup_description(description)
         return True, flags | c4d.DESCFLAGS_DESC_LOADED
 
     def CheckDirty(self, op, doc):
@@ -836,7 +823,7 @@ if __name__ == "__main__":
         id          = ID_TESSERACT,
         str         = NAME_TESSERACT,
         g           = TesseractObject,
-        description = "",
+        description = "Obase",
         icon        = ICO_TS,
         info        = c4d.OBJECT_GENERATOR,
     )
