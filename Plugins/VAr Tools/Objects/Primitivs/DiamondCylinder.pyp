@@ -14,131 +14,26 @@ import tempfile
 
 ID_DIAMONDCYLINDER = 1068873
 
-NAME_DIAMONDCYLINDER = "Diamond Cylinder v1.6.1"
+NAME_DIAMONDCYLINDER = "Diamond Cylinder v1.7"
 
-# ─── UserData SubID (общая схема: SubID=1 — группа, поля с 2) ────────────────
+# ─── Description-based parameter IDs ──────────────────────────────────────────────────
 
-UD_GROUP = 1   # Группа "Параметры"
-
-# DiamondCylinder
-DC_RADIUS  = 2
-DC_HEIGHT  = 3
-DC_SEGS_R  = 4
-DC_SEGS_H  = 5
-DC_CAPS    = 6
-DC_SURFACE = 7   # Тип поверхности (enum)
-DC_TWIST        = 8   # Скрутка по оси Y (градусы)
-DC_STAR_ENABLED = 9   # Галочка "Смещение (звезда)"
-DC_STAR_OFFSET  = 10  # Величина радиального смещения чётных точек
+DC_GRP           = 2000
+DC_D_RADIUS      = 2001
+DC_D_HEIGHT      = 2002
+DC_D_SEGS_R      = 2003
+DC_D_SEGS_H      = 2004
+DC_D_CAPS        = 2005
+DC_D_SURFACE     = 2006
+DC_D_TWIST       = 2007
+DC_D_STAR_ENABLED = 2008
+DC_D_STAR_OFFSET = 2009
 
 # Значения для DC_SURFACE
 SURF_ZIGZAG  = 0   # Зигзаг (ромбы) — исходный режим
 SURF_SPIRAL  = 1   # Спираль
 SURF_HEX     = 2   # Гексагональная сетка
 SURF_DIAMOND = 3   # Прямые ромбы (без смещения рядов)
-
-
-# ─── Вспомогательные функции UserData ────────────────────────────────────────
-
-def _ud_descid(op, uid):
-    """Ищет UserData по SubID. Возвращает (DescID, BaseContainer) или (None, None)."""
-    for descid, bc in op.GetUserDataContainer():
-        if descid[1].id == uid:
-            return descid, bc
-    return None, None
-
-
-def _ud_get(op, uid, default=None):
-    did, _ = _ud_descid(op, uid)
-    if did is not None:
-        val = op[did]
-        if val is not None:
-            return val
-    return default
-
-
-def _add_group(op, name):
-    """Добавляет корневую группу UserData. Возвращает SubID группы."""
-    bc = c4d.GetCustomDatatypeDefault(c4d.DTYPE_GROUP)
-    bc[c4d.DESC_NAME]       = name
-    bc[c4d.DESC_SHORT_NAME] = name
-    bc[c4d.DESC_TITLEBAR]   = 1
-    bc[c4d.DESC_DEFAULT]    = 1  # развёрнута по умолчанию
-    did = op.AddUserData(bc)
-    return did[1].id   # [1] — SubID, [0] — ID_USERDATA(700)
-
-
-def _add_in_group(op, grp_subid, bc):
-    """Добавляет элемент UserData внутрь группы с данным SubID."""
-    bc[c4d.DESC_PARENTGROUP] = c4d.DescID(
-        c4d.DescLevel(c4d.ID_USERDATA, c4d.DTYPE_SUBCONTAINER, 0),
-        c4d.DescLevel(grp_subid, c4d.DTYPE_GROUP, 0)
-    )
-    return op.AddUserData(bc)
-
-
-def _make_float_bc(name, default, minval, maxval, unit=c4d.DESC_UNIT_METER, step=1.0):
-    bc = c4d.GetCustomDatatypeDefault(c4d.DTYPE_REAL)
-    bc[c4d.DESC_NAME]       = name
-    bc[c4d.DESC_SHORT_NAME] = name
-    bc[c4d.DESC_DEFAULT]    = default
-    bc[c4d.DESC_MIN]        = minval
-    bc[c4d.DESC_MAX]        = maxval
-    bc[c4d.DESC_UNIT]       = unit
-    bc[c4d.DESC_STEP]       = step
-    bc[c4d.DESC_ANIMATE]    = c4d.DESC_ANIMATE_ON
-    return bc
-
-
-def _make_int_bc(name, default, minval, maxval):
-    bc = c4d.GetCustomDatatypeDefault(c4d.DTYPE_LONG)
-    bc[c4d.DESC_NAME]       = name
-    bc[c4d.DESC_SHORT_NAME] = name
-    bc[c4d.DESC_DEFAULT]    = default
-    bc[c4d.DESC_MIN]        = minval
-    bc[c4d.DESC_MAX]        = maxval
-    bc[c4d.DESC_STEP]       = 1
-    bc[c4d.DESC_ANIMATE]    = c4d.DESC_ANIMATE_ON
-    return bc
-
-
-def _make_bool_bc(name, default):
-    bc = c4d.GetCustomDatatypeDefault(c4d.DTYPE_BOOL)
-    bc[c4d.DESC_NAME]       = name
-    bc[c4d.DESC_SHORT_NAME] = name
-    bc[c4d.DESC_DEFAULT]    = default
-    bc[c4d.DESC_ANIMATE]    = c4d.DESC_ANIMATE_ON
-    return bc
-
-
-def _make_cycle_bc(name, default, items):
-    """Создаёт поле-выпадающий список (CUSTOMDATATYPE_CYCLE / DTYPE_LONG).
-    items — список строк в нужном порядке (индекс = значение).
-    """
-    bc = c4d.GetCustomDatatypeDefault(c4d.DTYPE_LONG)
-    bc[c4d.DESC_NAME]       = name
-    bc[c4d.DESC_SHORT_NAME] = name
-    bc[c4d.DESC_DEFAULT]    = default
-    bc[c4d.DESC_ANIMATE]    = c4d.DESC_ANIMATE_ON
-    bc[c4d.DESC_CUSTOMGUI]  = c4d.CUSTOMGUI_CYCLE
-    cycle_bc = c4d.BaseContainer()
-    for i, label in enumerate(items):
-        cycle_bc[i] = label
-    bc[c4d.DESC_CYCLE] = cycle_bc
-    return bc
-
-
-def _ud_already_created(op, first_field_uid):
-    """Проверяет, созданы ли уже UserData по наличию поля с данным SubID."""
-    did, _ = _ud_descid(op, first_field_uid)
-    return did is not None
-
-
-def _ud_set_default(op, uid, value):
-    """Устанавливает значение поля UserData по SubID."""
-    did, _ = _ud_descid(op, uid)
-    if did is not None:
-        op[did] = value
 
 
 # ─── Генераторы мешей ─────────────────────────────────────────────────────────
@@ -418,42 +313,29 @@ def _make_poly_object(points, polys, name):
 class _MeshPrimitiveBase(c4d.plugins.ObjectData):
     """
     Базовый класс для всех mesh-примитивов.
+    Использует Description-систему для UI (вкладки в Attributes Manager).
     Подклассы определяют:
-      OBJECT_NAME   — имя объекта по умолчанию
-      _first_ud_id  — SubID первого поля UserData (для проверки инициализации)
-      _create_ud()  — создание UserData-полей
+      OBJECT_NAME     — имя объекта по умолчанию
+      GetDDescription() — описание UI (вкладки и параметры)
       _set_defaults() — установка значений по умолчанию
-      _build_mesh() — генерация (points, polys)
+      _build_mesh()   — генерация (points, polys)
     """
 
-    OBJECT_NAME  = "MeshPrimitive"
-    _first_ud_id = DC_RADIUS   # переопределяется в подклассах
+    OBJECT_NAME = "MeshPrimitive"
 
     def Init(self, op, isload=False):
         if not isload:
             op.SetName(self.OBJECT_NAME)
-        if not _ud_already_created(op, self._first_ud_id):
-            grp_subid = _add_group(op, "Параметры")
-            self._create_ud(op, grp_subid)
             self._set_defaults(op)
         return True
 
     def GetVirtualObjects(self, op, hh):
-        if not _ud_already_created(op, self._first_ud_id):
-            grp_subid = _add_group(op, "Параметры")
-            self._create_ud(op, grp_subid)
-            self._set_defaults(op)
-
         points, polys = self._build_mesh(op)
         return _make_poly_object(points, polys, self.OBJECT_NAME)
 
     def GetDDescription(self, op, description, flags):
-        if not description.LoadDescription(op.GetType()):
+        if not description.LoadDescription("Obase"):
             return False, flags
-        if not _ud_already_created(op, self._first_ud_id):
-            grp_subid = _add_group(op, "Параметры")
-            self._create_ud(op, grp_subid)
-            self._set_defaults(op)
         return True, flags | c4d.DESCFLAGS_DESC_LOADED
 
     def CheckDirty(self, op, doc):
@@ -461,10 +343,6 @@ class _MeshPrimitiveBase(c4d.plugins.ObjectData):
 
     def Draw(self, op, drawpass, bd, bh):
         return c4d.DRAWRESULT_OK
-
-    # Переопределить в подклассах:
-    def _create_ud(self, op, grp_subid):
-        pass
 
     def _set_defaults(self, op):
         pass
@@ -478,51 +356,146 @@ class _MeshPrimitiveBase(c4d.plugins.ObjectData):
 class DiamondCylinderObject(_MeshPrimitiveBase):
     """Цилиндр с ромбической сеткой."""
 
-    OBJECT_NAME  = "Diamond Cylinder"
-    _first_ud_id = DC_RADIUS
-
-    def _create_ud(self, op, grp_subid):
-        _add_in_group(op, grp_subid, _make_float_bc(
-            "Радиус", 100.0, 1.0, 100000.0))
-        _add_in_group(op, grp_subid, _make_float_bc(
-            "Высота", 200.0, 1.0, 100000.0))
-        _add_in_group(op, grp_subid, _make_int_bc(
-            "Сегменты (окружность)", 12, 3, 200))
-        _add_in_group(op, grp_subid, _make_int_bc(
-            "Сегменты (высота)", 6, 1, 200))
-        _add_in_group(op, grp_subid, _make_bool_bc(
-            "Крышки", True))
-        _add_in_group(op, grp_subid, _make_cycle_bc(
-            "Тип поверхности", SURF_ZIGZAG,
-            ["Зигзаг (ромбы)", "Спираль", "Гармошка", "Прямая сетка"]))
-        _add_in_group(op, grp_subid, _make_float_bc(
-            "Скрутка (°)", 0.0, math.radians(-3600.0), math.radians(3600.0), unit=c4d.DESC_UNIT_DEGREE, step=math.radians(0.1)))
-        _add_in_group(op, grp_subid, _make_bool_bc(
-            "Смещение (звезда)", False))
-        _add_in_group(op, grp_subid, _make_float_bc(
-            "Величина смещения", 20.0, 0.0, 100000.0, unit=c4d.DESC_UNIT_METER, step=1.0))
+    OBJECT_NAME = "Diamond Cylinder"
 
     def _set_defaults(self, op):
-        _ud_set_default(op, DC_RADIUS, 100.0)
-        _ud_set_default(op, DC_HEIGHT, 200.0)
-        _ud_set_default(op, DC_SEGS_R, 12)
-        _ud_set_default(op, DC_SEGS_H, 6)
-        _ud_set_default(op, DC_CAPS,    True)
-        _ud_set_default(op, DC_SURFACE, SURF_ZIGZAG)
-        _ud_set_default(op, DC_TWIST,   0.0)
-        _ud_set_default(op, DC_STAR_ENABLED, False)
-        _ud_set_default(op, DC_STAR_OFFSET,  20.0)
+        op[DC_D_RADIUS]       = 100.0
+        op[DC_D_HEIGHT]       = 200.0
+        op[DC_D_SEGS_R]       = 12
+        op[DC_D_SEGS_H]       = 6
+        op[DC_D_CAPS]         = True
+        op[DC_D_SURFACE]      = SURF_ZIGZAG
+        op[DC_D_TWIST]        = 0.0
+        op[DC_D_STAR_ENABLED] = False
+        op[DC_D_STAR_OFFSET]  = 20.0
+
+    def GetDDescription(self, op, description, flags):
+        if not description.LoadDescription("Obase"):
+            return False, flags
+
+        bc = c4d.GetCustomDataTypeDefault(c4d.DTYPE_GROUP)
+        bc[c4d.DESC_NAME]    = "Параметры"
+        bc[c4d.DESC_COLUMNS] = 1
+        bc[c4d.DESC_DEFAULT] = 1
+        description.SetParameter(
+            c4d.DescID(c4d.DescLevel(DC_GRP, c4d.DTYPE_GROUP, 0)),
+            bc, c4d.ID_LISTHEAD
+        )
+        gid = c4d.DescID(c4d.DescLevel(DC_GRP, c4d.DTYPE_GROUP, 0))
+
+        bc = c4d.GetCustomDataTypeDefault(c4d.DTYPE_REAL)
+        bc[c4d.DESC_NAME]    = "Радиус"
+        bc[c4d.DESC_DEFAULT] = 100.0
+        bc[c4d.DESC_MIN]     = 1.0
+        bc[c4d.DESC_MAX]     = 100000.0
+        bc[c4d.DESC_UNIT]    = c4d.DESC_UNIT_METER
+        bc[c4d.DESC_STEP]    = 1.0
+        description.SetParameter(
+            c4d.DescID(c4d.DescLevel(DC_D_RADIUS, c4d.DTYPE_REAL, 0)),
+            bc, gid
+        )
+
+        bc = c4d.GetCustomDataTypeDefault(c4d.DTYPE_REAL)
+        bc[c4d.DESC_NAME]    = "Высота"
+        bc[c4d.DESC_DEFAULT] = 200.0
+        bc[c4d.DESC_MIN]     = 1.0
+        bc[c4d.DESC_MAX]     = 100000.0
+        bc[c4d.DESC_UNIT]    = c4d.DESC_UNIT_METER
+        bc[c4d.DESC_STEP]    = 1.0
+        description.SetParameter(
+            c4d.DescID(c4d.DescLevel(DC_D_HEIGHT, c4d.DTYPE_REAL, 0)),
+            bc, gid
+        )
+
+        bc = c4d.GetCustomDataTypeDefault(c4d.DTYPE_LONG)
+        bc[c4d.DESC_NAME]    = "Сегменты (окружность)"
+        bc[c4d.DESC_DEFAULT] = 12
+        bc[c4d.DESC_MIN]     = 3
+        bc[c4d.DESC_MAX]     = 200
+        bc[c4d.DESC_STEP]    = 1
+        description.SetParameter(
+            c4d.DescID(c4d.DescLevel(DC_D_SEGS_R, c4d.DTYPE_LONG, 0)),
+            bc, gid
+        )
+
+        bc = c4d.GetCustomDataTypeDefault(c4d.DTYPE_LONG)
+        bc[c4d.DESC_NAME]    = "Сегменты (высота)"
+        bc[c4d.DESC_DEFAULT] = 6
+        bc[c4d.DESC_MIN]     = 1
+        bc[c4d.DESC_MAX]     = 200
+        bc[c4d.DESC_STEP]    = 1
+        description.SetParameter(
+            c4d.DescID(c4d.DescLevel(DC_D_SEGS_H, c4d.DTYPE_LONG, 0)),
+            bc, gid
+        )
+
+        bc = c4d.GetCustomDataTypeDefault(c4d.DTYPE_BOOL)
+        bc[c4d.DESC_NAME]    = "Крышки"
+        bc[c4d.DESC_DEFAULT] = True
+        description.SetParameter(
+            c4d.DescID(c4d.DescLevel(DC_D_CAPS, c4d.DTYPE_BOOL, 0)),
+            bc, gid
+        )
+
+        bc = c4d.GetCustomDataTypeDefault(c4d.DTYPE_LONG)
+        bc[c4d.DESC_NAME]      = "Тип поверхности"
+        bc[c4d.DESC_CUSTOMGUI] = c4d.CUSTOMGUI_CYCLE
+        bc[c4d.DESC_DEFAULT]   = SURF_ZIGZAG
+        cyc = c4d.BaseContainer()
+        cyc[0] = "Зигзаг (ромбы)"
+        cyc[1] = "Спираль"
+        cyc[2] = "Гармошка"
+        cyc[3] = "Прямая сетка"
+        bc[c4d.DESC_CYCLE] = cyc
+        description.SetParameter(
+            c4d.DescID(c4d.DescLevel(DC_D_SURFACE, c4d.DTYPE_LONG, 0)),
+            bc, gid
+        )
+
+        bc = c4d.GetCustomDataTypeDefault(c4d.DTYPE_REAL)
+        bc[c4d.DESC_NAME]    = "Скрутка (°)"
+        bc[c4d.DESC_DEFAULT] = 0.0
+        bc[c4d.DESC_MIN]     = math.radians(-3600.0)
+        bc[c4d.DESC_MAX]     = math.radians(3600.0)
+        bc[c4d.DESC_UNIT]    = c4d.DESC_UNIT_DEGREE
+        bc[c4d.DESC_STEP]    = math.radians(0.1)
+        description.SetParameter(
+            c4d.DescID(c4d.DescLevel(DC_D_TWIST, c4d.DTYPE_REAL, 0)),
+            bc, gid
+        )
+
+        bc = c4d.GetCustomDataTypeDefault(c4d.DTYPE_BOOL)
+        bc[c4d.DESC_NAME]    = "Смещение (звезда)"
+        bc[c4d.DESC_DEFAULT] = False
+        description.SetParameter(
+            c4d.DescID(c4d.DescLevel(DC_D_STAR_ENABLED, c4d.DTYPE_BOOL, 0)),
+            bc, gid
+        )
+
+        bc = c4d.GetCustomDataTypeDefault(c4d.DTYPE_REAL)
+        bc[c4d.DESC_NAME]    = "Величина смещения"
+        bc[c4d.DESC_DEFAULT] = 20.0
+        bc[c4d.DESC_MIN]     = 0.0
+        bc[c4d.DESC_MAX]     = 100000.0
+        bc[c4d.DESC_UNIT]    = c4d.DESC_UNIT_METER
+        bc[c4d.DESC_STEP]    = 1.0
+        description.SetParameter(
+            c4d.DescID(c4d.DescLevel(DC_D_STAR_OFFSET, c4d.DTYPE_REAL, 0)),
+            bc, gid
+        )
+
+        return True, flags | c4d.DESCFLAGS_DESC_LOADED
 
     def _build_mesh(self, op):
-        radius       = _ud_get(op, DC_RADIUS, 100.0)
-        height       = _ud_get(op, DC_HEIGHT, 200.0)
-        segs_r       = max(3,  int(_ud_get(op, DC_SEGS_R, 12)))
-        segs_h       = max(1,  int(_ud_get(op, DC_SEGS_H, 6)))
-        caps         = bool(_ud_get(op, DC_CAPS, True))
-        surf         = int(_ud_get(op, DC_SURFACE, SURF_ZIGZAG))
-        twist        = _ud_get(op, DC_TWIST, 0.0)  # скрутка по Y, хранится в радианах (C4D конвертирует из °)
-        star_enabled = bool(_ud_get(op, DC_STAR_ENABLED, False))
-        star_offset  = float(_ud_get(op, DC_STAR_OFFSET, 20.0))
+        radius        = op[DC_D_RADIUS]
+        height        = op[DC_D_HEIGHT]
+        segs_r        = max(3,  int(op[DC_D_SEGS_R]))
+        segs_h        = max(1,  int(op[DC_D_SEGS_H]))
+        caps          = bool(op[DC_D_CAPS])
+        surf          = int(op[DC_D_SURFACE])
+        twist         = op[DC_D_TWIST]  # скрутка по Y, хранится в радианах (C4D конвертирует из °)
+        star_enabled  = bool(op[DC_D_STAR_ENABLED])
+        star_offset   = float(op[DC_D_STAR_OFFSET])
 
         # Если смещение включено — segs_r должен быть чётным (звезда требует пар точек)
         if star_enabled and segs_r % 2 != 0:
@@ -570,7 +543,7 @@ if __name__ == "__main__":
         id          = ID_DIAMONDCYLINDER,
         str         = NAME_DIAMONDCYLINDER,
         g           = DiamondCylinderObject,
-        description = "",
+        description = "Obase",
         icon        = ICO_DC,
         info        = c4d.OBJECT_GENERATOR,
     )
