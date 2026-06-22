@@ -1692,6 +1692,21 @@ img {
     color: var(--color-text-secondary);
 }
 
+/* Иконки/изображения */
+.md-ico-wrap {
+    display: block;
+    text-align: left;
+    margin: 4px 0;
+}
+
+.md-ico-wrap-center {
+    text-align: center;
+}
+
+.md-ico-wrap-right {
+    text-align: right;
+}
+
 /* ========================================
     Модальные окна (modal blocks)
     ======================================== */
@@ -2029,6 +2044,7 @@ img {
 .md-modal-body {
     padding: 20px 24px 24px;
     overflow-y: auto;
+    overflow-x: hidden;
     flex: 1;
     min-height: 0;
     scrollbar-width: thin;
@@ -2086,6 +2102,15 @@ img {
 .md-photo-carousel {
     margin: 24px 0;
     border-radius: var(--radius-md);
+}
+
+.md-photo-carousel-wrap-center {
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.md-photo-carousel-wrap-right {
+    margin-left: auto;
 }
 
 .md-photo-carousel-title {
@@ -2216,6 +2241,16 @@ img {
     border-radius: var(--radius-md);
     background: var(--color-surface);
     border: 1px solid var(--color-border);
+}
+
+.md-leveling-wrap-center {
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.md-leveling-wrap-right {
+    margin-left: auto;
+}
     overflow: hidden;
 }
 

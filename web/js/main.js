@@ -456,14 +456,14 @@ function renderMarkdown(markdown) {
         return saveBlock(`<div class="changelog">${entries.join('')}</div>`);
     });
 
-    // Фотокарусель: ===photo -n[Title] -sWxH ===
-    html = html.replace(/===photo(?:_\w+)?\s*(?:-n\[([^\]]*)\])?\s*(?:-s(\d+)[x*](\d+))?\n([\s\S]*?)===/g, (_, title, w, h, content) => {
-        return saveBlock(renderPhotoCarousel('photo', title, w, h, content));
+    // Фотокарусель: ===photo -n[Title] -sWxH -c1 -asc200 -asp500 ===
+    html = html.replace(/===photo(?:_\w+)?\s*(?:-n\[([^\]]*)\])?\s*(?:-s(\d+)[x*](\d+))?\s*(?:-c([1-3]))?\s*(?:-asc(\d+))?\s*(?:-asp(\d+))?\n([\s\S]*?)===/g, (_, title, w, h, align, asc, asp, content) => {
+        return saveBlock(renderPhotoCarousel('photo', title, w, h, content, align, asc, asp));
     });
 
-    // Сравнение фото: ===leveling -n[Title] -sWxH ===
-    html = html.replace(/===leveling\s*(?:-n\[([^\]]*)\])?\s*(?:-s(\d+)[x*](\d+))?\n([\s\S]*?)===/g, (_, title, w, h, content) => {
-        return saveBlock(renderLeveling(title || 'Сравнение', parseInt(w) || 600, parseInt(h) || 400, content));
+    // Сравнение фото: ===leveling -n[Title] -sWxH -c1 -asc200 -asp500 ===
+    html = html.replace(/===leveling\s*(?:-n\[([^\]]*)\])?\s*(?:-s(\d+)[x*](\d+))?\s*(?:-c([1-3]))?\s*(?:-asc(\d+))?\s*(?:-asp(\d+))?\n([\s\S]*?)===/g, (_, title, w, h, align, asc, asp, content) => {
+        return saveBlock(renderLeveling(title || 'Сравнение', parseInt(w) || 600, parseInt(h) || 400, content, align, asc, asp));
     });
 
     // Экранируем HTML в исходном тексте для безопасности
@@ -631,12 +631,12 @@ function renderInlineContent(text) {
         return `<div class="callout callout-${type}"><span class="callout-icon">${icons[type]}</span><div class="callout-content">${renderInlineContent(content.trim())}</div></div>`;
     });
 
-    html = html.replace(/===photo(?:_\w+)?\s*(?:-n\[([^\]]*)\])?\s*(?:-s(\d+)[x*](\d+))?\n([\s\S]*?)===/g, (_, title, w, h, content) => {
-        return renderPhotoCarousel('photo', title, w, h, content);
+    html = html.replace(/===photo(?:_\w+)?\s*(?:-n\[([^\]]*)\])?\s*(?:-s(\d+)[x*](\d+))?\s*(?:-c([1-3]))?\s*(?:-asc(\d+))?\s*(?:-asp(\d+))?\n([\s\S]*?)===/g, (_, title, w, h, align, asc, asp, content) => {
+        return renderPhotoCarousel('photo', title, w, h, content, align, asc, asp);
     });
 
-    html = html.replace(/===leveling\s*(?:-n\[([^\]]*)\])?\s*(?:-s(\d+)[x*](\d+))?\n([\s\S]*?)===/g, (_, title, w, h, content) => {
-        return renderLeveling(title || 'Сравнение', parseInt(w) || 600, parseInt(h) || 400, content);
+    html = html.replace(/===leveling\s*(?:-n\[([^\]]*)\])?\s*(?:-s(\d+)[x*](\d+))?\s*(?:-c([1-3]))?\s*(?:-asc(\d+))?\s*(?:-asp(\d+))?\n([\s\S]*?)===/g, (_, title, w, h, align, asc, asp, content) => {
+        return renderLeveling(title || 'Сравнение', parseInt(w) || 600, parseInt(h) || 400, content, align, asc, asp);
     });
 
     html = html.replace(/^####\s+(.+)$/gm, '<h4>$1</h4>');
@@ -755,21 +755,27 @@ function renderInlineSyntax(html) {
     // Иконка/изображение: [[ico:'path/to/img.png'|WxH]] или [[ico:'path':WxH]]
     // Примеры: [[ico:'plugins/icon.png'|32x32]]  [[ico:'img/logo.svg':64*64]]  [[ico:'img/pic.jpg'|120x80]]
 
-    // Вариант -x / -H: [[ico:'path'-x]] исходный размер, [[ico:'path'-100]] высота 100px, ширина пропорционально
-    html = html.replace(/\[\[ico:'([^']+)'-(x|\d+)\]\]/g, (_, src, size) => {
+    // Вариант -x / -H: [[ico:'path'-x]] [[ico:'path'-100]] [[ico:'path'-300-c2]]
+    html = html.replace(/\[\[ico:'([^']+)'-(x|\d+)(?:-c([1-3]))?\]\]/g, (_, src, size, align) => {
+        const alignCls = align ? ` md-ico-wrap-${['','left','center','right'][align]}` : '';
+        const wrapOpen = align ? `<span class="md-ico-wrap${alignCls}">` : '';
+        const wrapClose = align ? `</span>` : '';
         if (size === 'x') {
-            return `<img class="md-ico" src="${escapeHtml(src)}" alt="" loading="lazy" style="object-fit:contain;vertical-align:middle;display:inline-block;border-radius:0;">`;
+            return `${wrapOpen}<img class="md-ico" src="${escapeHtml(src)}" alt="" loading="lazy" style="object-fit:contain;vertical-align:middle;display:inline-block;border-radius:0;">${wrapClose}`;
         }
         const h = parseInt(size);
-        return `<img class="md-ico" src="${escapeHtml(src)}" height="${h}" alt="" loading="lazy" style="height:${h}px;width:auto;object-fit:contain;vertical-align:middle;display:inline-block;border-radius:0;">`;
+        return `${wrapOpen}<img class="md-ico" src="${escapeHtml(src)}" height="${h}" alt="" loading="lazy" style="height:${h}px;width:auto;object-fit:contain;vertical-align:middle;display:inline-block;border-radius:0;">${wrapClose}`;
     });
 
-    // Вариант с размером: [[ico:'path'|WxH]] или [[ico:'path':WxH]]
-    html = html.replace(/\[\[ico:'([^']+)'\[|:](\d+)[x*](\d+)\]\]/g, (_, src, w, h) => {
-        return `<img class="md-ico" src="${escapeHtml(src)}" width="${parseInt(w)}" height="${parseInt(h)}" alt="" loading="lazy" style="width:${parseInt(w)}px;height:${parseInt(h)}px;object-fit:contain;vertical-align:middle;display:inline-block;border-radius:0;">`;
+    // Вариант с размером: [[ico:'path'|WxH]] [[ico:'path':WxH]] [[ico:'path'|300*200-c2]]
+    html = html.replace(/\[\[ico:'([^']+)'\[|:](\d+)[x*](\d+)(?:-c([1-3]))?\]\]/g, (_, src, w, h, align) => {
+        const alignCls = align ? ` md-ico-wrap-${['','left','center','right'][align]}` : '';
+        const wrapOpen = align ? `<span class="md-ico-wrap${alignCls}">` : '';
+        const wrapClose = align ? `</span>` : '';
+        return `${wrapOpen}<img class="md-ico" src="${escapeHtml(src)}" width="${parseInt(w)}" height="${parseInt(h)}" alt="" loading="lazy" style="width:${parseInt(w)}px;height:${parseInt(h)}px;object-fit:contain;vertical-align:middle;display:inline-block;border-radius:0;">${wrapClose}`;
     });
 
-    // Вариант без размеров: [[ico:'path/to/img.png']] — отображается как 36x36
+    // Вариант без размеров: [[ico:'path/to/img.png']] [[ico:'path'-c2]]
     html = html.replace(/\[\[ico:'([^']+)'\]\]/g, (_, src) => {
         return `<img class="md-ico" src="${escapeHtml(src)}" width="24" height="24" alt="" loading="lazy" style="width:36px;height:36px;object-fit:contain;vertical-align:middle;display:inline-block;border-radius:0;">`;
     });
@@ -1102,7 +1108,7 @@ function showPluginError(title, message) {
    Фотоальбом: карусель (блоковый)
    ======================================== */
 
-function renderPhotoCarousel(type, title, w, h, content) {
+function renderPhotoCarousel(type, title, w, h, content, align, asc, asp) {
     const photos = [];
     const photoRegex = /\[\[p:'([^']+)'\]\]/g;
     let m;
@@ -1116,7 +1122,14 @@ function renderPhotoCarousel(type, title, w, h, content) {
     const height = parseInt(h) || 300;
     const photosJson = JSON.stringify(photos).replace(/"/g, '&quot;');
 
-    let out = `<div class="md-photo-carousel" id="${id}" data-photos="${photosJson}" style="width:${width}px;max-width:100%">`;
+    const alignMap = { '2': 'center', '3': 'right' };
+    const alignName = alignMap[align] || '';
+    const wrapClass = alignName ? ` md-photo-carousel-wrap-${alignName}` : '';
+
+    const ascAttr = asc ? ` data-asc="${parseInt(asc)}"` : '';
+    const aspAttr = asp ? ` data-asp="${parseInt(asp)}"` : '';
+
+    let out = `<div class="md-photo-carousel${wrapClass}" id="${id}" data-photos="${photosJson}"${ascAttr}${aspAttr} style="width:${width}px;max-width:100%">`;
     if (title) {
         out += `<div class="md-photo-carousel-title">${escapeHtml(title)}</div>`;
     }
@@ -1350,7 +1363,7 @@ function closeModal() {
    Фотокарусель: навигация (3D)
    ======================================== */
 
-function applyCarousel3D(id, index) {
+function applyCarousel3D(id, index, instant) {
     const el = document.getElementById(id);
     if (!el) return;
     const track = el.querySelector('.md-photo-carousel-track');
@@ -1359,12 +1372,15 @@ function applyCarousel3D(id, index) {
     const counter = el.querySelector('.md-photo-carousel-counter');
     track.dataset.current = index;
     const total = slides.length;
+    const asp = parseInt(el.dataset.asp) || 500;
 
     slides.forEach((slide, i) => {
         let offset = i - index;
         if (offset > total / 2) offset -= total;
         if (offset < -total / 2) offset += total;
         const absOffset = Math.abs(offset);
+
+        slide.style.transition = instant ? 'none' : `transform ${asp}ms ease, opacity ${asp}ms ease`;
 
         if (offset === 0) {
             slide.style.transform = 'translateZ(0) rotateY(0deg) scale(1)';
@@ -1396,14 +1412,50 @@ function applyCarousel3D(id, index) {
     if (counter) counter.textContent = `${index + 1} / ${total}`;
 }
 
-function slideCarousel(id, dir) {
+function slideCarousel(id, dir, instant) {
     const el = document.getElementById(id);
     if (!el) return;
     const track = el.querySelector('.md-photo-carousel-track');
     const slides = track.children;
     let current = parseInt(track.dataset.current || '0');
     current = (current + dir + slides.length) % slides.length;
-    applyCarousel3D(id, current);
+    applyCarousel3D(id, current, instant);
+}
+
+function startAutoScroll(carousel) {
+    const id = carousel.id;
+    const asp = parseInt(carousel.dataset.asp) || 500;
+    const asc = parseInt(carousel.dataset.asc) || 0;
+
+    if (asc > 0) {
+        const interval = asc + asp;
+        carousel._ascTimer = setInterval(() => slideCarousel(id, 1), interval);
+        carousel.addEventListener('mouseenter', () => clearInterval(carousel._ascTimer));
+        carousel.addEventListener('mouseleave', () => {
+            carousel._ascTimer = setInterval(() => slideCarousel(id, 1), interval);
+        });
+    } else {
+        const autoNext = () => {
+            slideCarousel(id, 1);
+            const track = carousel.querySelector('.md-photo-carousel-track');
+            const active = track ? track.querySelector('.active') : null;
+            if (active) {
+                const handler = (e) => {
+                    if (e.propertyName !== 'transform') return;
+                    active.removeEventListener('transitionend', handler);
+                    carousel._autoTimeout = setTimeout(autoNext, 30);
+                };
+                active.addEventListener('transitionend', handler);
+            } else {
+                carousel._autoTimeout = setTimeout(autoNext, asp);
+            }
+        };
+        carousel._autoTimeout = setTimeout(autoNext, asp);
+        carousel.addEventListener('mouseenter', () => clearTimeout(carousel._autoTimeout));
+        carousel.addEventListener('mouseleave', () => {
+            carousel._autoTimeout = setTimeout(autoNext, 30);
+        });
+    }
 }
 
 function goToSlide(id, index) {
@@ -1436,6 +1488,11 @@ function initPhotoCarousels(root = document) {
         }, { passive: true });
 
         applyCarousel3D(id, 0);
+
+        const asp = parseInt(carousel.dataset.asp) || 0;
+        if (asp > 0 && slides.length > 1) {
+            startAutoScroll(carousel);
+        }
     });
 }
 
@@ -1443,7 +1500,7 @@ function initPhotoCarousels(root = document) {
    Сравнение фото (leveling)
    ======================================== */
 
-function renderLeveling(title, w, h, content) {
+function renderLeveling(title, w, h, content, align, asc, asp) {
     const photos = [];
     const photoRegex = /\[\[lv:'([^']+)'\]\]\s*(?:-d\[([^\]]*)\])?/g;
     let m;
@@ -1463,7 +1520,14 @@ function renderLeveling(title, w, h, content) {
         dividerPositions.push(66.67);
     }
 
-    let out = `<div class="md-leveling" id="${id}" style="width:${w}px;max-width:100%">`;
+    const alignMap = { '2': 'center', '3': 'right' };
+    const alignName = alignMap[align] || '';
+    const wrapClass = alignName ? ` md-leveling-wrap-${alignName}` : '';
+
+    const ascAttr = asc ? ` data-asc="${parseInt(asc)}"` : '';
+    const aspAttr = asp ? ` data-asp="${parseInt(asp)}"` : '';
+
+    let out = `<div class="md-leveling${wrapClass}" id="${id}" data-count="${count}"${ascAttr}${aspAttr} style="width:${w}px;max-width:100%">`;
     out += `<div class="md-leveling-title">${escapeHtml(title)}</div>`;
     out += `<div class="md-leveling-viewport" style="height:${h}px" data-count="${count}">`;
 
@@ -1587,5 +1651,53 @@ function initLevelingSliders(root = document) {
                 document.addEventListener('touchend', touchend);
             }, { passive: false });
         });
+
+        const asc = parseInt(el.dataset.asc) || 0;
+        const asp = parseInt(el.dataset.asp) || 0;
+        if (asp > 0) {
+            let autoIdx = 0;
+
+            const animate = (from, to, duration, cb) => {
+                const start = performance.now();
+                const tick = (now) => {
+                    const t = Math.min((now - start) / duration, 1);
+                    const ease = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+                    const pos = from + (to - from) * ease;
+                    cb(pos);
+                    if (t < 1) requestAnimationFrame(tick);
+                };
+                requestAnimationFrame(tick);
+            };
+
+            const autoStep = () => {
+                if (count === 2) {
+                    const target = autoIdx % 2 === 0 ? 5 : 95;
+                    animate(getPositions()[0], target, asp, (p) => setPositions([p]));
+                    autoIdx++;
+                } else {
+                    const positions = autoIdx % 3 === 0
+                        ? [80, 95]
+                        : autoIdx % 3 === 1
+                        ? [5, 95]
+                        : [5, 20];
+                    const from = getPositions();
+                    animate(0, 1, asp, (t) => {
+                        setPositions([
+                            from[0] + (positions[0] - from[0]) * t,
+                            from[1] + (positions[1] - from[1]) * t
+                        ]);
+                    });
+                    autoIdx++;
+                }
+            };
+
+            const interval = asc > 0 ? asc + asp : asp;
+
+            el._ascTimer = setInterval(autoStep, interval);
+            el.addEventListener('mouseenter', () => clearInterval(el._ascTimer));
+            el.addEventListener('mouseleave', () => {
+                el._ascTimer = setInterval(autoStep, interval);
+            });
+        }
     });
 }
