@@ -1,47 +1,37 @@
 # -*- coding: utf-8 -*-
 """
-MolecularHexLattice — Cinema 4D ObjectData Plugin v1.0
-=======================================================
-Генератор молекулярных связей:
-  • Узлы — гексагональные шары (dual icosphere) с удалёнными гексагонами
-    в местах подключения трубок
-  • Трубки — цилиндры, строго стыкующиеся к отверстиям в шарах
-  • Фаска на стыке шар↔трубка с регулируемым размером и подразделением
+MolecularHexLattice — Cinema 4D ObjectData Plugin
+======================================================
+Генератор молекулярных связей (Description-based parameters):
+  • Узлы — гексагональные шары (dual icosphere)
+  • Трубки — цилиндры, стыкующиеся к отверстиям в шарах
+  • Фаска на стыке шар↔трубка
   • Регулировка каркаса по X/Y/Z, плотности узлов, плотности связей, seed
-  • «Strip» — плавное смещение узлов по синусоиде без разрыва трубок
+  • «Strip» — плавное смещение узлов по синусоиде
   • Материальные теги: M — шары, T — трубки, F — фаски
-  • Фонг-сглаживание 45° на всех объектах
+  • Фонг-сглаживание на всех объектах
   • Уникальная иконка (генерируется программно)
 
-UserData SubID MAP (строго фиксировано):
-  SubID=1  : g_lat (группа «Каркас»)
-  SubID=2  : ML_SIZE_X
-  SubID=3  : ML_SIZE_Y
-  SubID=4  : ML_SIZE_Z
-  SubID=5  : ML_DENSITY
-  SubID=6  : ML_BOND_DENS
-  SubID=7  : ML_SEED
-  SubID=8  : ML_JITTER
-  SubID=9  : g_strip (группа «Strip»)
-  SubID=10 : ML_STRIP_AMP
-  SubID=11 : ML_STRIP_FREQ
-  SubID=12 : ML_STRIP_PHASE
-  SubID=13 : ML_STRIP_AXIS
-  SubID=14 : g_sph (группа «Шары»)
-  SubID=15 : ML_SPHERE_RADIUS
-  SubID=16 : ML_SPHERE_SUBDIV
-  SubID=24 : ML_SPHERE_PHONG
-  SubID=17 : g_tub (группа «Трубки»)
-  SubID=18 : ML_TUBE_RADIUS
-  SubID=19 : ML_TUBE_SEGS_R
-  SubID=20 : ML_TUBE_SEGS_H
-  SubID=21 : g_bev (группа «Фаска»)
-  SubID=22 : ML_BEVEL_SIZE
-  SubID=23 : ML_BEVEL_SUBDIV
-  SubID=24 : ML_SPHERE_PHONG
+Description Parameter IDs:
+  2000: g_lat   (группа «Каркас»)
+  2001: g_strip (группа «Strip»)
+  2002: g_sph   (группа «Шары»)
+  2003: g_tub   (группа «Трубки»)
+  2004: g_bev   (группа «Фаска»)
+  2100: ML_SIZE_X        2101: ML_SIZE_Y
+  2102: ML_SIZE_Z        2103: ML_DENSITY
+  2104: ML_BOND_DENS     2105: ML_SEED
+  2106: ML_JITTER        2107: ML_HIDE_ISOLATED
+  2110: ML_STRIP_AMP     2111: ML_STRIP_FREQ
+  2112: ML_STRIP_PHASE   2113: ML_STRIP_AXIS
+  2120: ML_SPHERE_RADIUS 2121: ML_SPHERE_SUBDIV
+  2122: ML_SPHERE_PHONG
+  2130: ML_TUBE_RADIUS   2131: ML_TUBE_SEGS_R
+  2132: ML_TUBE_SEGS_H
+  2140: ML_BEVEL_SIZE    2141: ML_BEVEL_SUBDIV
 """
 
-import c4d # type: ignore
+import c4d  # type: ignore
 import math
 import random
 import os
@@ -51,55 +41,55 @@ import struct
 import zlib
 
 
-# ══════════════════════════════════════════════════════════════════════════════
+# ════════════════════════════════════════════════════════════════════════
 #  Plugin ID & Name
-# ══════════════════════════════════════════════════════════════════════════════
+# ════════════════════════════════════════════════════════════════════════
 
 ID_MOLHEXLATTICE  = 1068899
-NAME_MOLHEXLATTICE = "Molecular Hex Lattice v1.9.1"
+NAME_MOLHEXLATTICE = "Molecular Hex Lattice v2.0"
 
-# ══════════════════════════════════════════════════════════════════════════════
-#  UserData SubID — СТРОГО совпадают с порядком вызовов AddUserData
-# ══════════════════════════════════════════════════════════════════════════════
+# ════════════════════════════════════════════════════════════════════════
+#  Description IDs — группы (табы)
+# ════════════════════════════════════════════════════════════════════════
 
-# Группы (занимают SubID наравне с полями)
-UD_G_LAT    = 1    # группа «Каркас»
-ML_SIZE_X   = 2
-ML_SIZE_Y   = 3
-ML_SIZE_Z   = 4
-ML_DENSITY  = 5
-ML_BOND_DENS = 6
-ML_SEED     = 7
-ML_JITTER   = 8
+MHL_GRP_LAT   = 2000
+MHL_GRP_STRIP = 2001
+MHL_GRP_SPH   = 2002
+MHL_GRP_TUB   = 2003
+MHL_GRP_BEV   = 2004
 
-UD_G_STRIP  = 9    # группа «Strip»
-ML_STRIP_AMP   = 10
-ML_STRIP_FREQ  = 11
-ML_STRIP_PHASE = 12
-ML_STRIP_AXIS  = 13
+# ════════════════════════════════════════════════════════════════════════
+#  Description IDs — параметры
+# ════════════════════════════════════════════════════════════════════════
 
-UD_G_SPH    = 14   # группа «Шары»
-ML_SPHERE_RADIUS = 15
-ML_SPHERE_SUBDIV = 16
+ML_SIZE_X        = 2100
+ML_SIZE_Y        = 2101
+ML_SIZE_Z        = 2102
+ML_DENSITY       = 2103
+ML_BOND_DENS     = 2104
+ML_SEED          = 2105
+ML_JITTER        = 2106
+ML_HIDE_ISOLATED = 2107
 
-UD_G_TUB    = 17   # группа «Трубки»
-ML_TUBE_RADIUS  = 18
-ML_TUBE_SEGS_R  = 19
-ML_TUBE_SEGS_H  = 20
+ML_STRIP_AMP     = 2110
+ML_STRIP_FREQ    = 2111
+ML_STRIP_PHASE   = 2112
+ML_STRIP_AXIS    = 2113
 
-UD_G_BEV    = 21   # группа «Фаска»
-ML_BEVEL_SIZE   = 22
-ML_BEVEL_SUBDIV = 23
+ML_SPHERE_RADIUS = 2120
+ML_SPHERE_SUBDIV = 2121
+ML_SPHERE_PHONG  = 2122
 
-ML_SPHERE_PHONG = 24   # угол фонг-сглаживания шаров (градусы)
-ML_HIDE_ISOLATED = 25  # галочка «Скрывать одиночные шары (без связей)»
+ML_TUBE_RADIUS   = 2130
+ML_TUBE_SEGS_R   = 2131
+ML_TUBE_SEGS_H   = 2132
 
-# Первый «настоящий» параметр данных (используется для проверки инициализации)
-ML_FIRST_PARAM = ML_SIZE_X  # SubID=2
+ML_BEVEL_SIZE    = 2140
+ML_BEVEL_SUBDIV  = 2141
 
-# ══════════════════════════════════════════════════════════════════════════════
+# ════════════════════════════════════════════════════════════════════════
 #  Дефолтные значения параметров
-# ══════════════════════════════════════════════════════════════════════════════
+# ════════════════════════════════════════════════════════════════════════
 
 DEFAULT_SIZE_X        = 401.0
 DEFAULT_SIZE_Y        = 401.0
@@ -116,7 +106,7 @@ DEFAULT_STRIP_AXIS    = 1
 
 DEFAULT_SPHERE_RADIUS = 35.0
 DEFAULT_SPHERE_SUBDIV = 1
-DEFAULT_SPHERE_PHONG  = math.radians(0.0)   # в радианах (единица хранения C4D)
+DEFAULT_SPHERE_PHONG  = math.radians(0.0)
 
 DEFAULT_TUBE_RADIUS   = 6.0
 DEFAULT_TUBE_SEGS_R   = 9
@@ -125,60 +115,25 @@ DEFAULT_TUBE_SEGS_H   = 2
 DEFAULT_BEVEL_SIZE    = 3.0
 DEFAULT_BEVEL_SUBDIV  = 0
 
-DEFAULT_HIDE_ISOLATED = True  # галочка «Скрывать одиночные шары»
-
-# ══════════════════════════════════════════════════════════════════════════════
-#  Вспомогательные функции UserData
-# ══════════════════════════════════════════════════════════════════════════════
-
-def _ud_descid(op, uid):
-    for descid, bc in op.GetUserDataContainer():
-        if descid[1].id == uid:
-            return descid, bc
-    return None, None
+DEFAULT_HIDE_ISOLATED = True
 
 
-def _ud_get(op, uid, default=None):
-    did, _ = _ud_descid(op, uid)
-    if did is not None:
-        val = op[did]
-        if val is not None:
-            return val
-    return default
+# ════════════════════════════════════════════════════════════════════════
+#  Description: вспомогательные функции построения параметров
+# ════════════════════════════════════════════════════════════════════════
 
-
-def _ud_set(op, uid, value):
-    did, _ = _ud_descid(op, uid)
-    if did is not None:
-        op[did] = value
-
-
-def _ud_exists(op, uid):
-    did, _ = _ud_descid(op, uid)
-    return did is not None
-
-
-def _add_group(op, name):
-    """Добавляет корневую группу UserData. Возвращает SubID группы."""
+def _desc_add_group(description, grp_id, name):
     bc = c4d.GetCustomDatatypeDefault(c4d.DTYPE_GROUP)
     bc[c4d.DESC_NAME]       = name
     bc[c4d.DESC_SHORT_NAME] = name
     bc[c4d.DESC_TITLEBAR]   = 1
-    bc[c4d.DESC_DEFAULT]    = 1
-    did = op.AddUserData(bc)
-    return did[1].id
+    desc_id = c4d.DescID(c4d.DescLevel(grp_id, c4d.DTYPE_GROUP, 0))
+    description.SetParameter(desc_id, bc, c4d.ID_LISTHEAD)
+    return desc_id
 
 
-def _add_in_group(op, grp_subid, bc):
-    """Добавляет элемент UserData внутрь группы с данным SubID."""
-    bc[c4d.DESC_PARENTGROUP] = c4d.DescID(
-        c4d.DescLevel(c4d.ID_USERDATA, c4d.DTYPE_SUBCONTAINER, 0),
-        c4d.DescLevel(grp_subid, c4d.DTYPE_GROUP, 0)
-    )
-    return op.AddUserData(bc)
-
-
-def _float_bc(name, default, minval, maxval, unit=c4d.DESC_UNIT_METER, step=1.0):
+def _desc_add_float(description, param_id, name, default, minval, maxval,
+                    unit=c4d.DESC_UNIT_METER, step=1.0, parent_id=None):
     bc = c4d.GetCustomDatatypeDefault(c4d.DTYPE_REAL)
     bc[c4d.DESC_NAME]       = name
     bc[c4d.DESC_SHORT_NAME] = name
@@ -188,10 +143,12 @@ def _float_bc(name, default, minval, maxval, unit=c4d.DESC_UNIT_METER, step=1.0)
     bc[c4d.DESC_UNIT]       = unit
     bc[c4d.DESC_STEP]       = step
     bc[c4d.DESC_ANIMATE]    = c4d.DESC_ANIMATE_ON
-    return bc
+    desc_id = c4d.DescID(c4d.DescLevel(param_id, c4d.DTYPE_REAL, 0))
+    description.SetParameter(desc_id, bc, parent_id)
 
 
-def _int_bc(name, default, minval, maxval):
+def _desc_add_int(description, param_id, name, default, minval, maxval,
+                  parent_id=None):
     bc = c4d.GetCustomDatatypeDefault(c4d.DTYPE_LONG)
     bc[c4d.DESC_NAME]       = name
     bc[c4d.DESC_SHORT_NAME] = name
@@ -200,10 +157,12 @@ def _int_bc(name, default, minval, maxval):
     bc[c4d.DESC_MAX]        = maxval
     bc[c4d.DESC_STEP]       = 1
     bc[c4d.DESC_ANIMATE]    = c4d.DESC_ANIMATE_ON
-    return bc
+    desc_id = c4d.DescID(c4d.DescLevel(param_id, c4d.DTYPE_LONG, 0))
+    description.SetParameter(desc_id, bc, parent_id)
 
 
-def _cycle_bc(name, default, items):
+def _desc_add_cycle(description, param_id, name, default, items,
+                    parent_id=None):
     bc = c4d.GetCustomDatatypeDefault(c4d.DTYPE_LONG)
     bc[c4d.DESC_NAME]       = name
     bc[c4d.DESC_SHORT_NAME] = name
@@ -214,22 +173,23 @@ def _cycle_bc(name, default, items):
     for i, label in enumerate(items):
         cyc[i] = label
     bc[c4d.DESC_CYCLE] = cyc
-    return bc
+    desc_id = c4d.DescID(c4d.DescLevel(param_id, c4d.DTYPE_LONG, 0))
+    description.SetParameter(desc_id, bc, parent_id)
 
 
-def _bool_bc(name, default):
-    """Чекбокс (Bool) для UserData."""
+def _desc_add_bool(description, param_id, name, default, parent_id=None):
     bc = c4d.GetCustomDatatypeDefault(c4d.DTYPE_BOOL)
     bc[c4d.DESC_NAME]       = name
     bc[c4d.DESC_SHORT_NAME] = name
     bc[c4d.DESC_DEFAULT]    = default
     bc[c4d.DESC_ANIMATE]    = c4d.DESC_ANIMATE_ON
-    return bc
+    desc_id = c4d.DescID(c4d.DescLevel(param_id, c4d.DTYPE_BOOL, 0))
+    description.SetParameter(desc_id, bc, parent_id)
 
 
-# ══════════════════════════════════════════════════════════════════════════════
+# ════════════════════════════════════════════════════════════════════════
 #  Математика
-# ══════════════════════════════════════════════════════════════════════════════
+# ════════════════════════════════════════════════════════════════════════
 
 def _normalize_tuple(v):
     d = math.sqrt(v[0]**2 + v[1]**2 + v[2]**2)
@@ -273,12 +233,11 @@ def _v3_lerp(a, b, t):
     )
 
 
-# ══════════════════════════════════════════════════════════════════════════════
+# ════════════════════════════════════════════════════════════════════════
 #  Dual Icosphere
-# ══════════════════════════════════════════════════════════════════════════════
+# ════════════════════════════════════════════════════════════════════════
 
 def _icosphere_tris(subdivisions):
-    """Икосаэдр с midpoint-подразделением. Возвращает (verts, faces)."""
     PHI = (1.0 + math.sqrt(5.0)) / 2.0
     raw = [
         ( 0,  1,  PHI), ( 0, -1,  PHI), ( 0,  1, -PHI), ( 0, -1, -PHI),
@@ -314,10 +273,6 @@ def _icosphere_tris(subdivisions):
 
 
 def _dual_mesh(ico_verts, ico_faces):
-    """
-    Dual mesh треугольной сетки.
-    Центры треугольников становятся вершинами dual_polys (гексагонов/пятиугольников).
-    """
     n_verts = len(ico_verts)
     dual_verts = []
     for f in ico_faces:
@@ -332,17 +287,15 @@ def _dual_mesh(ico_verts, ico_faces):
             vert_to_faces[vi].append(fi)
 
     dual_polys     = []
-    face_normals   = []   # unit-вектор «наружу» для каждого полигона
+    face_normals   = []
 
     for vi in range(n_verts):
         adj = vert_to_faces[vi]
         if len(adj) < 3:
             continue
 
-        # Нормаль полигона = направление ico-вершины (она на сфере)
         nx, ny, nz = ico_verts[vi]
 
-        # Касательная система для сортировки по углу
         if abs(nx) < 0.9:
             tx, ty, tz = 1.0, 0.0, 0.0
         else:
@@ -365,7 +318,6 @@ def _dual_mesh(ico_verts, ico_faces):
 
         ordered = sorted(adj, key=_angle)
 
-        # Проверяем ориентацию нормали (должна смотреть наружу)
         p0 = c4d.Vector(*dual_verts[ordered[0]])
         p1 = c4d.Vector(*dual_verts[ordered[1]])
         p2 = c4d.Vector(*dual_verts[ordered[2]])
@@ -384,13 +336,6 @@ def _dual_mesh(ico_verts, ico_faces):
 
 
 def _build_hex_sphere_data(radius, subdivisions):
-    """
-    Возвращает (sphere_pts, dual_polys, face_normals_unit, dual_verts_unit).
-    sphere_pts       — c4d.Vector на сфере (масштабированы на radius)
-    dual_polys       — индексные списки (гексагоны/пятиугольники)
-    face_normals     — unit-нормали каждой грани (направление наружу)
-    dual_verts_unit  — нормализованные координаты вершин dual mesh
-    """
     subdivisions = max(1, min(4, int(subdivisions)))
     ico_verts, ico_faces = _icosphere_tris(subdivisions)
     dual_verts, dual_polys, face_normals = _dual_mesh(ico_verts, ico_faces)
@@ -399,9 +344,9 @@ def _build_hex_sphere_data(radius, subdivisions):
     return sphere_pts, dual_polys, face_normals, dual_verts
 
 
-# ══════════════════════════════════════════════════════════════════════════════
+# ════════════════════════════════════════════════════════════════════════
 #  Phong-тег
-# ══════════════════════════════════════════════════════════════════════════════
+# ════════════════════════════════════════════════════════════════════════
 
 def _add_phong_tag(obj, angle_deg=45.0):
     tag = obj.MakeTag(c4d.Tphong)
@@ -412,9 +357,9 @@ def _add_phong_tag(obj, angle_deg=45.0):
     return tag
 
 
-# ══════════════════════════════════════════════════════════════════════════════
+# ════════════════════════════════════════════════════════════════════════
 #  Утилита создания PolygonObject
-# ══════════════════════════════════════════════════════════════════════════════
+# ════════════════════════════════════════════════════════════════════════
 
 def _make_poly_object(pts, cpolys, name):
     obj = c4d.PolygonObject(len(pts), len(cpolys))
@@ -427,29 +372,21 @@ def _make_poly_object(pts, cpolys, name):
     return obj
 
 
-# ══════════════════════════════════════════════════════════════════════════════
-#  Гексагональная сфера — цельная, полигоны не удаляются
-# ══════════════════════════════════════════════════════════════════════════════
+# ════════════════════════════════════════════════════════════════════════
+#  Гексагональная сфера
+# ════════════════════════════════════════════════════════════════════════
 
 def _fan_triangulate(indices, pts):
-    """N-гон → список c4d.CPolygon.
-    Для n==3,4 — стандартная триангуляция.
-    Для n>=5 (пятиугольники, гексагоны) — через центральную вершину (звезда):
-    центральная точка добавляется в pts, её индекс = len(pts) перед вызовом.
-    Возвращает список CPolygon; для n>=5 pts расширяется на 1 элемент (центр).
-    """
     n = len(indices)
     if n == 3:
         return [c4d.CPolygon(indices[0], indices[1], indices[2], indices[2])]
     if n == 4:
         return [c4d.CPolygon(indices[0], indices[1], indices[2], indices[3])]
-    # n >= 5: вычисляем центральную точку грани и добавляем в pts
     cx = sum(pts[idx].x for idx in indices) / n
     cy = sum(pts[idx].y for idx in indices) / n
     cz = sum(pts[idx].z for idx in indices) / n
     center_idx = len(pts)
     pts.append(c4d.Vector(cx, cy, cz))
-    # Каждый треугольник: центр + два соседних периметральных угла
     result = []
     for k in range(n):
         a = indices[k]
@@ -459,29 +396,17 @@ def _fan_triangulate(indices, pts):
 
 
 def _build_sphere_with_holes(radius, subdivisions, hole_face_indices, phong_angle=45.0):
-    """
-    Строит цельную dual icosphere — полигоны НЕ удаляются.
-    Зазор между шаром и трубкой закрывается фаской с цилиндрической экструзией.
-
-    Возвращает:
-      (PolygonObject, hole_centers, hole_normals)
-      hole_centers — c4d.Vector точек на поверхности сферы (центры граней связей)
-      hole_normals — unit c4d.Vector нормалей этих граней (наружу)
-    """
-    sphere_pts, dual_polys, face_normals, dual_verts_unit = \
-        _build_hex_sphere_data(radius, subdivisions)
+    sphere_pts, dual_polys, face_normals, dual_verts_unit =         _build_hex_sphere_data(radius, subdivisions)
 
     pts    = list(sphere_pts)
     cpols  = []
     hidden = []
 
-    # Центры и нормали граней связей — нужны для позиционирования фасок
     hole_centers = []
     hole_normals = []
 
     for fi, poly_idx_list in enumerate(dual_polys):
         if fi in set(hole_face_indices):
-            # Вычисляем центр грани на поверхности сферы (для фаски)
             cx = cy = cz = 0.0
             for idx in poly_idx_list:
                 cx += pts[idx].x
@@ -491,19 +416,16 @@ def _build_sphere_with_holes(radius, subdivisions, hole_face_indices, phong_angl
             cx /= n_p; cy /= n_p; cz /= n_p
             hole_centers.append(c4d.Vector(cx, cy, cz))
             hole_normals.append(c4d.Vector(*face_normals[fi]))
-            # Полигон НЕ пропускаем — шар остаётся цельным
 
         start = len(cpols)
         new_cps = _fan_triangulate(poly_idx_list, pts)
         cpols.extend(new_cps)
 
-        # Для звёздной триангуляции (n>=5) — все внутренние рёбра скрыты
-        # (рёбра от центра к вершинам периметра — edge 0 каждого треугольника)
         n = len(poly_idx_list)
         if n > 4:
             for t in range(n):
                 pi = start + t
-                hidden.append(4 * pi + 0)  # ребро центр→вершина_a
+                hidden.append(4 * pi + 0)
 
     obj = _make_poly_object(pts, cpols, "MHL_Sphere")
 
@@ -516,18 +438,13 @@ def _build_sphere_with_holes(radius, subdivisions, hole_face_indices, phong_angl
     return obj, hole_centers, hole_normals
 
 
-# ══════════════════════════════════════════════════════════════════════════════
+# ════════════════════════════════════════════════════════════════════════
 #  Матрица поворота: ось Y → direction
-# ══════════════════════════════════════════════════════════════════════════════
+# ════════════════════════════════════════════════════════════════════════
 
 def _matrix_y_to_dir(direction):
-    """
-    Строит c4d.Matrix, выравнивающую ось Y объекта вдоль direction.
-    Используется для позиционирования трубок и фасок.
-    """
     up = _v3_normalize(direction)
 
-    # Выбираем вспомогательный вектор, не параллельный up
     helper = c4d.Vector(0, 0, 1)
     if abs(_v3_dot(up, helper)) > 0.99:
         helper = c4d.Vector(1, 0, 0)
@@ -535,7 +452,6 @@ def _matrix_y_to_dir(direction):
     right  = _v3_normalize(_v3_cross(helper, up))
     fwd    = _v3_normalize(_v3_cross(up, right))
 
-    # c4d.Matrix(off, v1, v2, v3): v1=X, v2=Y, v3=Z
     mg = c4d.Matrix()
     mg.v1 = right
     mg.v2 = up
@@ -544,20 +460,12 @@ def _matrix_y_to_dir(direction):
     return mg
 
 
-# ══════════════════════════════════════════════════════════════════════════════
-#  Генератор трубки (основной цилиндр + фаски на концах)
-# ══════════════════════════════════════════════════════════════════════════════
+# ════════════════════════════════════════════════════════════════════════
+#  Генератор трубки + фаски
+# ════════════════════════════════════════════════════════════════════════
 
 def _build_tube_between(pt_a, pt_b, tube_radius, segs_r, segs_h,
                          bevel_size, bevel_subdiv):
-    """
-    Строит трубку от pt_a до pt_b.
-    Трубка позиционируется и ориентируется в мировом пространстве.
-
-    Возвращает (tube_obj, bevel_list):
-      tube_obj   — PolygonObject основного цилиндра
-      bevel_list — список PolygonObject фасок (0, 1 или 2 штуки)
-    """
     diff   = pt_b - pt_a
     length = _v3_len(diff)
     if length < 1e-6:
@@ -571,11 +479,9 @@ def _build_tube_between(pt_a, pt_b, tube_radius, segs_r, segs_h,
     bevel_subdiv = max(0,   int(bevel_subdiv))
     bevel_size   = max(0.0, float(bevel_size))
 
-    # Фаска не может превышать половину длины трубки
     actual_bevel = min(bevel_size, length * 0.45)
     inner_half   = length * 0.5 - actual_bevel
 
-    # ── Основной цилиндр ────────────────────────────────────────────────────
     tube_pts   = []
     tube_cpols = []
 
@@ -605,7 +511,6 @@ def _build_tube_between(pt_a, pt_b, tube_radius, segs_r, segs_h,
     mg.off = midpoint
     tube_obj.SetMg(mg)
 
-    # ── Фаски ───────────────────────────────────────────────────────────────
     bevel_list = []
 
     if actual_bevel > 1e-4:
@@ -615,31 +520,15 @@ def _build_tube_between(pt_a, pt_b, tube_radius, segs_r, segs_h,
             bev_pts   = []
             bev_cpols = []
 
-            # Профиль фаски (от стыка с трубкой к поверхности шара):
-            #   Секция A (кольца 0..n_bev): четверть дуги — радиус растёт
-            #     от tube_radius до tube_radius+actual_bevel,
-            #     Y идёт от ±inner_half до ±(inner_half + actual_bevel*(1-cos))
-            #     → максимальный Y дуги = ±(inner_half + actual_bevel)
-            #     (т.е. ровно ±half_length = поверхность шара)
-            #   Секция B (кольца n_bev..n_bev+1): прямой цилиндрический выступ
-            #     r = tube_radius+actual_bevel, Y идёт ещё на actual_bevel внутрь шара
-            #     Это «шип», утопленный в шар — закрывает зазор.
-            #
-            # Итого n_bev+2 кольца точек, n_bev+1 полос полигонов.
-
-            n_rings = n_bev + 2  # 0..n_bev — дуга, n_bev+1 — конец шипа
+            n_rings = n_bev + 2
 
             for ring in range(n_rings):
                 if ring <= n_bev:
-                    # Секция A: четверть окружности (скругление-фаска)
                     t     = ring / n_bev
-                    angle = t * math.pi * 0.5   # 0..90°
+                    angle = t * math.pi * 0.5
                     r_ring = tube_radius + actual_bevel * math.sin(angle)
                     y_ring = end_sign * (inner_half + actual_bevel * (1.0 - math.cos(angle)))
                 else:
-                    # Секция B: прямой цилиндрический выступ в тело шара
-                    # r фиксирован = tube_radius+actual_bevel
-                    # Y сдвигается ещё на actual_bevel в сторону шара
                     r_ring = tube_radius + actual_bevel
                     y_ring = end_sign * (inner_half + actual_bevel + actual_bevel)
 
@@ -657,7 +546,6 @@ def _build_tube_between(pt_a, pt_b, tube_radius, segs_r, segs_h,
                     br = ring * segs_r + (col + 1) % segs_r
                     tl = (ring + 1) * segs_r + col
                     tr = (ring + 1) * segs_r + (col + 1) % segs_r
-                    # Нижний конец: нормаль смотрит вниз → переставляем порядок
                     if end_sign < 0:
                         bev_cpols.append(c4d.CPolygon(bl, br, tr, tl))
                     else:
@@ -671,12 +559,11 @@ def _build_tube_between(pt_a, pt_b, tube_radius, segs_r, segs_h,
     return tube_obj, bevel_list
 
 
-# ══════════════════════════════════════════════════════════════════════════════
+# ════════════════════════════════════════════════════════════════════════
 #  Генератор позиций и связей
-# ══════════════════════════════════════════════════════════════════════════════
+# ════════════════════════════════════════════════════════════════════════
 
 def _generate_positions(size_x, size_y, size_z, density, seed, jitter):
-    """Генерирует позиции узлов на решётке + случайный джиттер."""
     rng     = random.Random(int(seed))
     density = max(1.0, float(density))
     nx = max(1, int(math.ceil(size_x / density)))
@@ -699,28 +586,23 @@ def _generate_positions(size_x, size_y, size_z, density, seed, jitter):
 
 
 def _apply_strip(positions, amplitude, frequency, phase, axis):
-    """
-    Плавно смещает позиции синусоидой вдоль перпендикулярного направления.
-    Трубки не рвутся, так как пересчитываются при каждом изменении phase.
-    """
     if amplitude < 1e-6:
         return positions
     result = []
     for p in positions:
-        if axis == 0:        # синусоида вдоль X, смещение по Y
+        if axis == 0:
             val = math.sin(p.x * frequency + phase)
             result.append(c4d.Vector(p.x, p.y + amplitude * val, p.z))
-        elif axis == 1:      # синусоида вдоль Y, смещение по X
+        elif axis == 1:
             val = math.sin(p.y * frequency + phase)
             result.append(c4d.Vector(p.x + amplitude * val, p.y, p.z))
-        else:                # синусоида вдоль Z, смещение по Y
+        else:
             val = math.sin(p.z * frequency + phase)
             result.append(c4d.Vector(p.x, p.y + amplitude * val, p.z))
     return result
 
 
 def _find_bonds(positions, max_dist):
-    """Находит все пары узлов на расстоянии ≤ max_dist."""
     bonds  = []
     max_sq = max_dist * max_dist
     n = len(positions)
@@ -734,10 +616,6 @@ def _find_bonds(positions, max_dist):
 
 
 def _find_best_face(face_normals, direction):
-    """
-    Возвращает индекс грани dual_sphere, нормаль которой ближе всего
-    к direction (unit vector). Используется для выбора места подключения трубки.
-    """
     best_idx = 0
     best_dot = -2.0
     dx, dy, dz = direction.x, direction.y, direction.z
@@ -749,73 +627,57 @@ def _find_best_face(face_normals, direction):
     return best_idx
 
 
-# ══════════════════════════════════════════════════════════════════════════════
-#  Теги выделения полигонов (F, T, M)
-# ══════════════════════════════════════════════════════════════════════════════
+# ════════════════════════════════════════════════════════════════════════
+#  Теги выделения полигонов
+# ════════════════════════════════════════════════════════════════════════
 
 def _apply_selection_tag(obj, selection_name):
-    """
-    Вешает тег выделения полигонов (Tpolygonselection) с именем selection_name
-    (F, T или M) на все полигоны объекта.
-
-    Материал пользователь назначает сам — drag-and-drop на примитив с
-    ограничением выделения F, T или M, либо без ограничения (на весь объект).
-    """
     n_polys = obj.GetPolygonCount()
     if n_polys == 0:
         return
-
     tag = obj.MakeTag(c4d.Tpolygonselection)
     if tag is None:
         return
-
     tag.SetName(selection_name)
-
     sel = tag.GetBaseSelect()
-    # Выделяем все полигоны объекта под данное имя выделения
     for pi in range(n_polys):
         sel.Select(pi)
 
 
-# ══════════════════════════════════════════════════════════════════════════════
+# ════════════════════════════════════════════════════════════════════════
 #  Главный генератор
-# ══════════════════════════════════════════════════════════════════════════════
+# ════════════════════════════════════════════════════════════════════════
 
 def _build_lattice(op):
-    """Строит всю молекулярную систему и возвращает нулевой объект-контейнер."""
+    size_x      = max(1.0,  float(op[ML_SIZE_X]))
+    size_y      = max(1.0,  float(op[ML_SIZE_Y]))
+    size_z      = max(1.0,  float(op[ML_SIZE_Z]))
+    density     = max(10.0, float(op[ML_DENSITY]))
+    bond_dens   = max(1.0,  float(op[ML_BOND_DENS]))
+    seed        = int(op[ML_SEED])
+    jitter      = max(0.0,  float(op[ML_JITTER]))
 
-    # ── Параметры ────────────────────────────────────────────────────────────
-    size_x      = max(1.0,  float(_ud_get(op, ML_SIZE_X,       DEFAULT_SIZE_X)))
-    size_y      = max(1.0,  float(_ud_get(op, ML_SIZE_Y,       DEFAULT_SIZE_Y)))
-    size_z      = max(1.0,  float(_ud_get(op, ML_SIZE_Z,       DEFAULT_SIZE_Z)))
-    density     = max(10.0, float(_ud_get(op, ML_DENSITY,      DEFAULT_DENSITY)))
-    bond_dens   = max(1.0,  float(_ud_get(op, ML_BOND_DENS,    DEFAULT_BOND_DENS)))
-    seed        = int(_ud_get(op, ML_SEED,    DEFAULT_SEED))
-    jitter      = max(0.0,  float(_ud_get(op, ML_JITTER,       DEFAULT_JITTER)))
+    strip_amp   = max(0.0,   float(op[ML_STRIP_AMP]))
+    strip_freq  = max(0.0001, float(op[ML_STRIP_FREQ]))
+    strip_phase = float(op[ML_STRIP_PHASE])
+    strip_axis  = int(op[ML_STRIP_AXIS])
 
-    strip_amp   = max(0.0,   float(_ud_get(op, ML_STRIP_AMP,   DEFAULT_STRIP_AMP)))
-    strip_freq  = max(0.0001,float(_ud_get(op, ML_STRIP_FREQ,  DEFAULT_STRIP_FREQ)))
-    strip_phase = float(_ud_get(op, ML_STRIP_PHASE, DEFAULT_STRIP_PHASE))
-    strip_axis  = int(_ud_get(op, ML_STRIP_AXIS,   DEFAULT_STRIP_AXIS))
+    sphere_r    = max(1.0,  float(op[ML_SPHERE_RADIUS]))
+    sphere_sub  = max(1,    min(4, int(op[ML_SPHERE_SUBDIV])))
 
-    sphere_r    = max(1.0,  float(_ud_get(op, ML_SPHERE_RADIUS, DEFAULT_SPHERE_RADIUS)))
-    sphere_sub  = max(1,    min(4, int(_ud_get(op, ML_SPHERE_SUBDIV, DEFAULT_SPHERE_SUBDIV))))
+    tube_r      = max(0.5,  float(op[ML_TUBE_RADIUS]))
+    tube_sr     = max(3,    int(op[ML_TUBE_SEGS_R]))
+    tube_sh     = max(1,    int(op[ML_TUBE_SEGS_H]))
 
-    tube_r      = max(0.5,  float(_ud_get(op, ML_TUBE_RADIUS,   DEFAULT_TUBE_RADIUS)))
-    tube_sr     = max(3,    int(_ud_get(op, ML_TUBE_SEGS_R,    DEFAULT_TUBE_SEGS_R)))
-    tube_sh     = max(1,    int(_ud_get(op, ML_TUBE_SEGS_H,    DEFAULT_TUBE_SEGS_H)))
+    bevel_size  = max(0.0,  float(op[ML_BEVEL_SIZE]))
+    bevel_sub   = max(0,    int(op[ML_BEVEL_SUBDIV]))
 
-    bevel_size  = max(0.0,  float(_ud_get(op, ML_BEVEL_SIZE,    DEFAULT_BEVEL_SIZE)))
-    bevel_sub   = max(0,    int(_ud_get(op, ML_BEVEL_SUBDIV,    DEFAULT_BEVEL_SUBDIV)))
+    sphere_phong = math.degrees(max(0.0, min(math.radians(180.0), float(op[ML_SPHERE_PHONG]))))
 
-    sphere_phong = math.degrees(max(0.0, min(math.radians(180.0), float(_ud_get(op, ML_SPHERE_PHONG, DEFAULT_SPHERE_PHONG)))))
+    hide_isolated = bool(op[ML_HIDE_ISOLATED])
 
-    hide_isolated = bool(_ud_get(op, ML_HIDE_ISOLATED, DEFAULT_HIDE_ISOLATED))
-
-    # ── Позиции узлов ────────────────────────────────────────────────────────
     positions_raw = _generate_positions(size_x, size_y, size_z, density, seed, jitter)
 
-    # Жёсткое ограничение (производительность)
     MAX_NODES = 150
     if len(positions_raw) > MAX_NODES:
         positions_raw = positions_raw[:MAX_NODES]
@@ -827,18 +689,15 @@ def _build_lattice(op):
         null.SetName("MolecularHexLattice [пусто]")
         return null
 
-    # ── Связи ────────────────────────────────────────────────────────────────
     bonds = _find_bonds(positions, bond_dens)
 
     MAX_BONDS = 500
     if len(bonds) > MAX_BONDS:
         bonds = bonds[:MAX_BONDS]
 
-    # ── Данные dual icosphere для определения лучшей грани ───────────────────
     _, _, face_normals, _ = _build_hex_sphere_data(1.0, sphere_sub)
     n_faces = len(face_normals)
 
-    # Для каждого узла: список индексов граней, куда подключены трубки
     node_holes = [[] for _ in range(len(positions))]
 
     for i, j in bonds:
@@ -853,17 +712,12 @@ def _build_lattice(op):
         if fi_ji not in node_holes[j]:
             node_holes[j].append(fi_ji)
 
-    # ── Фильтр одиночных шаров ───────────────────────────────────────────────
-    # Если галочка включена — узлы без единой связи полностью исключаются из генерации.
-    # bonds при этом не меняются (они ссылаются на оригинальные индексы через remap).
     if hide_isolated:
-        # Множество узлов, участвующих хотя бы в одной связи
         connected = set()
         for i, j in bonds:
             connected.add(i)
             connected.add(j)
 
-        # Таблица переиндексации: старый индекс → новый
         remap = {}
         new_positions  = []
         new_node_holes = []
@@ -875,10 +729,8 @@ def _build_lattice(op):
 
         positions  = new_positions
         node_holes = new_node_holes
-        # Переиндексируем bonds под новые индексы узлов
         bonds = [(remap[i], remap[j]) for i, j in bonds]
 
-    # ── Строим иерархию ──────────────────────────────────────────────────────
     root = c4d.BaseObject(c4d.Onull)
     root.SetName("MolecularHexLattice")
 
@@ -894,19 +746,16 @@ def _build_lattice(op):
     g_bevels.SetName("Bevels")
     g_bevels.InsertUnder(root)
 
-    # ── Шары ─────────────────────────────────────────────────────────────────
     for node_idx, pos in enumerate(positions):
         hole_faces = [f for f in node_holes[node_idx] if f < n_faces]
 
-        sphere_obj, hole_centers, hole_normals = \
-            _build_sphere_with_holes(sphere_r, sphere_sub, hole_faces, sphere_phong)
+        sphere_obj, hole_centers, hole_normals =             _build_sphere_with_holes(sphere_r, sphere_sub, hole_faces, sphere_phong)
 
         sphere_obj.SetAbsPos(pos)
         sphere_obj.SetName("Sphere_%03d" % node_idx)
         _apply_selection_tag(sphere_obj, "M")
         sphere_obj.InsertUnder(g_spheres)
 
-    # ── Трубки и фаски ────────────────────────────────────────────────────────
     for bond_idx, (i, j) in enumerate(bonds):
         pi = positions[i]
         pj = positions[j]
@@ -917,13 +766,11 @@ def _build_lattice(op):
 
         dir_n = _v3_normalize(diff)
 
-        # Точки старта/конца трубки у поверхности шаров
         pt_a = pi + dir_n * sphere_r
         pt_b = pj - dir_n * sphere_r
 
         tube_len = _v3_len(pt_b - pt_a)
         if tube_len < tube_r * 0.1:
-            # Узлы слишком близко — трубка не вмещается
             continue
 
         tube_obj, bevel_list = _build_tube_between(
@@ -945,124 +792,109 @@ def _build_lattice(op):
     return root
 
 
-# ══════════════════════════════════════════════════════════════════════════════
-#  UserData: создание интерфейса
-# ══════════════════════════════════════════════════════════════════════════════
-
-def _create_userdata(op):
-    """
-    Создаёт все группы и поля UserData В СТРОГО ФИКСИРОВАННОМ ПОРЯДКЕ.
-    SubID назначается автоматически C4D: каждый вызов AddUserData
-    даёт следующий свободный SubID (начиная с 1).
-    """
-    # SubID=1 → g_lat
-    g_lat = _add_group(op, "Каркас (Lattice)")
-    # SubID=2..8 → поля
-    _add_in_group(op, g_lat, _float_bc("Размер X",           DEFAULT_SIZE_X,    10.0, 100000.0))
-    _add_in_group(op, g_lat, _float_bc("Размер Y",           DEFAULT_SIZE_Y,    10.0, 100000.0))
-    _add_in_group(op, g_lat, _float_bc("Размер Z",           DEFAULT_SIZE_Z,    10.0, 100000.0))
-    _add_in_group(op, g_lat, _float_bc("Плотность (шаг сетки)", DEFAULT_DENSITY, 10.0, 10000.0))
-    _add_in_group(op, g_lat, _float_bc("Макс. длина связи",  DEFAULT_BOND_DENS, 10.0, 10000.0))
-    _add_in_group(op, g_lat, _int_bc  ("Seed",               DEFAULT_SEED,      0,    99999))
-    _add_in_group(op, g_lat, _float_bc("Джиттер (шум позиций)", DEFAULT_JITTER, 0.0, 5000.0))
-
-    # SubID=9 → g_strip
-    g_strip = _add_group(op, "Strip — волновое смещение")
-    # SubID=10..13 → поля
-    _add_in_group(op, g_strip, _float_bc("Амплитуда",          DEFAULT_STRIP_AMP,   0.0,    10000.0))
-    _add_in_group(op, g_strip, _float_bc("Частота",            DEFAULT_STRIP_FREQ,  0.0001, 10.0,
-                                          unit=c4d.DESC_UNIT_FLOAT, step=0.001))
-    _add_in_group(op, g_strip, _float_bc("Фаза (анимировать)", DEFAULT_STRIP_PHASE, -1000.0, 1000.0,
-                                          unit=c4d.DESC_UNIT_FLOAT, step=0.01))
-    _add_in_group(op, g_strip, _cycle_bc("Ось волны",          DEFAULT_STRIP_AXIS,
-                                          ["X (смещение Y)", "Y (смещение X)", "Z (смещение Y)"]))
-
-    # SubID=14 → g_sph
-    g_sph = _add_group(op, "Шары  [M]")
-    # SubID=15..16, 24
-    _add_in_group(op, g_sph, _float_bc("Радиус шара",   DEFAULT_SPHERE_RADIUS, 1.0, 100000.0))
-    _add_in_group(op, g_sph, _int_bc  ("Подразделение", DEFAULT_SPHERE_SUBDIV, 1,   4))
-
-    # SubID=17 → g_tub
-    g_tub = _add_group(op, "Трубки  [T]")
-    # SubID=18..20
-    _add_in_group(op, g_tub, _float_bc("Радиус трубки",          DEFAULT_TUBE_RADIUS,  0.5,  100000.0))
-    _add_in_group(op, g_tub, _int_bc  ("Сегменты окружности",    DEFAULT_TUBE_SEGS_R,  3,    64))
-    _add_in_group(op, g_tub, _int_bc  ("Сегменты длины",         DEFAULT_TUBE_SEGS_H,  1,    64))
-
-    # SubID=21 → g_bev
-    g_bev = _add_group(op, "Фаска  [F]")
-    # SubID=22..23
-    _add_in_group(op, g_bev, _float_bc("Размер фаски",           DEFAULT_BEVEL_SIZE,   0.0,  100000.0))
-    _add_in_group(op, g_bev, _int_bc  ("Подразделение фаски",    DEFAULT_BEVEL_SUBDIV, 0,    8))
-
-    # SubID=24 → угол фонг-сглаживания шаров
-    _add_in_group(op, g_sph, _float_bc("Фонг шаров (°)",        DEFAULT_SPHERE_PHONG,  0.0,  math.radians(180.0),
-                                        unit=c4d.DESC_UNIT_DEGREE, step=math.radians(1.0)))
-
-    # SubID=25 → галочка скрытия одиночных шаров (без связей)
-    _add_in_group(op, g_lat, _bool_bc("Скрывать одиночные шары", DEFAULT_HIDE_ISOLATED))
-
-
-def _set_defaults(op):
-    _ud_set(op, ML_SIZE_X,       DEFAULT_SIZE_X)
-    _ud_set(op, ML_SIZE_Y,       DEFAULT_SIZE_Y)
-    _ud_set(op, ML_SIZE_Z,       DEFAULT_SIZE_Z)
-    _ud_set(op, ML_DENSITY,      DEFAULT_DENSITY)
-    _ud_set(op, ML_BOND_DENS,    DEFAULT_BOND_DENS)
-    _ud_set(op, ML_SEED,         DEFAULT_SEED)
-    _ud_set(op, ML_JITTER,       DEFAULT_JITTER)
-
-    _ud_set(op, ML_STRIP_AMP,    DEFAULT_STRIP_AMP)
-    _ud_set(op, ML_STRIP_FREQ,   DEFAULT_STRIP_FREQ)
-    _ud_set(op, ML_STRIP_PHASE,  DEFAULT_STRIP_PHASE)
-    _ud_set(op, ML_STRIP_AXIS,   DEFAULT_STRIP_AXIS)
-
-    _ud_set(op, ML_SPHERE_RADIUS, DEFAULT_SPHERE_RADIUS)
-    _ud_set(op, ML_SPHERE_SUBDIV, DEFAULT_SPHERE_SUBDIV)
-    _ud_set(op, ML_SPHERE_PHONG,  DEFAULT_SPHERE_PHONG)
-
-    _ud_set(op, ML_TUBE_RADIUS,  DEFAULT_TUBE_RADIUS)
-    _ud_set(op, ML_TUBE_SEGS_R,  DEFAULT_TUBE_SEGS_R)
-    _ud_set(op, ML_TUBE_SEGS_H,  DEFAULT_TUBE_SEGS_H)
-
-    _ud_set(op, ML_BEVEL_SIZE,   DEFAULT_BEVEL_SIZE)
-    _ud_set(op, ML_BEVEL_SUBDIV, DEFAULT_BEVEL_SUBDIV)
-
-    _ud_set(op, ML_HIDE_ISOLATED, DEFAULT_HIDE_ISOLATED)
-
-
-# ══════════════════════════════════════════════════════════════════════════════
+# ════════════════════════════════════════════════════════════════════════
 #  Plugin class
-# ══════════════════════════════════════════════════════════════════════════════
+# ════════════════════════════════════════════════════════════════════════
 
 class MolecularHexLatticeObject(c4d.plugins.ObjectData):
-    """Генератор молекулярной гексагональной решётки."""
 
     OBJECT_NAME = "Molecular Hex Lattice"
-
-    def _ensure_ud(self, op):
-        """Инициализирует UserData один раз (проверяет по первому параметру)."""
-        if not _ud_exists(op, ML_FIRST_PARAM):
-            _create_userdata(op)
-            _set_defaults(op)
-
-    # ── ObjectData interface ──────────────────────────────────────────────────
 
     def Init(self, op, isload=False):
         if not isload:
             op.SetName(self.OBJECT_NAME)
-        self._ensure_ud(op)
+            op[ML_SIZE_X]        = DEFAULT_SIZE_X
+            op[ML_SIZE_Y]        = DEFAULT_SIZE_Y
+            op[ML_SIZE_Z]        = DEFAULT_SIZE_Z
+            op[ML_DENSITY]       = DEFAULT_DENSITY
+            op[ML_BOND_DENS]     = DEFAULT_BOND_DENS
+            op[ML_SEED]          = DEFAULT_SEED
+            op[ML_JITTER]        = DEFAULT_JITTER
+            op[ML_HIDE_ISOLATED] = DEFAULT_HIDE_ISOLATED
+
+            op[ML_STRIP_AMP]    = DEFAULT_STRIP_AMP
+            op[ML_STRIP_FREQ]   = DEFAULT_STRIP_FREQ
+            op[ML_STRIP_PHASE]  = DEFAULT_STRIP_PHASE
+            op[ML_STRIP_AXIS]   = DEFAULT_STRIP_AXIS
+
+            op[ML_SPHERE_RADIUS] = DEFAULT_SPHERE_RADIUS
+            op[ML_SPHERE_SUBDIV] = DEFAULT_SPHERE_SUBDIV
+            op[ML_SPHERE_PHONG]  = DEFAULT_SPHERE_PHONG
+
+            op[ML_TUBE_RADIUS]  = DEFAULT_TUBE_RADIUS
+            op[ML_TUBE_SEGS_R]  = DEFAULT_TUBE_SEGS_R
+            op[ML_TUBE_SEGS_H]  = DEFAULT_TUBE_SEGS_H
+
+            op[ML_BEVEL_SIZE]   = DEFAULT_BEVEL_SIZE
+            op[ML_BEVEL_SUBDIV] = DEFAULT_BEVEL_SUBDIV
         return True
 
     def GetVirtualObjects(self, op, hh):
-        self._ensure_ud(op)
         return _build_lattice(op)
 
     def GetDDescription(self, op, description, flags):
-        if not description.LoadDescription(op.GetType()):
+        if not description.LoadDescription("Obase"):
             return False, flags
-        self._ensure_ud(op)
+
+        grp_lat = c4d.DescID(c4d.DescLevel(MHL_GRP_LAT, c4d.DTYPE_GROUP, 0))
+        _desc_add_group(description, MHL_GRP_LAT, "Каркас (Lattice)")
+        _desc_add_float(description, ML_SIZE_X, "Размер X", DEFAULT_SIZE_X,
+                        10.0, 100000.0, parent_id=grp_lat)
+        _desc_add_float(description, ML_SIZE_Y, "Размер Y", DEFAULT_SIZE_Y,
+                        10.0, 100000.0, parent_id=grp_lat)
+        _desc_add_float(description, ML_SIZE_Z, "Размер Z", DEFAULT_SIZE_Z,
+                        10.0, 100000.0, parent_id=grp_lat)
+        _desc_add_float(description, ML_DENSITY, "Плотность (шаг сетки)", DEFAULT_DENSITY,
+                        10.0, 10000.0, parent_id=grp_lat)
+        _desc_add_float(description, ML_BOND_DENS, "Макс. длина связи", DEFAULT_BOND_DENS,
+                        10.0, 10000.0, parent_id=grp_lat)
+        _desc_add_int(description, ML_SEED, "Seed", DEFAULT_SEED,
+                      0, 99999, parent_id=grp_lat)
+        _desc_add_float(description, ML_JITTER, "Джиттер (шум позиций)", DEFAULT_JITTER,
+                        0.0, 5000.0, parent_id=grp_lat)
+        _desc_add_bool(description, ML_HIDE_ISOLATED, "Скрывать одиночные шары",
+                       DEFAULT_HIDE_ISOLATED, parent_id=grp_lat)
+
+        grp_strip = c4d.DescID(c4d.DescLevel(MHL_GRP_STRIP, c4d.DTYPE_GROUP, 0))
+        _desc_add_group(description, MHL_GRP_STRIP, "Strip — волновое смещение")
+        _desc_add_float(description, ML_STRIP_AMP, "Амплитуда", DEFAULT_STRIP_AMP,
+                        0.0, 10000.0, parent_id=grp_strip)
+        _desc_add_float(description, ML_STRIP_FREQ, "Частота", DEFAULT_STRIP_FREQ,
+                        0.0001, 10.0, unit=c4d.DESC_UNIT_FLOAT, step=0.001,
+                        parent_id=grp_strip)
+        _desc_add_float(description, ML_STRIP_PHASE, "Фаза (анимировать)", DEFAULT_STRIP_PHASE,
+                        -1000.0, 1000.0, unit=c4d.DESC_UNIT_FLOAT, step=0.01,
+                        parent_id=grp_strip)
+        _desc_add_cycle(description, ML_STRIP_AXIS, "Ось волны", DEFAULT_STRIP_AXIS,
+                        ["X (смещение Y)", "Y (смещение X)", "Z (смещение Y)"],
+                        parent_id=grp_strip)
+
+        grp_sph = c4d.DescID(c4d.DescLevel(MHL_GRP_SPH, c4d.DTYPE_GROUP, 0))
+        _desc_add_group(description, MHL_GRP_SPH, "Шары  [M]")
+        _desc_add_float(description, ML_SPHERE_RADIUS, "Радиус шара", DEFAULT_SPHERE_RADIUS,
+                        1.0, 100000.0, parent_id=grp_sph)
+        _desc_add_int(description, ML_SPHERE_SUBDIV, "Подразделение", DEFAULT_SPHERE_SUBDIV,
+                      1, 4, parent_id=grp_sph)
+        _desc_add_float(description, ML_SPHERE_PHONG, "Фонг шаров (°)", DEFAULT_SPHERE_PHONG,
+                        0.0, math.radians(180.0), unit=c4d.DESC_UNIT_DEGREE,
+                        step=math.radians(1.0), parent_id=grp_sph)
+
+        grp_tub = c4d.DescID(c4d.DescLevel(MHL_GRP_TUB, c4d.DTYPE_GROUP, 0))
+        _desc_add_group(description, MHL_GRP_TUB, "Трубки  [T]")
+        _desc_add_float(description, ML_TUBE_RADIUS, "Радиус трубки", DEFAULT_TUBE_RADIUS,
+                        0.5, 100000.0, parent_id=grp_tub)
+        _desc_add_int(description, ML_TUBE_SEGS_R, "Сегменты окружности", DEFAULT_TUBE_SEGS_R,
+                      3, 64, parent_id=grp_tub)
+        _desc_add_int(description, ML_TUBE_SEGS_H, "Сегменты длины", DEFAULT_TUBE_SEGS_H,
+                      1, 64, parent_id=grp_tub)
+
+        grp_bev = c4d.DescID(c4d.DescLevel(MHL_GRP_BEV, c4d.DTYPE_GROUP, 0))
+        _desc_add_group(description, MHL_GRP_BEV, "Фаска  [F]")
+        _desc_add_float(description, ML_BEVEL_SIZE, "Размер фаски", DEFAULT_BEVEL_SIZE,
+                        0.0, 100000.0, parent_id=grp_bev)
+        _desc_add_int(description, ML_BEVEL_SUBDIV, "Подразделение фаски", DEFAULT_BEVEL_SUBDIV,
+                      0, 8, parent_id=grp_bev)
+
         return True, flags | c4d.DESCFLAGS_DESC_LOADED
 
     def CheckDirty(self, op, doc):
@@ -1102,7 +934,7 @@ if __name__ == "__main__":
         id          = ID_MOLHEXLATTICE,
         str         = NAME_MOLHEXLATTICE,
         g           = MolecularHexLatticeObject,
-        description = "",
+        description = "Obase",
         icon        = ICON_B64,
         info        = c4d.OBJECT_GENERATOR,
     )
