@@ -9,39 +9,38 @@ TriTorus — Cinema 4D ObjectData Plugin
   • Детальная настройка фонг-сглаживания
   • Уникальная иконка
 
-UserData SubID MAP (строго фиксировано):
-  SubID=1  : g_base       — группа «Основные»
-  SubID=2  : TT_RADIUS_MAJOR
-  SubID=3  : TT_RADIUS_MINOR
-  SubID=4  : TT_SEGS_MAJOR
-  SubID=5  : TT_SEGS_MINOR
-  SubID=6  : TT_SURFACE_TYPE
-  SubID=7  : TT_QUADS
+Description Parameter MAP (строго фиксировано):
+  GrpID=2000 : TT_GRP_BASE     — группа «Основные»
+  ID=2100    : TT_RADIUS_MAJOR
+  ID=2101    : TT_RADIUS_MINOR
+  ID=2102    : TT_SEGS_MAJOR
+  ID=2103    : TT_SEGS_MINOR
+  ID=2104    : TT_SURFACE_TYPE
 
-  SubID=8  : g_deform     — группа «Деформации»
-  SubID=9  : TT_TWIST
-  SubID=10 : TT_TAPER_X
-  SubID=11 : TT_TAPER_Y
-  SubID=12 : TT_SCALE_X
-  SubID=13 : TT_SCALE_Y
-  SubID=14 : TT_SCALE_Z
+  GrpID=2001 : TT_GRP_DEFORM   — группа «Деформации»
+  ID=2110    : TT_TWIST
+  ID=2111    : TT_TAPER_X
+  ID=2112    : TT_TAPER_Y
+  ID=2113    : TT_SCALE_X
+  ID=2114    : TT_SCALE_Y
+  ID=2115    : TT_SCALE_Z
 
-  SubID=15 : g_disp       — группа «Смещение поверхности»
-  SubID=16 : TT_DISP_TYPE
-  SubID=17 : TT_DISP_AMP
-  SubID=18 : TT_DISP_FREQ
-  SubID=19 : TT_DISP_PHASE
-  SubID=20 : TT_DISP_OCTAVES
-  SubID=21 : TT_DISP_LACUNARITY
-  SubID=22 : TT_DISP_GAIN
+  GrpID=2002 : TT_GRP_DISP     — группа «Смещение поверхности»
+  ID=2120    : TT_DISP_TYPE
+  ID=2121    : TT_DISP_AMP
+  ID=2122    : TT_DISP_FREQ
+  ID=2123    : TT_DISP_PHASE
+  ID=2124    : TT_DISP_OCTAVES
+  ID=2125    : TT_DISP_LACUNARITY
+  ID=2126    : TT_DISP_GAIN
 
-  SubID=23 : g_spiral     — группа «Спираль»
-  SubID=24 : TT_SPIRAL_TURNS
-  SubID=25 : TT_SPIRAL_DIRECTION
+  GrpID=2003 : TT_GRP_SPIRAL   — группа «Спираль»
+  ID=2130    : TT_SPIRAL_TURNS
+  ID=2131    : TT_SPIRAL_DIRECTION
 
-  SubID=26 : g_phong      — группа «Фонг»
-  SubID=27 : TT_PHONG_ANGLE
-  SubID=28 : TT_PHONG_LIMIT
+  GrpID=2004 : TT_GRP_PHONG    — группа «Фонг»
+  ID=2140    : TT_PHONG_ANGLE
+  ID=2141    : TT_PHONG_LIMIT
 """
 
 import c4d  # type: ignore
@@ -56,45 +55,43 @@ import random
 # ══════════════════════════════════════════════════════════════════════════════
 
 ID_TRITORUS  = 1068874
-NAME_TRITORUS = "Tri Torus v2.4"
+NAME_TRITORUS = "Tri Torus v2.5"
 
 # ══════════════════════════════════════════════════════════════════════════════
-#  UserData SubID
+#  Description Parameter IDs
 # ══════════════════════════════════════════════════════════════════════════════
 
-UD_G_BASE    = 1
-TT_RADIUS_MAJOR = 2
-TT_RADIUS_MINOR = 3
-TT_SEGS_MAJOR   = 4
-TT_SEGS_MINOR   = 5
-TT_SURFACE_TYPE = 6
+TT_GRP_BASE    = 2000
+TT_RADIUS_MAJOR = 2100
+TT_RADIUS_MINOR = 2101
+TT_SEGS_MAJOR   = 2102
+TT_SEGS_MINOR   = 2103
+TT_SURFACE_TYPE = 2104
 
-UD_G_DEFORM  = 7
-TT_TWIST     = 8
-TT_TAPER_X   = 9
-TT_TAPER_Y   = 10
-TT_SCALE_X   = 11
-TT_SCALE_Y   = 12
-TT_SCALE_Z   = 13
+TT_GRP_DEFORM  = 2001
+TT_TWIST       = 2110
+TT_TAPER_X     = 2111
+TT_TAPER_Y     = 2112
+TT_SCALE_X     = 2113
+TT_SCALE_Y     = 2114
+TT_SCALE_Z     = 2115
 
-UD_G_DISP    = 14
-TT_DISP_TYPE = 15
-TT_DISP_AMP  = 16
-TT_DISP_FREQ = 17
-TT_DISP_PHASE = 18
-TT_DISP_OCTAVES  = 19
-TT_DISP_LACUNARITY = 20
-TT_DISP_GAIN  = 21
+TT_GRP_DISP    = 2002
+TT_DISP_TYPE   = 2120
+TT_DISP_AMP    = 2121
+TT_DISP_FREQ   = 2122
+TT_DISP_PHASE  = 2123
+TT_DISP_OCTAVES  = 2124
+TT_DISP_LACUNARITY = 2125
+TT_DISP_GAIN   = 2126
 
-UD_G_SPIRAL  = 22
-TT_SPIRAL_TURNS   = 23
-TT_SPIRAL_DIRECTION = 24
+TT_GRP_SPIRAL  = 2003
+TT_SPIRAL_TURNS   = 2130
+TT_SPIRAL_DIRECTION = 2131
 
-UD_G_PHONG   = 25
-TT_PHONG_ANGLE = 26
-TT_PHONG_LIMIT = 27
-
-TT_FIRST_PARAM = TT_RADIUS_MAJOR
+TT_GRP_PHONG   = 2004
+TT_PHONG_ANGLE = 2140
+TT_PHONG_LIMIT = 2141
 
 # ══════════════════════════════════════════════════════════════════════════════
 #  Дефолтные значения
@@ -128,53 +125,8 @@ DEFAULT_PHONG_ANGLE = 45.0
 DEFAULT_PHONG_LIMIT = True
 
 # ══════════════════════════════════════════════════════════════════════════════
-#  Вспомогательные функции UserData
+#  Вспомогательные функции Description
 # ══════════════════════════════════════════════════════════════════════════════
-
-def _ud_descid(op, uid):
-    for descid, bc in op.GetUserDataContainer():
-        if descid[1].id == uid:
-            return descid, bc
-    return None, None
-
-
-def _ud_get(op, uid, default=None):
-    did, _ = _ud_descid(op, uid)
-    if did is not None:
-        val = op[did]
-        if val is not None:
-            return val
-    return default
-
-
-def _ud_set(op, uid, value):
-    did, _ = _ud_descid(op, uid)
-    if did is not None:
-        op[did] = value
-
-
-def _ud_exists(op, uid):
-    did, _ = _ud_descid(op, uid)
-    return did is not None
-
-
-def _add_group(op, name):
-    bc = c4d.GetCustomDatatypeDefault(c4d.DTYPE_GROUP)
-    bc[c4d.DESC_NAME]       = name
-    bc[c4d.DESC_SHORT_NAME] = name
-    bc[c4d.DESC_TITLEBAR]   = 1
-    bc[c4d.DESC_DEFAULT]    = 1
-    did = op.AddUserData(bc)
-    return did[1].id
-
-
-def _add_in_group(op, grp_subid, bc):
-    bc[c4d.DESC_PARENTGROUP] = c4d.DescID(
-        c4d.DescLevel(c4d.ID_USERDATA, c4d.DTYPE_SUBCONTAINER, 0),
-        c4d.DescLevel(grp_subid, c4d.DTYPE_GROUP, 0)
-    )
-    return op.AddUserData(bc)
-
 
 def _float_bc(name, default, minval, maxval, unit=c4d.DESC_UNIT_METER, step=1.0):
     bc = c4d.GetCustomDatatypeDefault(c4d.DTYPE_REAL)
@@ -221,6 +173,15 @@ def _cycle_bc(name, default, items):
     for i, label in enumerate(items):
         cyc[i] = label
     bc[c4d.DESC_CYCLE] = cyc
+    return bc
+
+
+def _group_bc(name):
+    bc = c4d.GetCustomDatatypeDefault(c4d.DTYPE_GROUP)
+    bc[c4d.DESC_NAME]       = name
+    bc[c4d.DESC_SHORT_NAME] = name
+    bc[c4d.DESC_TITLEBAR]   = 1
+    bc[c4d.DESC_DEFAULT]    = 1
     return bc
 
 
@@ -558,58 +519,40 @@ def _apply_displacement(verts, segs_m, segs_n,
 # ══════════════════════════════════════════════════════════════════════════════
 
 def _build_mesh(op):
-    r_major      = max(1.0,  float(_ud_get(op, TT_RADIUS_MAJOR, DEFAULT_RADIUS_MAJOR)))
-    r_minor      = max(0.1,  float(_ud_get(op, TT_RADIUS_MINOR, DEFAULT_RADIUS_MINOR)))
-    segs_m       = max(3,    int(_ud_get(op, TT_SEGS_MAJOR, DEFAULT_SEGS_MAJOR)))
-    segs_n       = max(3,    int(_ud_get(op, TT_SEGS_MINOR, DEFAULT_SEGS_MINOR)))
-    surface_type = int(_ud_get(op, TT_SURFACE_TYPE, DEFAULT_SURFACE_TYPE))
-    quads        = True  # параметр "Квадратные ячейки" убран из интерфейса, поведение зафиксировано
+    r_major      = max(1.0,  float(op[TT_RADIUS_MAJOR]))
+    r_minor      = max(0.1,  float(op[TT_RADIUS_MINOR]))
+    segs_m       = max(3,    int(op[TT_SEGS_MAJOR]))
+    segs_n       = max(3,    int(op[TT_SEGS_MINOR]))
+    surface_type = int(op[TT_SURFACE_TYPE])
 
-    twist        = float(_ud_get(op, TT_TWIST, DEFAULT_TWIST))
-    taper_x      = float(_ud_get(op, TT_TAPER_X, DEFAULT_TAPER_X))
-    taper_y      = float(_ud_get(op, TT_TAPER_Y, DEFAULT_TAPER_Y))
-    scale_x      = max(0.01, float(_ud_get(op, TT_SCALE_X, DEFAULT_SCALE_X)))
-    scale_y      = max(0.01, float(_ud_get(op, TT_SCALE_Y, DEFAULT_SCALE_Y)))
-    scale_z      = max(0.01, float(_ud_get(op, TT_SCALE_Z, DEFAULT_SCALE_Z)))
+    twist        = float(op[TT_TWIST])
+    taper_x      = float(op[TT_TAPER_X])
+    taper_y      = float(op[TT_TAPER_Y])
+    scale_x      = max(0.01, float(op[TT_SCALE_X]))
+    scale_y      = max(0.01, float(op[TT_SCALE_Y]))
+    scale_z      = max(0.01, float(op[TT_SCALE_Z]))
 
-    disp_type    = int(_ud_get(op, TT_DISP_TYPE, DEFAULT_DISP_TYPE))
-    disp_amp     = float(_ud_get(op, TT_DISP_AMP, DEFAULT_DISP_AMP))
-    disp_freq    = max(0.001, float(_ud_get(op, TT_DISP_FREQ, DEFAULT_DISP_FREQ)))
-    disp_phase   = float(_ud_get(op, TT_DISP_PHASE, DEFAULT_DISP_PHASE))
-    disp_oct     = max(1, int(_ud_get(op, TT_DISP_OCTAVES, DEFAULT_DISP_OCTAVES)))
-    disp_lac     = max(1.0, float(_ud_get(op, TT_DISP_LACUNARITY, DEFAULT_DISP_LACUNARITY)))
-    disp_gain    = max(0.01, float(_ud_get(op, TT_DISP_GAIN, DEFAULT_DISP_GAIN)))
+    disp_type    = int(op[TT_DISP_TYPE])
+    disp_amp     = float(op[TT_DISP_AMP])
+    disp_freq    = max(0.001, float(op[TT_DISP_FREQ]))
+    disp_phase   = float(op[TT_DISP_PHASE])
+    disp_oct     = max(1, int(op[TT_DISP_OCTAVES]))
+    disp_lac     = max(1.0, float(op[TT_DISP_LACUNARITY]))
+    disp_gain    = max(0.01, float(op[TT_DISP_GAIN]))
 
-    spiral_turns = max(0, int(_ud_get(op, TT_SPIRAL_TURNS, DEFAULT_SPIRAL_TURNS)))
-    spiral_dir   = int(_ud_get(op, TT_SPIRAL_DIRECTION, DEFAULT_SPIRAL_DIRECTION))
+    spiral_turns = max(0, int(op[TT_SPIRAL_TURNS]))
+    spiral_dir   = int(op[TT_SPIRAL_DIRECTION])
 
     if surface_type == 0:
-        if quads:
-            verts, polys = _build_torus_standard(r_major, r_minor, segs_m, segs_n)
-        else:
-            verts, polys = _build_torus_triangulated(r_major, r_minor, segs_m, segs_n)
+        verts, polys = _build_torus_standard(r_major, r_minor, segs_m, segs_n)
     elif surface_type == 1:
         verts, polys = _build_torus_triangulated(r_major, r_minor, segs_m, segs_n)
     elif surface_type == 2:
         clockwise = (spiral_dir == 0)
         verts, polys = _build_torus_spiral(r_major, r_minor, segs_m, segs_n,
                                            spiral_turns, clockwise)
-        if not quads:
-            new_polys = []
-            for cp in polys:
-                a, b, c, d = cp[0], cp[1], cp[2], cp[3]
-                new_polys.append(c4d.CPolygon(a, b, c, c))
-                new_polys.append(c4d.CPolygon(a, c, d, d))
-            polys = new_polys
     elif surface_type == 3:
         verts, polys = _build_torus_diagonal(r_major, r_minor, segs_m, segs_n)
-        if not quads:
-            new_polys = []
-            for cp in polys:
-                a, b, c, d = cp[0], cp[1], cp[2], cp[3]
-                new_polys.append(c4d.CPolygon(a, b, c, c))
-                new_polys.append(c4d.CPolygon(a, c, d, d))
-            polys = new_polys
     else:
         verts, polys = _build_torus_standard(r_major, r_minor, segs_m, segs_n)
 
@@ -627,90 +570,6 @@ def _build_mesh(op):
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-#  UserData: создание интерфейса
-# ══════════════════════════════════════════════════════════════════════════════
-
-def _create_userdata(op):
-    g_base = _add_group(op, "Основные")
-    _add_in_group(op, g_base, _float_bc("Радиус (большой)", DEFAULT_RADIUS_MAJOR, 1.0, 100000.0))
-    _add_in_group(op, g_base, _float_bc("Радиус (малый)", DEFAULT_RADIUS_MINOR, 0.1, 100000.0))
-    _add_in_group(op, g_base, _int_bc("Сегменты (кольцо)", DEFAULT_SEGS_MAJOR, 3, 500))
-    _add_in_group(op, g_base, _int_bc("Сегменты (труба)", DEFAULT_SEGS_MINOR, 3, 500))
-    _add_in_group(op, g_base, _cycle_bc("Тип поверхности", DEFAULT_SURFACE_TYPE,
-                  ["Квадратная", "Треугольная", "Спиральная", "Диагональная"]))
-
-    g_deform = _add_group(op, "Деформации")
-    _add_in_group(op, g_deform, _float_bc("Кручение (Twist)", DEFAULT_TWIST,
-                  math.radians(-3600.0), math.radians(3600.0),
-                  unit=c4d.DESC_UNIT_DEGREE, step=math.radians(1.0)))
-    _add_in_group(op, g_deform, _float_bc("Сужение X (Taper)", DEFAULT_TAPER_X,
-                  -2.0, 2.0, unit=c4d.DESC_UNIT_FLOAT, step=0.01))
-    _add_in_group(op, g_deform, _float_bc("Сужение Y (Taper)", DEFAULT_TAPER_Y,
-                  -2.0, 2.0, unit=c4d.DESC_UNIT_FLOAT, step=0.01))
-    _add_in_group(op, g_deform, _float_bc("Масштаб X", DEFAULT_SCALE_X,
-                  0.01, 10.0, unit=c4d.DESC_UNIT_FLOAT, step=0.01))
-    _add_in_group(op, g_deform, _float_bc("Масштаб Y", DEFAULT_SCALE_Y,
-                  0.01, 10.0, unit=c4d.DESC_UNIT_FLOAT, step=0.01))
-    _add_in_group(op, g_deform, _float_bc("Масштаб Z", DEFAULT_SCALE_Z,
-                  0.01, 10.0, unit=c4d.DESC_UNIT_FLOAT, step=0.01))
-
-    g_disp = _add_group(op, "Смещение поверхности")
-    _add_in_group(op, g_disp, _cycle_bc("Тип смещения", DEFAULT_DISP_TYPE,
-                  ["Нет", "Синусоида", "Шум Перлина", "Радиальное"]))
-    _add_in_group(op, g_disp, _float_bc("Амплитуда", DEFAULT_DISP_AMP, 0.0, 10000.0))
-    _add_in_group(op, g_disp, _float_bc("Частота", DEFAULT_DISP_FREQ,
-                  0.001, 10.0, unit=c4d.DESC_UNIT_FLOAT, step=0.01))
-    _add_in_group(op, g_disp, _float_bc("Фаза (анимировать)", DEFAULT_DISP_PHASE,
-                  -1000.0, 1000.0, unit=c4d.DESC_UNIT_FLOAT, step=0.01))
-    _add_in_group(op, g_disp, _int_bc("Октавы шума", DEFAULT_DISP_OCTAVES, 1, 8))
-    _add_in_group(op, g_disp, _float_bc("Лакунарность", DEFAULT_DISP_LACUNARITY,
-                  1.0, 8.0, unit=c4d.DESC_UNIT_FLOAT, step=0.1))
-    _add_in_group(op, g_disp, _float_bc("Усиление (Gain)", DEFAULT_DISP_GAIN,
-                  0.01, 2.0, unit=c4d.DESC_UNIT_FLOAT, step=0.01))
-
-    g_spiral = _add_group(op, "Спираль")
-    _add_in_group(op, g_spiral, _int_bc("Количество витков", int(DEFAULT_SPIRAL_TURNS),
-                  0, 50))
-    _add_in_group(op, g_spiral, _cycle_bc("Направление", DEFAULT_SPIRAL_DIRECTION,
-                  ["По часовой", "Против часовой"]))
-
-    g_phong = _add_group(op, "Фонг")
-    _add_in_group(op, g_phong, _float_bc("Угол фонга (°)", DEFAULT_PHONG_ANGLE,
-                  0.0, math.radians(180.0), unit=c4d.DESC_UNIT_DEGREE,
-                  step=math.radians(1.0)))
-    _add_in_group(op, g_phong, _bool_bc("Ограничение угла", DEFAULT_PHONG_LIMIT))
-
-
-def _set_defaults(op):
-    _ud_set(op, TT_RADIUS_MAJOR,  DEFAULT_RADIUS_MAJOR)
-    _ud_set(op, TT_RADIUS_MINOR,  DEFAULT_RADIUS_MINOR)
-    _ud_set(op, TT_SEGS_MAJOR,    DEFAULT_SEGS_MAJOR)
-    _ud_set(op, TT_SEGS_MINOR,    DEFAULT_SEGS_MINOR)
-    _ud_set(op, TT_SURFACE_TYPE,  DEFAULT_SURFACE_TYPE)
-
-    _ud_set(op, TT_TWIST,   DEFAULT_TWIST)
-    _ud_set(op, TT_TAPER_X, DEFAULT_TAPER_X)
-    _ud_set(op, TT_TAPER_Y, DEFAULT_TAPER_Y)
-    _ud_set(op, TT_SCALE_X, DEFAULT_SCALE_X)
-    _ud_set(op, TT_SCALE_Y, DEFAULT_SCALE_Y)
-    _ud_set(op, TT_SCALE_Z, DEFAULT_SCALE_Z)
-
-    _ud_set(op, TT_DISP_TYPE,       DEFAULT_DISP_TYPE)
-    _ud_set(op, TT_DISP_AMP,        DEFAULT_DISP_AMP)
-    _ud_set(op, TT_DISP_FREQ,       DEFAULT_DISP_FREQ)
-    _ud_set(op, TT_DISP_PHASE,      DEFAULT_DISP_PHASE)
-    _ud_set(op, TT_DISP_OCTAVES,    DEFAULT_DISP_OCTAVES)
-    _ud_set(op, TT_DISP_LACUNARITY, DEFAULT_DISP_LACUNARITY)
-    _ud_set(op, TT_DISP_GAIN,       DEFAULT_DISP_GAIN)
-
-    _ud_set(op, TT_SPIRAL_TURNS,     DEFAULT_SPIRAL_TURNS)
-    _ud_set(op, TT_SPIRAL_DIRECTION, DEFAULT_SPIRAL_DIRECTION)
-
-    _ud_set(op, TT_PHONG_ANGLE, DEFAULT_PHONG_ANGLE)
-    _ud_set(op, TT_PHONG_LIMIT, DEFAULT_PHONG_LIMIT)
-
-
-# ══════════════════════════════════════════════════════════════════════════════
 #  Plugin class
 # ══════════════════════════════════════════════════════════════════════════════
 
@@ -719,20 +578,38 @@ class TriTorusObject(c4d.plugins.ObjectData):
 
     OBJECT_NAME = "Tri Torus"
 
-    def _ensure_ud(self, op):
-        if not _ud_exists(op, TT_FIRST_PARAM):
-            _create_userdata(op)
-            _set_defaults(op)
-
     def Init(self, op, isload=False):
         if not isload:
             op.SetName(self.OBJECT_NAME)
-        self._ensure_ud(op)
+            op[TT_RADIUS_MAJOR]  = DEFAULT_RADIUS_MAJOR
+            op[TT_RADIUS_MINOR]  = DEFAULT_RADIUS_MINOR
+            op[TT_SEGS_MAJOR]    = DEFAULT_SEGS_MAJOR
+            op[TT_SEGS_MINOR]    = DEFAULT_SEGS_MINOR
+            op[TT_SURFACE_TYPE]  = DEFAULT_SURFACE_TYPE
+
+            op[TT_TWIST]   = DEFAULT_TWIST
+            op[TT_TAPER_X] = DEFAULT_TAPER_X
+            op[TT_TAPER_Y] = DEFAULT_TAPER_Y
+            op[TT_SCALE_X] = DEFAULT_SCALE_X
+            op[TT_SCALE_Y] = DEFAULT_SCALE_Y
+            op[TT_SCALE_Z] = DEFAULT_SCALE_Z
+
+            op[TT_DISP_TYPE]       = DEFAULT_DISP_TYPE
+            op[TT_DISP_AMP]        = DEFAULT_DISP_AMP
+            op[TT_DISP_FREQ]       = DEFAULT_DISP_FREQ
+            op[TT_DISP_PHASE]      = DEFAULT_DISP_PHASE
+            op[TT_DISP_OCTAVES]    = DEFAULT_DISP_OCTAVES
+            op[TT_DISP_LACUNARITY] = DEFAULT_DISP_LACUNARITY
+            op[TT_DISP_GAIN]       = DEFAULT_DISP_GAIN
+
+            op[TT_SPIRAL_TURNS]     = DEFAULT_SPIRAL_TURNS
+            op[TT_SPIRAL_DIRECTION] = DEFAULT_SPIRAL_DIRECTION
+
+            op[TT_PHONG_ANGLE] = DEFAULT_PHONG_ANGLE
+            op[TT_PHONG_LIMIT] = DEFAULT_PHONG_LIMIT
         return True
 
     def GetVirtualObjects(self, op, hh):
-        self._ensure_ud(op)
-
         points, polys, uv_map, segs_m, segs_n = _build_mesh(op)
         obj = _make_poly_object(points, polys, self.OBJECT_NAME)
 
@@ -740,16 +617,118 @@ class TriTorusObject(c4d.plugins.ObjectData):
         obj.InsertTag(uvw_tag)
 
         phong_angle_rad = max(0.0, min(math.radians(180.0),
-            float(_ud_get(op, TT_PHONG_ANGLE, math.radians(DEFAULT_PHONG_ANGLE)))))
-        phong_limit = bool(_ud_get(op, TT_PHONG_LIMIT, DEFAULT_PHONG_LIMIT))
+            float(op[TT_PHONG_ANGLE])))
+        phong_limit = bool(op[TT_PHONG_LIMIT])
         _add_phong_tag(obj, math.degrees(phong_angle_rad), phong_limit)
 
         return obj
 
     def GetDDescription(self, op, description, flags):
-        if not description.LoadDescription(op.GetType()):
+        if not description.LoadDescription("Obase"):
             return False, flags
-        self._ensure_ud(op)
+
+        grp_base = c4d.DescID(c4d.DescLevel(TT_GRP_BASE, c4d.DTYPE_GROUP, 0))
+        bc = _group_bc("Основные")
+        description.SetParameter(grp_base, bc, c4d.ID_LISTHEAD)
+
+        bc = _float_bc("Радиус (большой)", DEFAULT_RADIUS_MAJOR, 1.0, 100000.0)
+        description.SetParameter(c4d.DescID(c4d.DescLevel(TT_RADIUS_MAJOR, c4d.DTYPE_REAL, 0)), bc, grp_base)
+
+        bc = _float_bc("Радиус (малый)", DEFAULT_RADIUS_MINOR, 0.1, 100000.0)
+        description.SetParameter(c4d.DescID(c4d.DescLevel(TT_RADIUS_MINOR, c4d.DTYPE_REAL, 0)), bc, grp_base)
+
+        bc = _int_bc("Сегменты (кольцо)", DEFAULT_SEGS_MAJOR, 3, 500)
+        description.SetParameter(c4d.DescID(c4d.DescLevel(TT_SEGS_MAJOR, c4d.DTYPE_LONG, 0)), bc, grp_base)
+
+        bc = _int_bc("Сегменты (труба)", DEFAULT_SEGS_MINOR, 3, 500)
+        description.SetParameter(c4d.DescID(c4d.DescLevel(TT_SEGS_MINOR, c4d.DTYPE_LONG, 0)), bc, grp_base)
+
+        bc = _cycle_bc("Тип поверхности", DEFAULT_SURFACE_TYPE,
+                       ["Квадратная", "Треугольная", "Спиральная", "Диагональная"])
+        description.SetParameter(c4d.DescID(c4d.DescLevel(TT_SURFACE_TYPE, c4d.DTYPE_LONG, 0)), bc, grp_base)
+
+        grp_deform = c4d.DescID(c4d.DescLevel(TT_GRP_DEFORM, c4d.DTYPE_GROUP, 0))
+        bc = _group_bc("Деформации")
+        description.SetParameter(grp_deform, bc, c4d.ID_LISTHEAD)
+
+        bc = _float_bc("Кручение (Twist)", DEFAULT_TWIST,
+                       math.radians(-3600.0), math.radians(3600.0),
+                       unit=c4d.DESC_UNIT_DEGREE, step=math.radians(1.0))
+        description.SetParameter(c4d.DescID(c4d.DescLevel(TT_TWIST, c4d.DTYPE_REAL, 0)), bc, grp_deform)
+
+        bc = _float_bc("Сужение X (Taper)", DEFAULT_TAPER_X,
+                       -2.0, 2.0, unit=c4d.DESC_UNIT_FLOAT, step=0.01)
+        description.SetParameter(c4d.DescID(c4d.DescLevel(TT_TAPER_X, c4d.DTYPE_REAL, 0)), bc, grp_deform)
+
+        bc = _float_bc("Сужение Y (Taper)", DEFAULT_TAPER_Y,
+                       -2.0, 2.0, unit=c4d.DESC_UNIT_FLOAT, step=0.01)
+        description.SetParameter(c4d.DescID(c4d.DescLevel(TT_TAPER_Y, c4d.DTYPE_REAL, 0)), bc, grp_deform)
+
+        bc = _float_bc("Масштаб X", DEFAULT_SCALE_X,
+                       0.01, 10.0, unit=c4d.DESC_UNIT_FLOAT, step=0.01)
+        description.SetParameter(c4d.DescID(c4d.DescLevel(TT_SCALE_X, c4d.DTYPE_REAL, 0)), bc, grp_deform)
+
+        bc = _float_bc("Масштаб Y", DEFAULT_SCALE_Y,
+                       0.01, 10.0, unit=c4d.DESC_UNIT_FLOAT, step=0.01)
+        description.SetParameter(c4d.DescID(c4d.DescLevel(TT_SCALE_Y, c4d.DTYPE_REAL, 0)), bc, grp_deform)
+
+        bc = _float_bc("Масштаб Z", DEFAULT_SCALE_Z,
+                       0.01, 10.0, unit=c4d.DESC_UNIT_FLOAT, step=0.01)
+        description.SetParameter(c4d.DescID(c4d.DescLevel(TT_SCALE_Z, c4d.DTYPE_REAL, 0)), bc, grp_deform)
+
+        grp_disp = c4d.DescID(c4d.DescLevel(TT_GRP_DISP, c4d.DTYPE_GROUP, 0))
+        bc = _group_bc("Смещение поверхности")
+        description.SetParameter(grp_disp, bc, c4d.ID_LISTHEAD)
+
+        bc = _cycle_bc("Тип смещения", DEFAULT_DISP_TYPE,
+                       ["Нет", "Синусоида", "Шум Перлина", "Радиальное"])
+        description.SetParameter(c4d.DescID(c4d.DescLevel(TT_DISP_TYPE, c4d.DTYPE_LONG, 0)), bc, grp_disp)
+
+        bc = _float_bc("Амплитуда", DEFAULT_DISP_AMP, 0.0, 10000.0)
+        description.SetParameter(c4d.DescID(c4d.DescLevel(TT_DISP_AMP, c4d.DTYPE_REAL, 0)), bc, grp_disp)
+
+        bc = _float_bc("Частота", DEFAULT_DISP_FREQ,
+                       0.001, 10.0, unit=c4d.DESC_UNIT_FLOAT, step=0.01)
+        description.SetParameter(c4d.DescID(c4d.DescLevel(TT_DISP_FREQ, c4d.DTYPE_REAL, 0)), bc, grp_disp)
+
+        bc = _float_bc("Фаза (анимировать)", DEFAULT_DISP_PHASE,
+                       -1000.0, 1000.0, unit=c4d.DESC_UNIT_FLOAT, step=0.01)
+        description.SetParameter(c4d.DescID(c4d.DescLevel(TT_DISP_PHASE, c4d.DTYPE_REAL, 0)), bc, grp_disp)
+
+        bc = _int_bc("Октавы шума", DEFAULT_DISP_OCTAVES, 1, 8)
+        description.SetParameter(c4d.DescID(c4d.DescLevel(TT_DISP_OCTAVES, c4d.DTYPE_LONG, 0)), bc, grp_disp)
+
+        bc = _float_bc("Лакунарность", DEFAULT_DISP_LACUNARITY,
+                       1.0, 8.0, unit=c4d.DESC_UNIT_FLOAT, step=0.1)
+        description.SetParameter(c4d.DescID(c4d.DescLevel(TT_DISP_LACUNARITY, c4d.DTYPE_REAL, 0)), bc, grp_disp)
+
+        bc = _float_bc("Усиление (Gain)", DEFAULT_DISP_GAIN,
+                       0.01, 2.0, unit=c4d.DESC_UNIT_FLOAT, step=0.01)
+        description.SetParameter(c4d.DescID(c4d.DescLevel(TT_DISP_GAIN, c4d.DTYPE_REAL, 0)), bc, grp_disp)
+
+        grp_spiral = c4d.DescID(c4d.DescLevel(TT_GRP_SPIRAL, c4d.DTYPE_GROUP, 0))
+        bc = _group_bc("Спираль")
+        description.SetParameter(grp_spiral, bc, c4d.ID_LISTHEAD)
+
+        bc = _int_bc("Количество витков", int(DEFAULT_SPIRAL_TURNS), 0, 50)
+        description.SetParameter(c4d.DescID(c4d.DescLevel(TT_SPIRAL_TURNS, c4d.DTYPE_LONG, 0)), bc, grp_spiral)
+
+        bc = _cycle_bc("Направление", DEFAULT_SPIRAL_DIRECTION,
+                       ["По часовой", "Против часовой"])
+        description.SetParameter(c4d.DescID(c4d.DescLevel(TT_SPIRAL_DIRECTION, c4d.DTYPE_LONG, 0)), bc, grp_spiral)
+
+        grp_phong = c4d.DescID(c4d.DescLevel(TT_GRP_PHONG, c4d.DTYPE_GROUP, 0))
+        bc = _group_bc("Фонг")
+        description.SetParameter(grp_phong, bc, c4d.ID_LISTHEAD)
+
+        bc = _float_bc("Угол фонга (°)", DEFAULT_PHONG_ANGLE,
+                       0.0, math.radians(180.0), unit=c4d.DESC_UNIT_DEGREE,
+                       step=math.radians(1.0))
+        description.SetParameter(c4d.DescID(c4d.DescLevel(TT_PHONG_ANGLE, c4d.DTYPE_REAL, 0)), bc, grp_phong)
+
+        bc = _bool_bc("Ограничение угла", DEFAULT_PHONG_LIMIT)
+        description.SetParameter(c4d.DescID(c4d.DescLevel(TT_PHONG_LIMIT, c4d.DTYPE_BOOL, 0)), bc, grp_phong)
+
         return True, flags | c4d.DESCFLAGS_DESC_LOADED
 
     def CheckDirty(self, op, doc):
@@ -795,7 +774,7 @@ if __name__ == "__main__":
         id          = ID_TRITORUS,
         str         = NAME_TRITORUS,
         g           = TriTorusObject,
-        description = "",
+        description = "Obase",
         icon        = ICO_TT,
         info        = c4d.OBJECT_GENERATOR,
     )
