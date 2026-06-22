@@ -14,7 +14,7 @@ import tempfile
 
 ID_HEXSPHERE = 1068872
 
-NAME_HEXSPHERE = "Hex Sphere v1.2.1"
+NAME_HEXSPHERE = "Hex Sphere v1.3"
 
 # ─── UserData SubID (общая схема: SubID=1 — группа, поля с 2) ────────────────
 
@@ -24,6 +24,12 @@ UD_GROUP = 1   # Группа "Параметры"
 HS_RADIUS  = 2
 HS_SUBDIV  = 3
 HS_SIDES   = 4
+
+# ─── Description-based parameter IDs ──────────────────────────────────
+HS_GRP        = 2000
+HS_D_RADIUS   = 2001
+HS_D_SUBDIV   = 2002
+HS_D_SIDES    = 2003
 
 
 # ─── Вспомогательные функции UserData ────────────────────────────────────────
@@ -494,42 +500,29 @@ def _make_poly_object(points, polys, name):
 class _MeshPrimitiveBase(c4d.plugins.ObjectData):
     """
     Базовый класс для всех mesh-примитивов.
+    Использует Description-систему для UI (вкладки в Attributes Manager).
     Подклассы определяют:
-      OBJECT_NAME   — имя объекта по умолчанию
-      _first_ud_id  — SubID первого поля UserData (для проверки инициализации)
-      _create_ud()  — создание UserData-полей
+      OBJECT_NAME     — имя объекта по умолчанию
+      GetDDescription() — описание UI (вкладки и параметры)
       _set_defaults() — установка значений по умолчанию
-      _build_mesh() — генерация (points, polys)
+      _build_mesh()   — генерация (points, polys)
     """
 
-    OBJECT_NAME  = "MeshPrimitive"
-    _first_ud_id = HS_RADIUS   # переопределяется в подклассах
+    OBJECT_NAME = "MeshPrimitive"
 
     def Init(self, op, isload=False):
         if not isload:
             op.SetName(self.OBJECT_NAME)
-        if not _ud_already_created(op, self._first_ud_id):
-            grp_subid = _add_group(op, "Параметры")
-            self._create_ud(op, grp_subid)
             self._set_defaults(op)
         return True
 
     def GetVirtualObjects(self, op, hh):
-        if not _ud_already_created(op, self._first_ud_id):
-            grp_subid = _add_group(op, "Параметры")
-            self._create_ud(op, grp_subid)
-            self._set_defaults(op)
-
         points, polys = self._build_mesh(op)
         return _make_poly_object(points, polys, self.OBJECT_NAME)
 
     def GetDDescription(self, op, description, flags):
-        if not description.LoadDescription(op.GetType()):
+        if not description.LoadDescription("Obase"):
             return False, flags
-        if not _ud_already_created(op, self._first_ud_id):
-            grp_subid = _add_group(op, "Параметры")
-            self._create_ud(op, grp_subid)
-            self._set_defaults(op)
         return True, flags | c4d.DESCFLAGS_DESC_LOADED
 
     def CheckDirty(self, op, doc):
@@ -537,10 +530,6 @@ class _MeshPrimitiveBase(c4d.plugins.ObjectData):
 
     def Draw(self, op, drawpass, bd, bh):
         return c4d.DRAWRESULT_OK
-
-    # Переопределить в подклассах:
-    def _create_ud(self, op, grp_subid):
-        pass
 
     def _set_defaults(self, op):
         pass
@@ -554,28 +543,70 @@ class _MeshPrimitiveBase(c4d.plugins.ObjectData):
 class HexSphereObject(_MeshPrimitiveBase):
     """Сфера с гексагональной/пятиугольной сеткой (dual icosphere)."""
 
-    OBJECT_NAME  = "Hex Sphere"
-    _first_ud_id = HS_RADIUS
-
-    def _create_ud(self, op, grp_subid):
-        _add_in_group(op, grp_subid, _make_float_bc(
-            "Радиус", 100.0, 1.0, 100000.0))
-        _add_in_group(op, grp_subid, _make_int_bc(
-            "Подразделения", 2, 1, 5))
-        _add_in_group(op, grp_subid, _make_int_bc(
-            "Углов", 6, 3, 16))
+    OBJECT_NAME = "Hex Sphere"
 
     def _set_defaults(self, op):
-        _ud_set_default(op, HS_RADIUS, 100.0)
-        _ud_set_default(op, HS_SUBDIV, 2)
-        _ud_set_default(op, HS_SIDES, 6)
+        op[HS_D_RADIUS] = 100.0
+        op[HS_D_SUBDIV] = 2
+        op[HS_D_SIDES]  = 6
+
+    def GetDDescription(self, op, description, flags):
+        if not description.LoadDescription("Obase"):
+            return False, flags
+
+        bc = c4d.GetCustomDataTypeDefault(c4d.DTYPE_GROUP)
+        bc[c4d.DESC_NAME]    = "Параметры"
+        bc[c4d.DESC_COLUMNS] = 1
+        bc[c4d.DESC_DEFAULT] = 1
+        description.SetParameter(
+            c4d.DescID(c4d.DescLevel(HS_GRP, c4d.DTYPE_GROUP, 0)),
+            bc, c4d.ID_LISTHEAD
+        )
+        gid = c4d.DescID(c4d.DescLevel(HS_GRP, c4d.DTYPE_GROUP, 0))
+
+        bc = c4d.GetCustomDataTypeDefault(c4d.DTYPE_REAL)
+        bc[c4d.DESC_NAME]      = "Радиус"
+        bc[c4d.DESC_DEFAULT]   = 100.0
+        bc[c4d.DESC_MIN]       = 1.0
+        bc[c4d.DESC_MAX]       = 100000.0
+        bc[c4d.DESC_UNIT]      = c4d.DESC_UNIT_METER
+        bc[c4d.DESC_STEP]      = 1.0
+        bc[c4d.DESC_ANIMATE]   = c4d.DESC_ANIMATE_ON
+        description.SetParameter(
+            c4d.DescID(c4d.DescLevel(HS_D_RADIUS, c4d.DTYPE_REAL, 0)),
+            bc, gid
+        )
+
+        bc = c4d.GetCustomDataTypeDefault(c4d.DTYPE_LONG)
+        bc[c4d.DESC_NAME]      = "Подразделения"
+        bc[c4d.DESC_DEFAULT]   = 2
+        bc[c4d.DESC_MIN]       = 1
+        bc[c4d.DESC_MAX]       = 5
+        bc[c4d.DESC_STEP]      = 1
+        bc[c4d.DESC_ANIMATE]   = c4d.DESC_ANIMATE_ON
+        description.SetParameter(
+            c4d.DescID(c4d.DescLevel(HS_D_SUBDIV, c4d.DTYPE_LONG, 0)),
+            bc, gid
+        )
+
+        bc = c4d.GetCustomDataTypeDefault(c4d.DTYPE_LONG)
+        bc[c4d.DESC_NAME]      = "Углов"
+        bc[c4d.DESC_DEFAULT]   = 6
+        bc[c4d.DESC_MIN]       = 3
+        bc[c4d.DESC_MAX]       = 16
+        bc[c4d.DESC_STEP]      = 1
+        bc[c4d.DESC_ANIMATE]   = c4d.DESC_ANIMATE_ON
+        description.SetParameter(
+            c4d.DescID(c4d.DescLevel(HS_D_SIDES, c4d.DTYPE_LONG, 0)),
+            bc, gid
+        )
+
+        return True, flags | c4d.DESCFLAGS_DESC_LOADED
 
     def _build_mesh(self, op):
-        radius = _ud_get(op, HS_RADIUS, 100.0)
-        subdiv = _ud_get(op, HS_SUBDIV, 2)
-        sides  = _ud_get(op, HS_SIDES, 6)
-        subdiv = max(1, min(5, int(subdiv)))  # ограничиваем: при 5 уже 20480 граней
-        sides  = max(3, min(16, int(sides)))
+        radius = float(op[HS_D_RADIUS])
+        subdiv = max(1, min(5, int(op[HS_D_SUBDIV])))
+        sides  = max(3, min(16, int(op[HS_D_SIDES])))
         return build_hexsphere(radius, subdiv, sides)
 
 
@@ -608,7 +639,7 @@ if __name__ == "__main__":
         id          = ID_HEXSPHERE,
         str         = NAME_HEXSPHERE,
         g           = HexSphereObject,
-        description = "",
+        description = "Obase",
         icon        = ICO_HS,
         info        = c4d.OBJECT_GENERATOR,
     )
