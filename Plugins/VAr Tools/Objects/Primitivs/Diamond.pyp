@@ -32,7 +32,7 @@ if not hasattr(c4d, "DESC_UNIT_NONE"):
 # ─── Plugin ID & Name ────────────────────────────────────────────────────────
 
 ID_DIAMOND   = 1069031
-NAME_DIAMOND = "Diamond v2.0"
+NAME_DIAMOND = "Diamond v2.1"
 
 # ─── UserData SubID ───────────────────────────────────────────────────────────
 # SubID=1 зарезервирован под группу. Поля начинаются с 2.
@@ -48,6 +48,18 @@ DM_SEGS       = 7   # Число граней (для огранок на осн
 DM_TABLE_SIZE = 8   # Размер площадки (0..1 от размера камня)
 DM_CULET      = 9   # Размер калеты (кончик павильона, 0..1)
 DM_STEPS      = 10  # Число ступеней (для Emerald / Asscher)
+
+# ─── Description-based parameter IDs ──────────────────────────────────
+DM_GRP          = 2000
+DM_D_CUT        = 2001
+DM_D_SIZE       = 2002
+DM_D_HEIGHT     = 2003
+DM_D_CROWN_H    = 2004
+DM_D_GIRDLE_H   = 2005
+DM_D_SEGS       = 2006
+DM_D_TABLE_SIZE = 2007
+DM_D_CULET      = 2008
+DM_D_STEPS      = 2009
 
 # Индексы огранок
 CUT_BRILLIANT  = 0
@@ -1605,42 +1617,29 @@ def build_diamond_mesh(cut, size, height, crown_h, girdle_h,
 class _MeshPrimitiveBase(c4d.plugins.ObjectData):
     """
     Базовый класс для mesh-примитивов.
+    Использует Description-систему для UI (вкладки в Attributes Manager).
     Подклассы определяют:
-      OBJECT_NAME   — имя объекта по умолчанию
-      _first_ud_id  — SubID первого поля UserData
-      _create_ud()  — создание UserData-полей
+      OBJECT_NAME     — имя объекта по умолчанию
+      GetDDescription() — описание UI (вкладки и параметры)
       _set_defaults() — установка значений по умолчанию
-      _build_mesh() — генерация (points, polys)
+      _build_mesh()   — генерация (points, polys)
     """
 
-    OBJECT_NAME  = "MeshPrimitive"
-    _first_ud_id = DM_CUT
+    OBJECT_NAME = "MeshPrimitive"
 
     def Init(self, op, isload=False):
         if not isload:
             op.SetName(self.OBJECT_NAME)
-        if not _ud_already_created(op, self._first_ud_id):
-            grp_subid = _add_group(op, "Параметры")
-            self._create_ud(op, grp_subid)
             self._set_defaults(op)
         return True
 
     def GetVirtualObjects(self, op, hh):
-        if not _ud_already_created(op, self._first_ud_id):
-            grp_subid = _add_group(op, "Параметры")
-            self._create_ud(op, grp_subid)
-            self._set_defaults(op)
-
         points, polys = self._build_mesh(op)
         return _make_poly_object(points, polys, self.OBJECT_NAME)
 
     def GetDDescription(self, op, description, flags):
-        if not description.LoadDescription(op.GetType()):
+        if not description.LoadDescription("Obase"):
             return False, flags
-        if not _ud_already_created(op, self._first_ud_id):
-            grp_subid = _add_group(op, "Параметры")
-            self._create_ud(op, grp_subid)
-            self._set_defaults(op)
         return True, flags | c4d.DESCFLAGS_DESC_LOADED
 
     def CheckDirty(self, op, doc):
@@ -1648,9 +1647,6 @@ class _MeshPrimitiveBase(c4d.plugins.ObjectData):
 
     def Draw(self, op, drawpass, bd, bh):
         return c4d.DRAWRESULT_OK
-
-    def _create_ud(self, op, grp_subid):
-        pass
 
     def _set_defaults(self, op):
         pass
@@ -1664,89 +1660,180 @@ class _MeshPrimitiveBase(c4d.plugins.ObjectData):
 class DiamondObject(_MeshPrimitiveBase):
     """Параметрический алмаз с выбором огранки."""
 
-    OBJECT_NAME  = "Diamond"
-    _first_ud_id = DM_CUT
-
-    def _create_ud(self, op, grp_subid):
-        # 1. Тип огранки
-        _add_in_group(op, grp_subid, _make_cycle_bc(
-            "Огранка", CUT_BRILLIANT, [
-                "Бриллиант (Круглая)",
-                "Бриллиант (Квадратная)",
-                "Принцесса (Квадратная)",
-                "Изумруд (Ступенчатая)",
-                "Маркиза (Навет)",
-                "Груша (Teardrop)",
-                "Овал",
-                "Кушон (Подушка)",
-                "Ашер (Квадрат-ступени)",
-                "Сердце",
-                "Роза (Старинная)",
-                "Триллион (Треугольный)",
-            ]))
-
-        # 2. Общий размер
-        _add_in_group(op, grp_subid, _make_float_bc(
-            "Размер", 100.0, 1.0, 100000.0,
-            unit=c4d.DESC_UNIT_METER, step=1.0,
-            slider_min=20.0, slider_max=200.0))
-
-        # 3. Высота
-        _add_in_group(op, grp_subid, _make_float_bc(
-            "Высота", 65.0, 1.0, 100000.0,
-            unit=c4d.DESC_UNIT_METER, step=1.0,
-            slider_min=20.0, slider_max=200.0))
-
-        # 4. Доля короны
-        _add_in_group(op, grp_subid, _make_float_bc(
-            "Высота короны (%)", 0.35, 0.05, 0.6,
-            unit=c4d.DESC_UNIT_PERCENT, step=0.01))
-
-        # 5. Толщина рундиста
-        _add_in_group(op, grp_subid, _make_float_bc(
-            "Рундист", 3.0, 0.5, 50.0,
-            unit=c4d.DESC_UNIT_METER, step=0.5,
-            slider_min=0.5, slider_max=10.0))
-
-        # 6. Число граней (сегментов)
-        _add_in_group(op, grp_subid, _make_int_bc(
-            "Грани", 32, 8, 128))
-
-        # 7. Размер площадки
-        _add_in_group(op, grp_subid, _make_float_bc(
-            "Площадка (%)", 0.55, 0.05, 0.95,
-            unit=c4d.DESC_UNIT_PERCENT, step=0.01))
-
-        # 8. Размер калеты
-        _add_in_group(op, grp_subid, _make_float_bc(
-            "Калета (%)", 0.0, 0.0, 0.3,
-            unit=c4d.DESC_UNIT_PERCENT, step=0.005))
-
-        # 9. Ступени (для Изумруд / Ашер / Принцесса)
-        _add_in_group(op, grp_subid, _make_int_bc(
-            "Ступени", 2, 1, 5))
+    OBJECT_NAME = "Diamond"
 
     def _set_defaults(self, op):
-        _ud_set_default(op, DM_CUT,        CUT_BRILLIANT)
-        _ud_set_default(op, DM_SIZE,        100.0)
-        _ud_set_default(op, DM_HEIGHT,       65.0)
-        _ud_set_default(op, DM_CROWN_H,       0.35)
-        _ud_set_default(op, DM_GIRDLE_H,      3.0)
-        _ud_set_default(op, DM_SEGS,          32)
-        _ud_set_default(op, DM_TABLE_SIZE,     0.55)
-        _ud_set_default(op, DM_CULET,          0.0)
-        _ud_set_default(op, DM_STEPS,          2)
+        op[DM_D_CUT]        = CUT_BRILLIANT
+        op[DM_D_SIZE]       = 100.0
+        op[DM_D_HEIGHT]     = 65.0
+        op[DM_D_CROWN_H]    = 0.35
+        op[DM_D_GIRDLE_H]   = 3.0
+        op[DM_D_SEGS]       = 32
+        op[DM_D_TABLE_SIZE] = 0.55
+        op[DM_D_CULET]      = 0.0
+        op[DM_D_STEPS]      = 2
+
+    def GetDDescription(self, op, description, flags):
+        if not description.LoadDescription("Obase"):
+            return False, flags
+
+        bc = c4d.GetCustomDataTypeDefault(c4d.DTYPE_GROUP)
+        bc[c4d.DESC_NAME]    = "Параметры"
+        bc[c4d.DESC_COLUMNS] = 1
+        bc[c4d.DESC_DEFAULT] = 1
+        description.SetParameter(
+            c4d.DescID(c4d.DescLevel(DM_GRP, c4d.DTYPE_GROUP, 0)),
+            bc, c4d.ID_LISTHEAD
+        )
+        gid = c4d.DescID(c4d.DescLevel(DM_GRP, c4d.DTYPE_GROUP, 0))
+
+        bc = c4d.GetCustomDataTypeDefault(c4d.DTYPE_LONG)
+        bc[c4d.DESC_NAME]      = "Огранка"
+        bc[c4d.DESC_CUSTOMGUI] = c4d.CUSTOMGUI_CYCLE
+        bc[c4d.DESC_DEFAULT]   = CUT_BRILLIANT
+        cyc = c4d.BaseContainer()
+        cyc[0] = "Бриллиант (Круглая)"
+        cyc[1] = "Бриллиант (Квадратная)"
+        cyc[2] = "Принцесса (Квадратная)"
+        cyc[3] = "Изумруд (Ступенчатая)"
+        cyc[4] = "Маркиза (Навет)"
+        cyc[5] = "Груша (Teardrop)"
+        cyc[6] = "Овал"
+        cyc[7] = "Кушон (Подушка)"
+        cyc[8] = "Ашер (Квадрат-ступени)"
+        cyc[9] = "Сердце"
+        cyc[10] = "Роза (Старинная)"
+        cyc[11] = "Триллион (Треугольный)"
+        bc[c4d.DESC_CYCLE] = cyc
+        bc[c4d.DESC_ANIMATE] = c4d.DESC_ANIMATE_ON
+        description.SetParameter(
+            c4d.DescID(c4d.DescLevel(DM_D_CUT, c4d.DTYPE_LONG, 0)),
+            bc, gid
+        )
+
+        bc = c4d.GetCustomDataTypeDefault(c4d.DTYPE_REAL)
+        bc[c4d.DESC_NAME]      = "Размер"
+        bc[c4d.DESC_DEFAULT]   = 100.0
+        bc[c4d.DESC_MIN]       = 1.0
+        bc[c4d.DESC_MAX]       = 100000.0
+        bc[c4d.DESC_UNIT]      = c4d.DESC_UNIT_METER
+        bc[c4d.DESC_STEP]      = 1.0
+        bc[c4d.DESC_ANIMATE]   = c4d.DESC_ANIMATE_ON
+        bc[c4d.DESC_CUSTOMGUI] = c4d.CUSTOMGUI_REALSLIDER
+        bc[c4d.DESC_MINSLIDER] = 20.0
+        bc[c4d.DESC_MAXSLIDER] = 200.0
+        description.SetParameter(
+            c4d.DescID(c4d.DescLevel(DM_D_SIZE, c4d.DTYPE_REAL, 0)),
+            bc, gid
+        )
+
+        bc = c4d.GetCustomDataTypeDefault(c4d.DTYPE_REAL)
+        bc[c4d.DESC_NAME]      = "Высота"
+        bc[c4d.DESC_DEFAULT]   = 65.0
+        bc[c4d.DESC_MIN]       = 1.0
+        bc[c4d.DESC_MAX]       = 100000.0
+        bc[c4d.DESC_UNIT]      = c4d.DESC_UNIT_METER
+        bc[c4d.DESC_STEP]      = 1.0
+        bc[c4d.DESC_ANIMATE]   = c4d.DESC_ANIMATE_ON
+        bc[c4d.DESC_CUSTOMGUI] = c4d.CUSTOMGUI_REALSLIDER
+        bc[c4d.DESC_MINSLIDER] = 20.0
+        bc[c4d.DESC_MAXSLIDER] = 200.0
+        description.SetParameter(
+            c4d.DescID(c4d.DescLevel(DM_D_HEIGHT, c4d.DTYPE_REAL, 0)),
+            bc, gid
+        )
+
+        bc = c4d.GetCustomDataTypeDefault(c4d.DTYPE_REAL)
+        bc[c4d.DESC_NAME]      = "Высота короны (%)"
+        bc[c4d.DESC_DEFAULT]   = 0.35
+        bc[c4d.DESC_MIN]       = 0.05
+        bc[c4d.DESC_MAX]       = 0.6
+        bc[c4d.DESC_UNIT]      = c4d.DESC_UNIT_PERCENT
+        bc[c4d.DESC_STEP]      = 0.01
+        bc[c4d.DESC_ANIMATE]   = c4d.DESC_ANIMATE_ON
+        description.SetParameter(
+            c4d.DescID(c4d.DescLevel(DM_D_CROWN_H, c4d.DTYPE_REAL, 0)),
+            bc, gid
+        )
+
+        bc = c4d.GetCustomDataTypeDefault(c4d.DTYPE_REAL)
+        bc[c4d.DESC_NAME]      = "Рундист"
+        bc[c4d.DESC_DEFAULT]   = 3.0
+        bc[c4d.DESC_MIN]       = 0.5
+        bc[c4d.DESC_MAX]       = 50.0
+        bc[c4d.DESC_UNIT]      = c4d.DESC_UNIT_METER
+        bc[c4d.DESC_STEP]      = 0.5
+        bc[c4d.DESC_ANIMATE]   = c4d.DESC_ANIMATE_ON
+        bc[c4d.DESC_CUSTOMGUI] = c4d.CUSTOMGUI_REALSLIDER
+        bc[c4d.DESC_MINSLIDER] = 0.5
+        bc[c4d.DESC_MAXSLIDER] = 10.0
+        description.SetParameter(
+            c4d.DescID(c4d.DescLevel(DM_D_GIRDLE_H, c4d.DTYPE_REAL, 0)),
+            bc, gid
+        )
+
+        bc = c4d.GetCustomDataTypeDefault(c4d.DTYPE_LONG)
+        bc[c4d.DESC_NAME]      = "Грани"
+        bc[c4d.DESC_DEFAULT]   = 32
+        bc[c4d.DESC_MIN]       = 8
+        bc[c4d.DESC_MAX]       = 128
+        bc[c4d.DESC_STEP]      = 1
+        bc[c4d.DESC_ANIMATE]   = c4d.DESC_ANIMATE_ON
+        description.SetParameter(
+            c4d.DescID(c4d.DescLevel(DM_D_SEGS, c4d.DTYPE_LONG, 0)),
+            bc, gid
+        )
+
+        bc = c4d.GetCustomDataTypeDefault(c4d.DTYPE_REAL)
+        bc[c4d.DESC_NAME]      = "Площадка (%)"
+        bc[c4d.DESC_DEFAULT]   = 0.55
+        bc[c4d.DESC_MIN]       = 0.05
+        bc[c4d.DESC_MAX]       = 0.95
+        bc[c4d.DESC_UNIT]      = c4d.DESC_UNIT_PERCENT
+        bc[c4d.DESC_STEP]      = 0.01
+        bc[c4d.DESC_ANIMATE]   = c4d.DESC_ANIMATE_ON
+        description.SetParameter(
+            c4d.DescID(c4d.DescLevel(DM_D_TABLE_SIZE, c4d.DTYPE_REAL, 0)),
+            bc, gid
+        )
+
+        bc = c4d.GetCustomDataTypeDefault(c4d.DTYPE_REAL)
+        bc[c4d.DESC_NAME]      = "Калета (%)"
+        bc[c4d.DESC_DEFAULT]   = 0.0
+        bc[c4d.DESC_MIN]       = 0.0
+        bc[c4d.DESC_MAX]       = 0.3
+        bc[c4d.DESC_UNIT]      = c4d.DESC_UNIT_PERCENT
+        bc[c4d.DESC_STEP]      = 0.005
+        bc[c4d.DESC_ANIMATE]   = c4d.DESC_ANIMATE_ON
+        description.SetParameter(
+            c4d.DescID(c4d.DescLevel(DM_D_CULET, c4d.DTYPE_REAL, 0)),
+            bc, gid
+        )
+
+        bc = c4d.GetCustomDataTypeDefault(c4d.DTYPE_LONG)
+        bc[c4d.DESC_NAME]      = "Ступени"
+        bc[c4d.DESC_DEFAULT]   = 2
+        bc[c4d.DESC_MIN]       = 1
+        bc[c4d.DESC_MAX]       = 5
+        bc[c4d.DESC_STEP]      = 1
+        bc[c4d.DESC_ANIMATE]   = c4d.DESC_ANIMATE_ON
+        description.SetParameter(
+            c4d.DescID(c4d.DescLevel(DM_D_STEPS, c4d.DTYPE_LONG, 0)),
+            bc, gid
+        )
+
+        return True, flags | c4d.DESCFLAGS_DESC_LOADED
 
     def _build_mesh(self, op):
-        cut        = int(_ud_get(op, DM_CUT,        CUT_BRILLIANT))
-        size       = float(_ud_get(op, DM_SIZE,      100.0))
-        height     = float(_ud_get(op, DM_HEIGHT,     65.0))
-        crown_h    = float(_ud_get(op, DM_CROWN_H,    0.35))
-        girdle_h   = float(_ud_get(op, DM_GIRDLE_H,   3.0))
-        segs       = max(8, int(_ud_get(op, DM_SEGS,  32)))
-        table_size = float(_ud_get(op, DM_TABLE_SIZE,  0.55))
-        culet      = float(_ud_get(op, DM_CULET,       0.0))
-        steps      = max(1, min(5, int(_ud_get(op, DM_STEPS, 2))))
+        cut        = int(op[DM_D_CUT])
+        size       = float(op[DM_D_SIZE])
+        height     = float(op[DM_D_HEIGHT])
+        crown_h    = float(op[DM_D_CROWN_H])
+        girdle_h   = float(op[DM_D_GIRDLE_H])
+        segs       = max(8, int(op[DM_D_SEGS]))
+        table_size = float(op[DM_D_TABLE_SIZE])
+        culet      = float(op[DM_D_CULET])
+        steps      = max(1, min(5, int(op[DM_D_STEPS])))
 
         return build_diamond_mesh(
             cut, size, height, crown_h, girdle_h,
@@ -1791,7 +1878,7 @@ if __name__ == "__main__":
         id          = ID_DIAMOND,
         str         = NAME_DIAMOND,
         g           = DiamondObject,
-        description = "",
+        description = "Obase",
         icon        = ICO_DIAMOND,
         info        = c4d.OBJECT_GENERATOR,
     )
