@@ -14,24 +14,21 @@ import tempfile
 
 ID_TRICUBE = 1068871
 
-NAME_TRICUBE = "Tri Cube v1.4.1"
+NAME_TRICUBE = "Tri Cube v1.5"
 
-# ─── UserData SubID (общая схема: SubID=1 — группа, поля с 2) ────────────────
+# ─── Description-based parameter IDs ──────────────────────────────────────────────────
 
-UD_GROUP = 1   # Группа "Параметры"
-
-# TriCube — размеры по осям
-TC_SIZE_X  = 2
-TC_SIZE_Y  = 3
-TC_SIZE_Z  = 4
-# TriCube — подразделения по осям
-TC_SUB_X   = 5
-TC_SUB_Y   = 6
-TC_SUB_Z   = 7
-# TriCube — тип поверхности и смещение
-TC_SURFACE    = 8   # 0=Треугольники, 1=Квады, 2=Ёлочка, 3=Смещённые ряды
-TC_STAR_EN    = 9   # Галочка "Смещение (звезда)"
-TC_STAR_OFFSET = 10  # Величина смещения по нормали грани
+TC_GRP          = 2000
+TC_D_SIZE_X     = 2001
+TC_D_SIZE_Y     = 2002
+TC_D_SIZE_Z     = 2003
+TC_D_SUB_X      = 2004
+TC_D_SUB_Y      = 2005
+TC_D_SUB_Z      = 2006
+TC_D_SURFACE    = 2007
+TC_D_STAR_EN    = 2008
+TC_D_STAR_OFFSET = 2009
+TC_D_STAR_CAP   = 2010
 
 # Значения для TC_SURFACE
 SURF_TRI    = 0   # Треугольная сетка (диагональ единообразная)
@@ -39,112 +36,6 @@ SURF_QUAD   = 1   # Квадратная сетка
 SURF_HBONE  = 2   # Ёлочка (чередование диагоналей)
 SURF_SHIFT  = 3   # Смещённые ряды (кирпичная раскладка)
 SURF_HEX    = 4   # Гексагональная сетка
-
-# Галочка "Закрыть швы смещения"
-TC_STAR_CAP = 11  # Закрывает разрывы по рёбрам грани при star_offset != 0
-
-
-# ─── Вспомогательные функции UserData ────────────────────────────────────────
-
-def _ud_descid(op, uid):
-    """Ищет UserData по SubID. Возвращает (DescID, BaseContainer) или (None, None)."""
-    for descid, bc in op.GetUserDataContainer():
-        if descid[1].id == uid:
-            return descid, bc
-    return None, None
-
-
-def _ud_get(op, uid, default=None):
-    did, _ = _ud_descid(op, uid)
-    if did is not None:
-        val = op[did]
-        if val is not None:
-            return val
-    return default
-
-
-def _add_group(op, name):
-    """Добавляет корневую группу UserData. Возвращает SubID группы."""
-    bc = c4d.GetCustomDatatypeDefault(c4d.DTYPE_GROUP)
-    bc[c4d.DESC_NAME]       = name
-    bc[c4d.DESC_SHORT_NAME] = name
-    bc[c4d.DESC_TITLEBAR]   = 1
-    bc[c4d.DESC_DEFAULT]    = 1  # развёрнута по умолчанию
-    did = op.AddUserData(bc)
-    return did[1].id   # [1] — SubID, [0] — ID_USERDATA(700)
-
-
-def _add_in_group(op, grp_subid, bc):
-    """Добавляет элемент UserData внутрь группы с данным SubID."""
-    bc[c4d.DESC_PARENTGROUP] = c4d.DescID(
-        c4d.DescLevel(c4d.ID_USERDATA, c4d.DTYPE_SUBCONTAINER, 0),
-        c4d.DescLevel(grp_subid, c4d.DTYPE_GROUP, 0)
-    )
-    return op.AddUserData(bc)
-
-
-def _make_float_bc(name, default, minval, maxval, unit=c4d.DESC_UNIT_METER):
-    bc = c4d.GetCustomDatatypeDefault(c4d.DTYPE_REAL)
-    bc[c4d.DESC_NAME]       = name
-    bc[c4d.DESC_SHORT_NAME] = name
-    bc[c4d.DESC_DEFAULT]    = default
-    bc[c4d.DESC_MIN]        = minval
-    bc[c4d.DESC_MAX]        = maxval
-    bc[c4d.DESC_UNIT]       = unit
-    bc[c4d.DESC_STEP]       = 1.0
-    bc[c4d.DESC_ANIMATE]    = c4d.DESC_ANIMATE_ON
-    return bc
-
-
-def _make_int_bc(name, default, minval, maxval):
-    bc = c4d.GetCustomDatatypeDefault(c4d.DTYPE_LONG)
-    bc[c4d.DESC_NAME]       = name
-    bc[c4d.DESC_SHORT_NAME] = name
-    bc[c4d.DESC_DEFAULT]    = default
-    bc[c4d.DESC_MIN]        = minval
-    bc[c4d.DESC_MAX]        = maxval
-    bc[c4d.DESC_STEP]       = 1
-    bc[c4d.DESC_ANIMATE]    = c4d.DESC_ANIMATE_ON
-    return bc
-
-
-def _make_bool_bc(name, default):
-    bc = c4d.GetCustomDatatypeDefault(c4d.DTYPE_BOOL)
-    bc[c4d.DESC_NAME]       = name
-    bc[c4d.DESC_SHORT_NAME] = name
-    bc[c4d.DESC_DEFAULT]    = default
-    bc[c4d.DESC_ANIMATE]    = c4d.DESC_ANIMATE_ON
-    return bc
-
-
-def _make_cycle_bc(name, default, items):
-    """Создаёт поле-выпадающий список (CUSTOMGUI_CYCLE / DTYPE_LONG).
-    items — список строк в нужном порядке (индекс = значение).
-    """
-    bc = c4d.GetCustomDatatypeDefault(c4d.DTYPE_LONG)
-    bc[c4d.DESC_NAME]       = name
-    bc[c4d.DESC_SHORT_NAME] = name
-    bc[c4d.DESC_DEFAULT]    = default
-    bc[c4d.DESC_ANIMATE]    = c4d.DESC_ANIMATE_ON
-    bc[c4d.DESC_CUSTOMGUI]  = c4d.CUSTOMGUI_CYCLE
-    cycle_bc = c4d.BaseContainer()
-    for i, label in enumerate(items):
-        cycle_bc[i] = label
-    bc[c4d.DESC_CYCLE] = cycle_bc
-    return bc
-
-
-def _ud_already_created(op, first_field_uid):
-    """Проверяет, созданы ли уже UserData по наличию поля с данным SubID."""
-    did, _ = _ud_descid(op, first_field_uid)
-    return did is not None
-
-
-def _ud_set_default(op, uid, value):
-    """Устанавливает значение поля UserData по SubID."""
-    did, _ = _ud_descid(op, uid)
-    if did is not None:
-        op[did] = value
 
 
 # ─── Генераторы мешей ─────────────────────────────────────────────────────────
@@ -469,42 +360,29 @@ def _make_poly_object(points, polys, name):
 class _MeshPrimitiveBase(c4d.plugins.ObjectData):
     """
     Базовый класс для всех mesh-примитивов.
+    Использует Description-систему для UI (вкладки в Attributes Manager).
     Подклассы определяют:
-      OBJECT_NAME   — имя объекта по умолчанию
-      _first_ud_id  — SubID первого поля UserData (для проверки инициализации)
-      _create_ud()  — создание UserData-полей
+      OBJECT_NAME     — имя объекта по умолчанию
+      GetDDescription() — описание UI (вкладки и параметры)
       _set_defaults() — установка значений по умолчанию
-      _build_mesh() — генерация (points, polys)
+      _build_mesh()   — генерация (points, polys)
     """
 
-    OBJECT_NAME  = "MeshPrimitive"
-    _first_ud_id = TC_SIZE_X   # переопределяется в подклассах
+    OBJECT_NAME = "MeshPrimitive"
 
     def Init(self, op, isload=False):
         if not isload:
             op.SetName(self.OBJECT_NAME)
-        if not _ud_already_created(op, self._first_ud_id):
-            grp_subid = _add_group(op, "Параметры")
-            self._create_ud(op, grp_subid)
             self._set_defaults(op)
         return True
 
     def GetVirtualObjects(self, op, hh):
-        if not _ud_already_created(op, self._first_ud_id):
-            grp_subid = _add_group(op, "Параметры")
-            self._create_ud(op, grp_subid)
-            self._set_defaults(op)
-
         points, polys = self._build_mesh(op)
         return _make_poly_object(points, polys, self.OBJECT_NAME)
 
     def GetDDescription(self, op, description, flags):
-        if not description.LoadDescription(op.GetType()):
+        if not description.LoadDescription("Obase"):
             return False, flags
-        if not _ud_already_created(op, self._first_ud_id):
-            grp_subid = _add_group(op, "Параметры")
-            self._create_ud(op, grp_subid)
-            self._set_defaults(op)
         return True, flags | c4d.DESCFLAGS_DESC_LOADED
 
     def CheckDirty(self, op, doc):
@@ -512,10 +390,6 @@ class _MeshPrimitiveBase(c4d.plugins.ObjectData):
 
     def Draw(self, op, drawpass, bd, bh):
         return c4d.DRAWRESULT_OK
-
-    # Переопределить в подклассах:
-    def _create_ud(self, op, grp_subid):
-        pass
 
     def _set_defaults(self, op):
         pass
@@ -529,59 +403,160 @@ class _MeshPrimitiveBase(c4d.plugins.ObjectData):
 class TriCubeObject(_MeshPrimitiveBase):
     """Куб с треугольной сеткой."""
 
-    OBJECT_NAME  = "Tri Cube"
-    _first_ud_id = TC_SIZE_X
-
-    def _create_ud(self, op, grp_subid):
-        # Размеры по осям
-        _add_in_group(op, grp_subid, _make_float_bc(
-            "Размер X", 200.0, 1.0, 100000.0))
-        _add_in_group(op, grp_subid, _make_float_bc(
-            "Размер Y", 200.0, 1.0, 100000.0))
-        _add_in_group(op, grp_subid, _make_float_bc(
-            "Размер Z", 200.0, 1.0, 100000.0))
-        # Подразделения по осям
-        _add_in_group(op, grp_subid, _make_int_bc(
-            "Подразделения X", 3, 1, 50))
-        _add_in_group(op, grp_subid, _make_int_bc(
-            "Подразделения Y", 3, 1, 50))
-        _add_in_group(op, grp_subid, _make_int_bc(
-            "Подразделения Z", 3, 1, 50))
-        # Тип поверхности
-        _add_in_group(op, grp_subid, _make_cycle_bc(
-            "Поверхность", SURF_TRI,
-            ["Треугольники", "Квады", "Ёлочка", "Смещённые ряды", "Гексагоны"]))
-        # Смещение (звезда)
-        _add_in_group(op, grp_subid, _make_bool_bc(
-            "Смещение (звезда)", False))
-        _add_in_group(op, grp_subid, _make_float_bc(
-            "Величина смещения", 0.0, -10000.0, 10000.0))
-        # Закрыть швы смещения
-        _add_in_group(op, grp_subid, _make_bool_bc(
-            "Закрыть швы", False))
+    OBJECT_NAME = "Tri Cube"
 
     def _set_defaults(self, op):
-        _ud_set_default(op, TC_SIZE_X,     200.0)
-        _ud_set_default(op, TC_SIZE_Y,     200.0)
-        _ud_set_default(op, TC_SIZE_Z,     200.0)
-        _ud_set_default(op, TC_SUB_X,      3)
-        _ud_set_default(op, TC_SUB_Y,      3)
-        _ud_set_default(op, TC_SUB_Z,      3)
-        _ud_set_default(op, TC_SURFACE,    SURF_TRI)
-        _ud_set_default(op, TC_STAR_EN,    False)
-        _ud_set_default(op, TC_STAR_OFFSET, 0.0)
+        op[TC_D_SIZE_X]      = 200.0
+        op[TC_D_SIZE_Y]      = 200.0
+        op[TC_D_SIZE_Z]      = 200.0
+        op[TC_D_SUB_X]       = 3
+        op[TC_D_SUB_Y]       = 3
+        op[TC_D_SUB_Z]       = 3
+        op[TC_D_SURFACE]     = SURF_TRI
+        op[TC_D_STAR_EN]     = False
+        op[TC_D_STAR_OFFSET] = 0.0
+        op[TC_D_STAR_CAP]    = False
+
+    def GetDDescription(self, op, description, flags):
+        if not description.LoadDescription("Obase"):
+            return False, flags
+
+        bc = c4d.GetCustomDataTypeDefault(c4d.DTYPE_GROUP)
+        bc[c4d.DESC_NAME]    = "Параметры"
+        bc[c4d.DESC_COLUMNS] = 1
+        bc[c4d.DESC_DEFAULT] = 1
+        description.SetParameter(
+            c4d.DescID(c4d.DescLevel(TC_GRP, c4d.DTYPE_GROUP, 0)),
+            bc, c4d.ID_LISTHEAD
+        )
+        gid = c4d.DescID(c4d.DescLevel(TC_GRP, c4d.DTYPE_GROUP, 0))
+
+        bc = c4d.GetCustomDataTypeDefault(c4d.DTYPE_REAL)
+        bc[c4d.DESC_NAME]    = "Размер X"
+        bc[c4d.DESC_DEFAULT] = 200.0
+        bc[c4d.DESC_MIN]     = 1.0
+        bc[c4d.DESC_MAX]     = 100000.0
+        bc[c4d.DESC_UNIT]    = c4d.DESC_UNIT_METER
+        bc[c4d.DESC_STEP]    = 1.0
+        description.SetParameter(
+            c4d.DescID(c4d.DescLevel(TC_D_SIZE_X, c4d.DTYPE_REAL, 0)),
+            bc, gid
+        )
+
+        bc = c4d.GetCustomDataTypeDefault(c4d.DTYPE_REAL)
+        bc[c4d.DESC_NAME]    = "Размер Y"
+        bc[c4d.DESC_DEFAULT] = 200.0
+        bc[c4d.DESC_MIN]     = 1.0
+        bc[c4d.DESC_MAX]     = 100000.0
+        bc[c4d.DESC_UNIT]    = c4d.DESC_UNIT_METER
+        bc[c4d.DESC_STEP]    = 1.0
+        description.SetParameter(
+            c4d.DescID(c4d.DescLevel(TC_D_SIZE_Y, c4d.DTYPE_REAL, 0)),
+            bc, gid
+        )
+
+        bc = c4d.GetCustomDataTypeDefault(c4d.DTYPE_REAL)
+        bc[c4d.DESC_NAME]    = "Размер Z"
+        bc[c4d.DESC_DEFAULT] = 200.0
+        bc[c4d.DESC_MIN]     = 1.0
+        bc[c4d.DESC_MAX]     = 100000.0
+        bc[c4d.DESC_UNIT]    = c4d.DESC_UNIT_METER
+        bc[c4d.DESC_STEP]    = 1.0
+        description.SetParameter(
+            c4d.DescID(c4d.DescLevel(TC_D_SIZE_Z, c4d.DTYPE_REAL, 0)),
+            bc, gid
+        )
+
+        bc = c4d.GetCustomDataTypeDefault(c4d.DTYPE_LONG)
+        bc[c4d.DESC_NAME]    = "Подразделения X"
+        bc[c4d.DESC_DEFAULT] = 3
+        bc[c4d.DESC_MIN]     = 1
+        bc[c4d.DESC_MAX]     = 50
+        bc[c4d.DESC_STEP]    = 1
+        description.SetParameter(
+            c4d.DescID(c4d.DescLevel(TC_D_SUB_X, c4d.DTYPE_LONG, 0)),
+            bc, gid
+        )
+
+        bc = c4d.GetCustomDataTypeDefault(c4d.DTYPE_LONG)
+        bc[c4d.DESC_NAME]    = "Подразделения Y"
+        bc[c4d.DESC_DEFAULT] = 3
+        bc[c4d.DESC_MIN]     = 1
+        bc[c4d.DESC_MAX]     = 50
+        bc[c4d.DESC_STEP]    = 1
+        description.SetParameter(
+            c4d.DescID(c4d.DescLevel(TC_D_SUB_Y, c4d.DTYPE_LONG, 0)),
+            bc, gid
+        )
+
+        bc = c4d.GetCustomDataTypeDefault(c4d.DTYPE_LONG)
+        bc[c4d.DESC_NAME]    = "Подразделения Z"
+        bc[c4d.DESC_DEFAULT] = 3
+        bc[c4d.DESC_MIN]     = 1
+        bc[c4d.DESC_MAX]     = 50
+        bc[c4d.DESC_STEP]    = 1
+        description.SetParameter(
+            c4d.DescID(c4d.DescLevel(TC_D_SUB_Z, c4d.DTYPE_LONG, 0)),
+            bc, gid
+        )
+
+        bc = c4d.GetCustomDataTypeDefault(c4d.DTYPE_LONG)
+        bc[c4d.DESC_NAME]      = "Поверхность"
+        bc[c4d.DESC_CUSTOMGUI] = c4d.CUSTOMGUI_CYCLE
+        bc[c4d.DESC_DEFAULT]   = SURF_TRI
+        cyc = c4d.BaseContainer()
+        cyc[0] = "Треугольники"
+        cyc[1] = "Квады"
+        cyc[2] = "Ёлочка"
+        cyc[3] = "Смещённые ряды"
+        cyc[4] = "Гексагоны"
+        bc[c4d.DESC_CYCLE] = cyc
+        description.SetParameter(
+            c4d.DescID(c4d.DescLevel(TC_D_SURFACE, c4d.DTYPE_LONG, 0)),
+            bc, gid
+        )
+
+        bc = c4d.GetCustomDataTypeDefault(c4d.DTYPE_BOOL)
+        bc[c4d.DESC_NAME]    = "Смещение (звезда)"
+        bc[c4d.DESC_DEFAULT] = False
+        description.SetParameter(
+            c4d.DescID(c4d.DescLevel(TC_D_STAR_EN, c4d.DTYPE_BOOL, 0)),
+            bc, gid
+        )
+
+        bc = c4d.GetCustomDataTypeDefault(c4d.DTYPE_REAL)
+        bc[c4d.DESC_NAME]    = "Величина смещения"
+        bc[c4d.DESC_DEFAULT] = 0.0
+        bc[c4d.DESC_MIN]     = -10000.0
+        bc[c4d.DESC_MAX]     = 10000.0
+        bc[c4d.DESC_UNIT]    = c4d.DESC_UNIT_METER
+        bc[c4d.DESC_STEP]    = 1.0
+        description.SetParameter(
+            c4d.DescID(c4d.DescLevel(TC_D_STAR_OFFSET, c4d.DTYPE_REAL, 0)),
+            bc, gid
+        )
+
+        bc = c4d.GetCustomDataTypeDefault(c4d.DTYPE_BOOL)
+        bc[c4d.DESC_NAME]    = "Закрыть швы"
+        bc[c4d.DESC_DEFAULT] = False
+        description.SetParameter(
+            c4d.DescID(c4d.DescLevel(TC_D_STAR_CAP, c4d.DTYPE_BOOL, 0)),
+            bc, gid
+        )
+
+        return True, flags | c4d.DESCFLAGS_DESC_LOADED
 
     def _build_mesh(self, op):
-        size_x  = _ud_get(op, TC_SIZE_X,  200.0)
-        size_y  = _ud_get(op, TC_SIZE_Y,  200.0)
-        size_z  = _ud_get(op, TC_SIZE_Z,  200.0)
-        sub_x   = max(1, int(_ud_get(op, TC_SUB_X,  3)))
-        sub_y   = max(1, int(_ud_get(op, TC_SUB_Y,  3)))
-        sub_z   = max(1, int(_ud_get(op, TC_SUB_Z,  3)))
-        surface = int(_ud_get(op, TC_SURFACE, SURF_TRI))
-        star_en = bool(_ud_get(op, TC_STAR_EN, False))
-        star_offset = float(_ud_get(op, TC_STAR_OFFSET, 0.0)) if star_en else 0.0
-        star_cap = bool(_ud_get(op, TC_STAR_CAP, False))
+        size_x      = op[TC_D_SIZE_X]
+        size_y      = op[TC_D_SIZE_Y]
+        size_z      = op[TC_D_SIZE_Z]
+        sub_x       = max(1, int(op[TC_D_SUB_X]))
+        sub_y       = max(1, int(op[TC_D_SUB_Y]))
+        sub_z       = max(1, int(op[TC_D_SUB_Z]))
+        surface     = int(op[TC_D_SURFACE])
+        star_en     = bool(op[TC_D_STAR_EN])
+        star_offset = float(op[TC_D_STAR_OFFSET]) if star_en else 0.0
+        star_cap    = bool(op[TC_D_STAR_CAP])
         return build_tricube(size_x, size_y, size_z, sub_x, sub_y, sub_z, surface, star_offset, star_cap)
 
 
@@ -614,7 +589,7 @@ if __name__ == "__main__":
         id          = ID_TRICUBE,
         str         = NAME_TRICUBE,
         g           = TriCubeObject,
-        description = "",
+        description = "Obase",
         icon        = ICO_TC,
         info        = c4d.OBJECT_GENERATOR,
     )
