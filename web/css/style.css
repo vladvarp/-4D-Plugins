@@ -1636,6 +1636,13 @@ img {
     text-align: center;
 }
 
+.md-tif:disabled,
+.md-tif-slider:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+    pointer-events: none;
+}
+
 .md-tif-suffix {
     padding: 6px 8px;
     border-radius: 0 var(--radius-sm) var(--radius-sm) 0;

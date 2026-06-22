@@ -828,8 +828,8 @@ function renderInlineSyntax(html) {
         return `<span class="md-color-wrap"><input type="color" class="md-color" id="${id}" value="#${hex}" style="width:${width}px;height:${height}px">${hexHtml}</span>`;
     });
 
-    // Поле ввода: [[tif:'value'-t'0'-p'%'-s150-sc300-d0/100-st0,5]]
-    html = html.replace(/\[\[tif:'([^']*)'(?:-t'([^']*)')?(?:-p'([^']*)')?(?:-s(\d+))?(?:-sc(\d*))?(?:-d(-?[\d.,]+\/-?[\d.,]+))?(?:-st([\d.,]+))?\]\]/g, (_, value, type, suffix, w, scW, range, step) => {
+    // Поле ввода: [[tif:'value'-t'0'-p'%'-s150-sc300-d0/100-st0,5-r0]]
+    html = html.replace(/\[\[tif:'([^']*)'(?:-t'([^']*)')?(?:-p'([^']*)')?(?:-s(\d+))?(?:-sc(\d*))?(?:-d(-?[\d.,]+\/-?[\d.,]+))?(?:-st([\d.,]+))?(?:-r([01]))?\]\]/g, (_, value, type, suffix, w, scW, range, step, readOnly) => {
         const id = 'tif-' + Math.random().toString(36).substr(2, 6);
         let inputType = 'text';
         let pattern = '';
@@ -840,6 +840,7 @@ function renderInlineSyntax(html) {
         else if (type && /^\d+\.\d+$/.test(type)) { inputType = 'number'; inputMode = 'decimal'; }
 
         const typeAttr = inputType === 'number' ? ` type="number" inputmode="${inputMode}"` : ` type="text"`;
+        const disabled = readOnly === '0' ? ' disabled' : '';
         const style = w ? ` style="width:${parseInt(w)}px"` : '';
         const suffixHtml = suffix ? `<span class="md-tif-suffix">${escapeHtml(suffix)}</span>` : '';
 
@@ -853,11 +854,11 @@ function renderInlineSyntax(html) {
             }
             if (step) stepVal = parseFloat(step.replace(',', '.'));
             const sliderWidth = scW ? ` width:${parseInt(scW)}px` : '';
-            sliderHtml = `<input type="range" class="md-tif-slider" id="${id}-slider" min="${min}" max="${max}" step="${stepVal}" value="${escapeHtml(value)}"${sliderWidth ? ` style="${sliderWidth.trim()}"` : ''}>`;
+            sliderHtml = `<input type="range" class="md-tif-slider" id="${id}-slider" min="${min}" max="${max}" step="${stepVal}" value="${escapeHtml(value)}"${sliderWidth ? ` style="${sliderWidth.trim()}"` : ''}${disabled}>`;
         }
 
         const suffixPos = suffix ? suffixHtml : '';
-        return `<span class="md-tif-wrap"><input${typeAttr} class="md-tif" id="${id}" value="${escapeHtml(value)}"${style}>${suffixPos}${sliderHtml}</span>`;
+        return `<span class="md-tif-wrap"><input${typeAttr} class="md-tif" id="${id}" value="${escapeHtml(value)}"${style}${disabled}>${suffixPos}${sliderHtml}</span>`;
     });
 
     return html;

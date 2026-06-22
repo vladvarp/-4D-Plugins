@@ -951,6 +951,11 @@ https://www.youtube.com/watch?v=dQw4w9WgXcQ
                                     <td><code>-stШАГ</code></td>
                                     <td>Шаг ползунка (например, <code>-st0,5</code> или <code>-st0.5</code>)</td>
                                 </tr>
+                                <tr>
+                                    <td><code>-r</code></td>
+                                    <td><code>-r0</code> / <code>-r1</code></td>
+                                    <td>Только чтение: <code>-r0</code> — некликабельное, заглушённое, <code>-r1</code> или без параметра — обычное</td>
+                                </tr>
                             </tbody>
                         </table>
                         <div class="code-example">
@@ -961,7 +966,8 @@ https://www.youtube.com/watch?v=dQw4w9WgXcQ
                             <pre><code>[[tif:'50'-t'0'-p'%'-s80]]
 [[tif:'3.14'-t'0,0'-s100]]
 [[tif:'50'-t'0'-p'%'-s80-sc200-d0/100-st1]]
-[[tif:'текст'-s150]]</code></pre>
+[[tif:'текст'-s150]]
+[[tif:'42'-t'0'-r0-s80]]</code></pre>
                         </div>
 
                         <h3 id="inline-color">Выбор цвета</h3>
