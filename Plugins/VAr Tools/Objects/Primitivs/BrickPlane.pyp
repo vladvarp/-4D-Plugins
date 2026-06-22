@@ -16,7 +16,7 @@ import random
 
 ID_BRICKPLANE = 1068875
 
-NAME_BRICKPLANE = "Brick Plane v1.6.2"
+NAME_BRICKPLANE = "Brick Plane v1.7"
 
 # ─── UserData SubID (общая схема: SubID=1 — группа, поля с 2) ────────────────
 
@@ -39,6 +39,17 @@ PAT_THIRD_BOND   = 2   # Кладка 1/3 смещение
 PAT_HERRINGBONE  = 3   # Ёлочка (45°)
 PAT_HEXAGONAL    = 4   # Гексагональные плитки
 PAT_BASKET       = 5   # Корзинчатое плетение (basket weave)
+
+# ─── Description-based parameter IDs ──────────────────────────────────
+BP_GRP_PARAMS = 1000
+
+BP_D_WIDTH    = 1001
+BP_D_HEIGHT   = 1002
+BP_D_SEGS_W   = 1003
+BP_D_SEGS_H   = 1004
+BP_D_PATTERN  = 1005
+BP_D_OFFSET   = 1006
+BP_D_MORTAR   = 1007
 
 
 # ─── Вспомогательные функции UserData ────────────────────────────────────────
@@ -580,42 +591,29 @@ def _make_poly_object(points, polys, name):
 class _MeshPrimitiveBase(c4d.plugins.ObjectData):
     """
     Базовый класс для всех mesh-примитивов.
+    Использует Description-систему для UI (вкладки в Attributes Manager).
     Подклассы определяют:
-      OBJECT_NAME   — имя объекта по умолчанию
-      _first_ud_id  — SubID первого поля UserData (для проверки инициализации)
-      _create_ud()  — создание UserData-полей
+      OBJECT_NAME     — имя объекта по умолчанию
+      GetDDescription() — описание UI (вкладки и параметры)
       _set_defaults() — установка значений по умолчанию
-      _build_mesh() — генерация (points, polys)
+      _build_mesh()   — генерация (points, polys)
     """
 
-    OBJECT_NAME  = "MeshPrimitive"
-    _first_ud_id = BP_WIDTH   # переопределяется в подклассах
+    OBJECT_NAME = "MeshPrimitive"
 
     def Init(self, op, isload=False):
         if not isload:
             op.SetName(self.OBJECT_NAME)
-        if not _ud_already_created(op, self._first_ud_id):
-            grp_subid = _add_group(op, "Параметры")
-            self._create_ud(op, grp_subid)
             self._set_defaults(op)
         return True
 
     def GetVirtualObjects(self, op, hh):
-        if not _ud_already_created(op, self._first_ud_id):
-            grp_subid = _add_group(op, "Параметры")
-            self._create_ud(op, grp_subid)
-            self._set_defaults(op)
-
         points, polys = self._build_mesh(op)
         return _make_poly_object(points, polys, self.OBJECT_NAME)
 
     def GetDDescription(self, op, description, flags):
-        if not description.LoadDescription(op.GetType()):
+        if not description.LoadDescription("Obase"):
             return False, flags
-        if not _ud_already_created(op, self._first_ud_id):
-            grp_subid = _add_group(op, "Параметры")
-            self._create_ud(op, grp_subid)
-            self._set_defaults(op)
         return True, flags | c4d.DESCFLAGS_DESC_LOADED
 
     def CheckDirty(self, op, doc):
@@ -623,10 +621,6 @@ class _MeshPrimitiveBase(c4d.plugins.ObjectData):
 
     def Draw(self, op, drawpass, bd, bh):
         return c4d.DRAWRESULT_OK
-
-    # Переопределить в подклассах:
-    def _create_ud(self, op, grp_subid):
-        pass
 
     def _set_defaults(self, op):
         pass
@@ -638,54 +632,130 @@ class _MeshPrimitiveBase(c4d.plugins.ObjectData):
 # ─── BrickPlane ───────────────────────────────────────────────────────────────
 
 class BrickPlaneObject(_MeshPrimitiveBase):
-    """Плоскость с кирпичной сеткой (running bond)."""
+    """Плоскость с кирпичной сеткой."""
 
-    OBJECT_NAME  = "Brick Plane"
-    _first_ud_id = BP_WIDTH
-
-    def _create_ud(self, op, grp_subid):
-        _add_in_group(op, grp_subid, _make_float_bc(
-            "Ширина", 400.0, 1.0, 100000.0))
-        _add_in_group(op, grp_subid, _make_float_bc(
-            "Высота", 400.0, 1.0, 100000.0))
-        _add_in_group(op, grp_subid, _make_int_bc(
-            "Рядов (X)", 4, 1, 200))
-        _add_in_group(op, grp_subid, _make_int_bc(
-            "Рядов (Y)", 4, 1, 200))
-        # Тип паттерна (выпадающий список)
-        _add_in_group(op, grp_subid, _make_cycle_bc(
-            "Паттерн", PAT_RUNNING_BOND, {
-                PAT_RUNNING_BOND: "Кирпич (1/2)",
-                PAT_STACK_BOND:   "Кирпич (стек)",
-                PAT_THIRD_BOND:   "Кирпич (1/3)",
-                PAT_HERRINGBONE:  "Ёлочка",
-                PAT_HEXAGONAL:    "Гексагональные",
-                PAT_BASKET:       "Корзинка",
-            }))
-        # Смещение кирпичей по Y (displacement)
-        _add_in_group(op, grp_subid, _make_float_bc(
-            "Смещение (Y)", 0.0, 0.0, 10000.0, c4d.DESC_UNIT_METER))
-        # Ширина шва (0..0.4, безразмерная — DESC_UNIT_FLOAT доступен во всех версиях)
-        _add_in_group(op, grp_subid, _make_float_bc(
-            "Шов (0-0.4)", 0.0, 0.0, 0.4, c4d.DESC_UNIT_FLOAT, step=0.005))
+    OBJECT_NAME = "Brick Plane"
 
     def _set_defaults(self, op):
-        _ud_set_default(op, BP_WIDTH,   400.0)
-        _ud_set_default(op, BP_HEIGHT,  400.0)
-        _ud_set_default(op, BP_SEGS_W,  4)
-        _ud_set_default(op, BP_SEGS_H,  4)
-        _ud_set_default(op, BP_PATTERN, PAT_RUNNING_BOND)
-        _ud_set_default(op, BP_OFFSET,  0.0)
-        _ud_set_default(op, BP_MORTAR,  0.0)
+        op[BP_D_WIDTH]   = 400.0
+        op[BP_D_HEIGHT]  = 400.0
+        op[BP_D_SEGS_W]  = 4
+        op[BP_D_SEGS_H]  = 4
+        op[BP_D_PATTERN] = PAT_RUNNING_BOND
+        op[BP_D_OFFSET]  = 0.0
+        op[BP_D_MORTAR]  = 0.0
+
+    def GetDDescription(self, op, description, flags):
+        if not description.LoadDescription("Obase"):
+            return False, flags
+
+        bc = c4d.GetCustomDataTypeDefault(c4d.DTYPE_GROUP)
+        bc[c4d.DESC_NAME]    = "Параметры"
+        bc[c4d.DESC_COLUMNS] = 1
+        bc[c4d.DESC_DEFAULT] = 1
+        description.SetParameter(
+            c4d.DescID(c4d.DescLevel(BP_GRP_PARAMS, c4d.DTYPE_GROUP, 0)),
+            bc, c4d.ID_LISTHEAD
+        )
+        gid = c4d.DescID(c4d.DescLevel(BP_GRP_PARAMS, c4d.DTYPE_GROUP, 0))
+
+        bc = c4d.GetCustomDataTypeDefault(c4d.DTYPE_REAL)
+        bc[c4d.DESC_NAME]    = "Ширина"
+        bc[c4d.DESC_DEFAULT] = 400.0
+        bc[c4d.DESC_MIN]     = 1.0
+        bc[c4d.DESC_MAX]     = 100000.0
+        bc[c4d.DESC_UNIT]    = c4d.DESC_UNIT_METER
+        bc[c4d.DESC_STEP]    = 1.0
+        description.SetParameter(
+            c4d.DescID(c4d.DescLevel(BP_D_WIDTH, c4d.DTYPE_REAL, 0)),
+            bc, gid
+        )
+
+        bc = c4d.GetCustomDataTypeDefault(c4d.DTYPE_REAL)
+        bc[c4d.DESC_NAME]    = "Высота"
+        bc[c4d.DESC_DEFAULT] = 400.0
+        bc[c4d.DESC_MIN]     = 1.0
+        bc[c4d.DESC_MAX]     = 100000.0
+        bc[c4d.DESC_UNIT]    = c4d.DESC_UNIT_METER
+        bc[c4d.DESC_STEP]    = 1.0
+        description.SetParameter(
+            c4d.DescID(c4d.DescLevel(BP_D_HEIGHT, c4d.DTYPE_REAL, 0)),
+            bc, gid
+        )
+
+        bc = c4d.GetCustomDataTypeDefault(c4d.DTYPE_LONG)
+        bc[c4d.DESC_NAME]    = "Рядов (X)"
+        bc[c4d.DESC_DEFAULT] = 4
+        bc[c4d.DESC_MIN]     = 1
+        bc[c4d.DESC_MAX]     = 200
+        bc[c4d.DESC_STEP]    = 1
+        description.SetParameter(
+            c4d.DescID(c4d.DescLevel(BP_D_SEGS_W, c4d.DTYPE_LONG, 0)),
+            bc, gid
+        )
+
+        bc = c4d.GetCustomDataTypeDefault(c4d.DTYPE_LONG)
+        bc[c4d.DESC_NAME]    = "Рядов (Y)"
+        bc[c4d.DESC_DEFAULT] = 4
+        bc[c4d.DESC_MIN]     = 1
+        bc[c4d.DESC_MAX]     = 200
+        bc[c4d.DESC_STEP]    = 1
+        description.SetParameter(
+            c4d.DescID(c4d.DescLevel(BP_D_SEGS_H, c4d.DTYPE_LONG, 0)),
+            bc, gid
+        )
+
+        bc = c4d.GetCustomDataTypeDefault(c4d.DTYPE_LONG)
+        bc[c4d.DESC_NAME]      = "Паттерн"
+        bc[c4d.DESC_CUSTOMGUI] = c4d.CUSTOMGUI_CYCLE
+        bc[c4d.DESC_DEFAULT]   = PAT_RUNNING_BOND
+        cyc = c4d.BaseContainer()
+        cyc[0] = "Кирпич (1/2)"
+        cyc[1] = "Кирпич (стек)"
+        cyc[2] = "Кирпич (1/3)"
+        cyc[3] = "Ёлочка"
+        cyc[4] = "Гексагональные"
+        cyc[5] = "Корзинка"
+        bc[c4d.DESC_CYCLE] = cyc
+        description.SetParameter(
+            c4d.DescID(c4d.DescLevel(BP_D_PATTERN, c4d.DTYPE_LONG, 0)),
+            bc, gid
+        )
+
+        bc = c4d.GetCustomDataTypeDefault(c4d.DTYPE_REAL)
+        bc[c4d.DESC_NAME]    = "Смещение (Y)"
+        bc[c4d.DESC_DEFAULT] = 0.0
+        bc[c4d.DESC_MIN]     = 0.0
+        bc[c4d.DESC_MAX]     = 10000.0
+        bc[c4d.DESC_UNIT]    = c4d.DESC_UNIT_METER
+        bc[c4d.DESC_STEP]    = 1.0
+        description.SetParameter(
+            c4d.DescID(c4d.DescLevel(BP_D_OFFSET, c4d.DTYPE_REAL, 0)),
+            bc, gid
+        )
+
+        bc = c4d.GetCustomDataTypeDefault(c4d.DTYPE_REAL)
+        bc[c4d.DESC_NAME]    = "Шов (0-0.4)"
+        bc[c4d.DESC_DEFAULT] = 0.0
+        bc[c4d.DESC_MIN]     = 0.0
+        bc[c4d.DESC_MAX]     = 0.4
+        bc[c4d.DESC_UNIT]    = c4d.DESC_UNIT_FLOAT
+        bc[c4d.DESC_STEP]    = 0.005
+        description.SetParameter(
+            c4d.DescID(c4d.DescLevel(BP_D_MORTAR, c4d.DTYPE_REAL, 0)),
+            bc, gid
+        )
+
+        return True, flags | c4d.DESCFLAGS_DESC_LOADED
 
     def _build_mesh(self, op):
-        w       = _ud_get(op, BP_WIDTH,   400.0)
-        h       = _ud_get(op, BP_HEIGHT,  400.0)
-        segs_w  = max(1, int(_ud_get(op, BP_SEGS_W,  4)))
-        segs_h  = max(1, int(_ud_get(op, BP_SEGS_H,  4)))
-        pattern = int(_ud_get(op, BP_PATTERN, PAT_RUNNING_BOND))
-        offset  = float(_ud_get(op, BP_OFFSET,  0.0))
-        mortar  = float(_ud_get(op, BP_MORTAR,  0.0))
+        w       = op[BP_D_WIDTH]
+        h       = op[BP_D_HEIGHT]
+        segs_w  = max(1, int(op[BP_D_SEGS_W]))
+        segs_h  = max(1, int(op[BP_D_SEGS_H]))
+        pattern = int(op[BP_D_PATTERN])
+        offset  = float(op[BP_D_OFFSET])
+        mortar  = float(op[BP_D_MORTAR])
         return build_brickplane(w, h, segs_w, segs_h, pattern, offset, mortar)
 
 
@@ -718,7 +788,7 @@ if __name__ == "__main__":
         id          = ID_BRICKPLANE,
         str         = NAME_BRICKPLANE,
         g           = BrickPlaneObject,
-        description = "",
+        description = "Obase",
         icon        = ICO_BP,
         info        = c4d.OBJECT_GENERATOR,
     )
