@@ -195,7 +195,7 @@ Floor Generator — процедурный генератор напольных
 
 
 
-<mdc-n'ID1'-s500*800>
+<mdc-n'ID1'-s550*800>
 icon: ico/FloorGenerator.png
 title: Floor Generator
 tagline: Процедурный генератор напольных покрытий — ёлочка, паркет, шеврон, соты — с фаской, швами и рандомизированными UV.
