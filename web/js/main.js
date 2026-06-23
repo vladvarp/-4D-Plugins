@@ -85,7 +85,7 @@ function initIndexPage() {
             description: 'Сохранение и восстановление наборов выделения объектов. Каждый набор — это тег (Selection Set Tag) на нулевом объекте внутри контейнера "Selection Sets". Тег хранит имя набора и ссылки на объекты в пользовательских данных (UserData).',
             icon: 'ico/SelectionSet/icon_plugin.png',
             tags: [`Выделение`, `Утилиты`, `Организация`],
-            version: 'v1.3',
+            version: 'v1.4',
             mdFile: 'plugins/SelectionSet.md'
         },
         {

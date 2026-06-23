@@ -24,13 +24,17 @@ PLUGIN_ID_CMD = 1068965
 PLUGIN_ID_TAG = 1068966
 
 PLUGIN_NAME   = "Selection Sets"
-PLUGIN_NAME_V = "v1.3"
+PLUGIN_NAME_V = "v1.4"
 TAG_NAME      = "Selection Set Tag"
 PLUGIN_HELP   = "Управление наборами выделения объектов"
 
 UD_SET_NAME = 1
 OBJ_PREFIX  = "Obj_"
 MAX_OBJECTS = 256
+
+# Description-based parameter IDs
+SS_GRP_PARAMS = 2000
+SS_SET_NAME   = 2001
 
 # ── UI IDs ────────────────────────────────────────────────────────────────────
 ID_COMBO   = 1000
@@ -222,7 +226,7 @@ class SelSetDialog(c4d.gui.GeDialog):
         if self._sets:
             idx = self.GetInt32(ID_COMBO)
             if 0 <= idx < len(self._sets):
-                prev_name = self._sets[idx][c4d.ID_USERDATA, UD_SET_NAME]
+                prev_name = self._sets[idx][SS_SET_NAME]
 
         self.FreeChildren(ID_COMBO)
         self._sets = _find_all_sets(c4d.documents.GetActiveDocument())
@@ -235,7 +239,7 @@ class SelSetDialog(c4d.gui.GeDialog):
 
         new_idx = 0
         for i, t in enumerate(self._sets):
-            name = t[c4d.ID_USERDATA, UD_SET_NAME] or "Без имени"
+            name = t[SS_SET_NAME] or "Без имени"
             cnt = len(_tag_objects(t))
             self.AddChild(ID_COMBO, i, "{} ({} объектов)".format(name, cnt))
             if name == prev_name:
@@ -256,7 +260,7 @@ class SelSetDialog(c4d.gui.GeDialog):
             self.SetString(ID_LBL_INF, "")
             self.SetString(ID_LBL_OBJ, "")
             return
-        name = t[c4d.ID_USERDATA, UD_SET_NAME] or "Без имени"
+        name = t[SS_SET_NAME] or "Без имени"
         objs = _tag_objects(t)
         self.SetString(ID_LBL_INF,
             "Набор: {}  |  Объектов: {}".format(name, len(objs)))
@@ -300,7 +304,7 @@ class SelSetDialog(c4d.gui.GeDialog):
             doc.AddUndo(c4d.UNDOTYPE_NEW, null)
             t = null.MakeTag(PLUGIN_ID_TAG)
             doc.AddUndo(c4d.UNDOTYPE_NEW, t)
-            t[c4d.ID_USERDATA, UD_SET_NAME] = name
+            t[SS_SET_NAME] = name
             null.InsertUnder(container)
             for o in sel:
                 _tag_add(t, o)
@@ -379,12 +383,12 @@ class SelSetDialog(c4d.gui.GeDialog):
             t = self._cur()
             if not t:
                 return True
-            old = t[c4d.ID_USERDATA, UD_SET_NAME] or ""
+            old = t[SS_SET_NAME] or ""
             new = c4d.gui.InputDialog("Новое имя:", old)
             if not new or new == old:
                 return True
             doc.StartUndo()
-            t[c4d.ID_USERDATA, UD_SET_NAME] = new
+            t[SS_SET_NAME] = new
             parent = t.GetObject()
             if parent:
                 grandparent = parent.GetUp()
@@ -450,16 +454,32 @@ class SelSetCmd(c4d.plugins.CommandData):
 
 class SelSetTag(c4d.plugins.TagData):
 
-    def Init(self, node):
-        for _, bc in node.GetUserDataContainer():
-            if bc.GetString(c4d.DESC_NAME) == "Set Name":
-                return True
-        bc = c4d.GetCustomDatatypeDefault(c4d.DTYPE_STRING)
-        bc.SetString(c4d.DESC_NAME, "Set Name")
-        bc.SetString(c4d.DESC_SHORT_NAME, "Name")
-        bc.SetString(c4d.DESC_DEFAULT, "")
-        node.AddUserData(bc)
+    def Init(self, node, isload=False):
+        if not isload:
+            node[SS_SET_NAME] = ""
         return True
+
+    def GetDDescription(self, node, description, flags):
+        if not description.LoadDescription("Obase"):
+            return False, flags
+
+        bc = c4d.GetCustomDataTypeDefault(c4d.DTYPE_GROUP)
+        bc[c4d.DESC_NAME]    = "Имя набора"
+        bc[c4d.DESC_COLUMNS] = 1
+        bc[c4d.DESC_DEFAULT] = 1
+        description.SetParameter(
+            c4d.DescID(c4d.DescLevel(SS_GRP_PARAMS, c4d.DTYPE_GROUP, 0)),
+            bc, c4d.ID_LISTHEAD)
+        gid = c4d.DescID(c4d.DescLevel(SS_GRP_PARAMS, c4d.DTYPE_GROUP, 0))
+
+        bc = c4d.GetCustomDataTypeDefault(c4d.DTYPE_STRING)
+        bc[c4d.DESC_NAME]    = "Имя набора"
+        bc[c4d.DESC_DEFAULT] = ""
+        description.SetParameter(
+            c4d.DescID(c4d.DescLevel(SS_SET_NAME, c4d.DTYPE_STRING, 0)),
+            bc, gid)
+
+        return True, flags | c4d.DESCFLAGS_DESC_LOADED
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -516,7 +536,7 @@ if __name__ == "__main__":
         str=TAG_NAME,
         info=c4d.TAG_EXPRESSION | c4d.TAG_VISIBLE,
         g=SelSetTag,
-        description="",
+        description="Obase",
         icon=ICON_TAG,
     )
     c4d.plugins.RegisterCommandPlugin(
