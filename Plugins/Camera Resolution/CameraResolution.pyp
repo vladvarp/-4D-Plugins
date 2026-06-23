@@ -11,9 +11,11 @@ import base64
 import tempfile
 
 # ─── ID ───────────────────────────────────────────────────────────────────────
-PLUGIN_ID   = 1068834
+PLUGIN_ID_CMD   = 1068834
+PLUGIN_ID_TAG   = 1068836
+
 PLUGIN_NAME = "Resolution Manager"
-PLUGIN_NAME_V = "Resolution Manager v1.6"
+PLUGIN_NAME_V = "Resolution Manager v1.7"
 PLUGIN_HELP = "Управление разрешением рендера для каждой камеры"
 
 ID_BASE           = 10000
@@ -61,94 +63,112 @@ for _pname, _pw, _ph in _RAW_PRESETS:
     PRESETS.append((_pname, _pw, _ph))
 
 
-# ─── Работа с данными камеры через UserData ───────────────────────────────────
-#
-# Данные хранятся в пользовательских данных объекта (User Data).
-# Ищем поля по имени — это надёжнее чем по ID, который меняется
-# при добавлении/удалении других полей.
-#
+# ─── Работа с данными камеры через TagData ───────────────────────────────────
+
 UD_NAME_W     = "CamRes_W"
 UD_NAME_H     = "CamRes_H"
 UD_NAME_RATIO = "CamRes_Ratio"
 
+# Description-based parameter IDs
+CR_GRP_PARAMS = 2000
+CR_W          = 2001
+CR_H          = 2002
+CR_RATIO      = 2003
 
-def _ud_find(obj, name):
-    """Возвращает DescID пользовательского поля по имени, или None."""
-    ud = obj.GetUserDataContainer()
-    if not ud:
-        return None
-    for descid, bc in ud:
-        if bc.GetString(c4d.DESC_NAME) == name:
-            return descid
+
+def _find_tag(obj):
+    """Находит Camera Resolution Tag на объекте."""
+    tag = obj.GetFirstTag()
+    while tag:
+        if tag.GetType() == PLUGIN_ID_TAG:
+            return tag
+        tag = tag.GetNext()
     return None
 
 
-def _ud_ensure(obj, name, dtype, default_val):
-    """
-    Гарантирует существование пользовательского поля с заданным именем.
-    Если поля нет — создаёт его. Возвращает DescID.
-    dtype: c4d.DTYPE_LONG или c4d.DTYPE_BOOL
-    """
-    did = _ud_find(obj, name)
-    if did is not None:
-        return did
+def _ensure_tag(obj):
+    """Гарантирует наличие тега на камере. Возвращает тег."""
+    tag = _find_tag(obj)
+    if tag is not None:
+        return tag
+    tag = obj.MakeTag(PLUGIN_ID_TAG)
+    if tag is not None:
+        tag.SetName("Camera Resolution")
+    return tag
 
-    bc = c4d.GetCustomDataTypeDefault(dtype)
-    bc.SetString(c4d.DESC_NAME, name)
-    bc.SetString(c4d.DESC_SHORT_NAME, name)
-    bc.SetBool(c4d.DESC_HIDE, False)
 
-    if dtype == c4d.DTYPE_LONG:
-        bc.SetInt32(c4d.DESC_MIN, 1)
-        bc.SetInt32(c4d.DESC_MAX, 99999)
-        bc.SetInt32(c4d.DESC_STEP, 1)
-        bc.SetInt32(c4d.DESC_DEFAULT, int(default_val))
-
-    did = obj.AddUserData(bc)
-    obj[did] = default_val
-    return did
+def _remove_old_ud(obj):
+    """Удаляет старые UserData поля CamRes_* с объекта."""
+    to_remove = []
+    for descid, bc in obj.GetUserDataContainer():
+        name = bc.GetString(c4d.DESC_NAME)
+        if name in (UD_NAME_W, UD_NAME_H, UD_NAME_RATIO, "Camera Resolution Data"):
+            to_remove.append(descid)
+    for descid in reversed(to_remove):
+        obj.RemoveUserData(descid)
 
 
 def _cam_read(obj):
-    """Читает w, h, ratio из пользовательских данных объекта камеры."""
+    """Читает w, h, ratio. Сначала ищет тег, потом старые UserData."""
     _rw, _rh = _get_render_resolution()
     w     = _rw if _rw >= 1 else 1920
     h     = _rh if _rh >= 1 else 1080
     ratio = False
-    try:
-        did = _ud_find(obj, UD_NAME_W)
-        if did is not None:
-            val = obj[did]
+
+    tag = _find_tag(obj)
+    if tag is not None:
+        try:
+            val = tag[CR_W]
             if isinstance(val, (int, float)) and val >= 1:
                 w = int(val)
-    except Exception:
-        pass
-    try:
-        did = _ud_find(obj, UD_NAME_H)
-        if did is not None:
-            val = obj[did]
+        except Exception:
+            pass
+        try:
+            val = tag[CR_H]
             if isinstance(val, (int, float)) and val >= 1:
                 h = int(val)
-    except Exception:
-        pass
-    try:
-        did = _ud_find(obj, UD_NAME_RATIO)
-        if did is not None:
-            ratio = bool(obj[did])
-    except Exception:
-        pass
+        except Exception:
+            pass
+        try:
+            ratio = bool(tag[CR_RATIO])
+        except Exception:
+            pass
+        return w, h, ratio
+
+    # Fallback: старые UserData
+    ud = obj.GetUserDataContainer()
+    if ud:
+        for descid, bc in ud:
+            name = bc.GetString(c4d.DESC_NAME)
+            try:
+                if name == UD_NAME_W:
+                    val = obj[descid]
+                    if isinstance(val, (int, float)) and val >= 1:
+                        w = int(val)
+                elif name == UD_NAME_H:
+                    val = obj[descid]
+                    if isinstance(val, (int, float)) and val >= 1:
+                        h = int(val)
+                elif name == UD_NAME_RATIO:
+                    ratio = bool(obj[descid])
+            except Exception:
+                pass
+
     return w, h, ratio
 
 
 def _cam_write(obj, w, h, ratio):
-    """Записывает w, h, ratio в пользовательские данные объекта камеры."""
+    """Записывает w, h, ratio в тег на камере. Удаляет старые UserData."""
     try:
-        did_w     = _ud_ensure(obj, UD_NAME_W,     c4d.DTYPE_LONG, 1920)
-        did_h     = _ud_ensure(obj, UD_NAME_H,     c4d.DTYPE_LONG, 1080)
-        did_ratio = _ud_ensure(obj, UD_NAME_RATIO,  c4d.DTYPE_BOOL, False)
-        obj[did_w]     = int(w)
-        obj[did_h]     = int(h)
-        obj[did_ratio] = bool(ratio)
+        tag = _ensure_tag(obj)
+        if tag is not None:
+            tag[CR_W]     = int(w)
+            tag[CR_H]     = int(h)
+            tag[CR_RATIO] = bool(ratio)
+            tag.Message(c4d.MSG_UPDATE)
+
+        _remove_old_ud(obj)
+
         obj.Message(c4d.MSG_UPDATE)
         doc = c4d.documents.GetActiveDocument()
         if doc:
@@ -269,6 +289,68 @@ def _names_changed(old_list, new_list):
         if old_obj == new_obj and old_name != new_name:
             return True
     return False
+
+
+# ─── TagData ──────────────────────────────────────────────────────────────────
+
+class CameraResolutionTag(c4d.plugins.TagData):
+
+    def Init(self, node, isload=False):
+        if not isload:
+            node[CR_W]     = 1920
+            node[CR_H]     = 1080
+            node[CR_RATIO] = False
+        return True
+
+    def GetDDescription(self, node, description, flags):
+        if not description.LoadDescription(c4d.Tbase):
+            return False, flags
+
+        bc = c4d.GetCustomDataTypeDefault(c4d.DTYPE_GROUP)
+        bc[c4d.DESC_NAME]    = "Camera Resolution Data"
+        bc[c4d.DESC_COLUMNS] = 1
+        bc[c4d.DESC_DEFAULT] = 1
+        description.SetParameter(
+            c4d.DescID(c4d.DescLevel(CR_GRP_PARAMS, c4d.DTYPE_GROUP, 0)),
+            bc, c4d.ID_LISTHEAD)
+        gid = c4d.DescID(c4d.DescLevel(CR_GRP_PARAMS, c4d.DTYPE_GROUP, 0))
+
+        bc = c4d.GetCustomDataTypeDefault(c4d.DTYPE_LONG)
+        bc[c4d.DESC_NAME]    = "Ширина"
+        bc[c4d.DESC_DEFAULT] = 1920
+        bc[c4d.DESC_MIN]     = 1
+        bc[c4d.DESC_MAX]     = 99999
+        bc[c4d.DESC_STEP]    = 1
+        description.SetParameter(
+            c4d.DescID(c4d.DescLevel(CR_W, c4d.DTYPE_LONG, 0)),
+            bc, gid)
+
+        bc = c4d.GetCustomDataTypeDefault(c4d.DTYPE_LONG)
+        bc[c4d.DESC_NAME]    = "Высота"
+        bc[c4d.DESC_DEFAULT] = 1080
+        bc[c4d.DESC_MIN]     = 1
+        bc[c4d.DESC_MAX]     = 99999
+        bc[c4d.DESC_STEP]    = 1
+        description.SetParameter(
+            c4d.DescID(c4d.DescLevel(CR_H, c4d.DTYPE_LONG, 0)),
+            bc, gid)
+
+        bc = c4d.GetCustomDataTypeDefault(c4d.DTYPE_BOOL)
+        bc[c4d.DESC_NAME]    = "Сохранять пропорции"
+        bc[c4d.DESC_DEFAULT] = False
+        description.SetParameter(
+            c4d.DescID(c4d.DescLevel(CR_RATIO, c4d.DTYPE_BOOL, 0)),
+            bc, gid)
+
+        return True, flags | c4d.DESCFLAGS_DESC_LOADED
+
+    def Message(self, node, msg_type, data):
+        if msg_type == c4d.MSG_DESCRIPTION_POSTSETPARAMETER:
+            doc = c4d.documents.GetActiveDocument()
+            if doc:
+                doc.SetChanged()
+            c4d.EventAdd()
+        return True
 
 
 # ─── Диалог ───────────────────────────────────────────────────────────────────
@@ -677,7 +759,7 @@ class CamResCommand(c4d.plugins.CommandData):
         else:
             self._dialog.Open(
                 dlgtype=c4d.DLG_TYPE_ASYNC,
-                pluginid=PLUGIN_ID,
+                pluginid=PLUGIN_ID_CMD,
                 defaultw=710,
                 defaulth=280,
             )
@@ -686,7 +768,7 @@ class CamResCommand(c4d.plugins.CommandData):
     def RestoreLayout(self, secret):
         if self._dialog is None:
             self._dialog = CamResDialog(self)
-        return self._dialog.Restore(PLUGIN_ID, secret)
+        return self._dialog.Restore(PLUGIN_ID_CMD, secret)
 
     def GetState(self, doc):
         return c4d.CMD_ENABLED
@@ -751,8 +833,17 @@ ICON_B64 = _make_icon()
 # ─── Регистрация ──────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
+    c4d.plugins.RegisterTagPlugin(
+        id          = PLUGIN_ID_TAG,
+        str         = "Camera Resolution Tag",
+        info        = c4d.TAG_EXPRESSION | c4d.TAG_VISIBLE,
+        g           = CameraResolutionTag,
+        description = "Obase",
+        icon        = ICON_B64,
+    )
+
     c4d.plugins.RegisterCommandPlugin(
-        id   = PLUGIN_ID,
+        id   = PLUGIN_ID_CMD,
         str  = PLUGIN_NAME_V,
         info = 0,
         icon = ICON_B64,
