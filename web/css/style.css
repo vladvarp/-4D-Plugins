@@ -882,6 +882,19 @@ img {
     color: var(--color-text);
 }
 
+.code-scroll {
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    overflow-x: auto;
+}
+
+.code-scroll pre {
+    margin: 0;
+    border: none;
+    border-radius: 0;
+}
+
 /* Горизонтальная линия */
 .md-content hr {
     border: none;
@@ -2673,6 +2686,144 @@ img {
     border-left-color: var(--color-accent);
 }
 
+/* Поиск в руководстве */
+.toc-search {
+    margin-bottom: 12px;
+}
+
+.guide-search-input {
+    width: 100%;
+    padding: 8px 12px;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    background: var(--color-surface);
+    color: var(--color-text);
+    font-size: 13px;
+    font-family: var(--font-mono);
+    outline: none;
+    transition: border-color var(--transition);
+}
+
+.guide-search-input:focus {
+    border-color: var(--color-accent);
+}
+
+.guide-search-input::placeholder {
+    color: var(--color-muted);
+}
+
+.toc-list li.hidden {
+    display: none;
+}
+
+.toc-list li.search-match > a {
+    color: var(--color-accent);
+    font-weight: 600;
+}
+
+.search-highlight {
+    background: rgba(255, 140, 0, 0.25);
+    color: inherit;
+    border-radius: 3px;
+    padding: 0 2px;
+    box-shadow: 0 0 8px rgba(255, 140, 0, 0.4);
+}
+
+/* Плавающая кнопка поиска по разделам */
+.floating-search {
+    position: fixed;
+    top: 80px;
+    right: 24px;
+    z-index: 100;
+    display: flex;
+    align-items: center;
+    gap: 0;
+}
+
+.floating-search-btn {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    color: var(--color-muted);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.25s ease;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    flex-shrink: 0;
+}
+
+.floating-search-btn:hover {
+    color: var(--color-accent);
+    border-color: var(--color-accent);
+    box-shadow: 0 4px 16px rgba(77, 159, 255, 0.2);
+}
+
+.floating-search-input {
+    width: 0;
+    padding: 0;
+    border: none;
+    background: var(--color-surface);
+    color: var(--color-text);
+    font-size: 14px;
+    font-family: var(--font-body);
+    outline: none;
+    border-radius: 22px;
+    opacity: 0;
+    transition: all 0.3s ease;
+    margin-left: 0;
+    border: 1px solid transparent;
+}
+
+.floating-search:hover .floating-search-input,
+.floating-search-input:focus {
+    width: 260px;
+    padding: 10px 16px;
+    opacity: 1;
+    border-color: var(--color-border);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.floating-search-input::placeholder {
+    color: var(--color-muted);
+}
+
+.floating-search-clear {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    color: var(--color-muted);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.25s ease;
+    flex-shrink: 0;
+    opacity: 0;
+    pointer-events: none;
+    margin-left: -4px;
+}
+
+.floating-search.has-query .floating-search-clear,
+.floating-search:hover .floating-search-clear {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.floating-search-clear.hidden {
+    display: none;
+}
+
+.floating-search-clear:hover {
+    color: var(--color-accent);
+    border-color: var(--color-accent);
+}
+
 /* Блок с примером кода */
 .code-example {
     background: var(--color-surface);
@@ -2730,6 +2881,16 @@ img {
     background: none;
     border: none;
     padding: 0;
+}
+
+.md-ico-code {
+    width: 16px;
+    height: 16px;
+    object-fit: contain;
+    vertical-align: middle;
+    display: inline-block;
+    border-radius: 2px;
+    margin: 0 2px;
 }
 
 /* ========================================

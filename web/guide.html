@@ -40,13 +40,27 @@
                 </p>
             </section>
 
+            <!-- Плавающая кнопка поиска -->
+            <div class="floating-search" id="floating-search">
+                <button class="floating-search-btn" id="floating-search-btn" aria-label="Поиск по разделам">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                </button>
+                <input type="text" id="content-search" class="floating-search-input" placeholder="Поиск по разделам..." autocomplete="off">
+                <button class="floating-search-clear" id="floating-search-clear" aria-label="Сбросить поиск">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                </button>
+            </div>
+
             <!-- Двухколоночный макет: оглавление + контент -->
             <div class="guide-layout">
 
                 <!-- Оглавление (только десктоп) -->
                 <aside class="guide-toc" aria-label="Содержание">
                     <div class="toc-title">Содержание</div>
-                    <ul class="toc-list">
+                    <div class="toc-search">
+                        <input type="text" id="guide-search" class="guide-search-input" placeholder="Поиск..." autocomplete="off">
+                    </div>
+                    <ul class="toc-list" id="toc-list">
                         <li><a href="#structure">Структура файла</a></li>
                         <li><a href="#frontmatter">Frontmatter</a></li>
                         <li><a href="#required-fields">Обязательные поля</a></li>
@@ -383,7 +397,7 @@ github: https://github.com/username/scatter-pro
                         <h3 id="md-code">Блоки кода</h3>
                         <div class="code-example">
                             <div class="code-example-header">
-                                <span class="code-example-label">Блок кода с подсветкой языка</span>
+                                <span class="code-example-label">Базовый синтаксис</span>
                                 <button class="copy-btn">Копировать</button>
                             </div>
                             <pre><code>```python
@@ -392,6 +406,82 @@ import c4d
 def main():
     doc = c4d.documents.GetActiveDocument()
     print(doc.GetName())
+```</code></pre>
+                        </div>
+
+                        <p>Блок кода поддерживает параметры, указываемые сразу после <code>```</code>:</p>
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Параметр</th>
+                                    <th>Формат</th>
+                                    <th>Описание</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td><code>-ico</code></td>
+                                    <td><code>```-ico</code></td>
+                                    <td>Включает рендеринг <code>[[ico:'путь']]</code> как изображений внутри блока</td>
+                                </tr>
+                                <tr>
+                                    <td><code>-s</code></td>
+                                    <td><code>-sЧИСЛО</code></td>
+                                    <td>Размер шрифта внутри блока (в пикселях)</td>
+                                </tr>
+                                <tr>
+                                    <td><code>-l</code></td>
+                                    <td><code>-lЧИСЛО</code></td>
+                                    <td>Фиксированная высота блока (в пикселях). Содержимое пролистывается</td>
+                                </tr>
+                            </tbody>
+                        </table>
+
+                        <h4 id="md-code-ico">Иконки в блоке кода</h4>
+                        <p>
+                            Параметр <code>-ico</code> включает рендеринг <code>[[ico:'путь']]</code> как изображений прямо внутри блока кода.
+                            Иконки отображаются в месте их записи — даже между словами. Поддерживается размер: <code>[[ico:'путь'-200]]</code>.
+                        </p>
+                        <div class="code-example">
+                            <div class="code-example-header">
+                                <span class="code-example-label">Пример с -ico</span>
+                                <button class="copy-btn">Копировать</button>
+                            </div>
+                            <pre><code>```-ico
+[[ico:'ico/Var_tools/Objects/Primitivs/BrickPlane.png']] # иконка
+[[ico:'ico/Var_tools/Objects/Primitivs/BrickPlane2.png'-60]] # уменьшенная
+код...
+[[ico:'ico/Var_tools/Objects/Primitivs/BrickPlane3.png']] # иконка программы
+код...
+```</code></pre>
+                        </div>
+
+                        <h4 id="md-code-size">Размер шрифта</h4>
+                        <div class="code-example">
+                            <div class="code-example-header">
+                                <span class="code-example-label">Пример с -s</span>
+                                <button class="copy-btn">Копировать</button>
+                            </div>
+                            <pre><code>```-s20
+Крупный текст в блоке кода
+```</code></pre>
+                        </div>
+
+                        <h4 id="md-code-limit">Фиксированная высота</h4>
+                        <div class="code-example">
+                            <div class="code-example-header">
+                                <span class="code-example-label">Пример с -l</span>
+                                <button class="copy-btn">Копировать</button>
+                            </div>
+                            <pre><code>```-ico-s14-l200
+[[ico:'icon.png']] Строка 1
+Строка 2
+Строка 3
+Строка 4
+Строка 5
+Строка 6
+Строка 7
+Строка 8
 ```</code></pre>
                         </div>
 
@@ -1536,5 +1626,145 @@ tagline: Подробное описание возможностей и сов�
     </footer>
 
     <script src="js/main.js"></script>
+    <script>
+    (function() {
+        const searchInput = document.getElementById('guide-search');
+        const tocList = document.getElementById('toc-list');
+        const tocLinks = tocList ? Array.from(tocList.querySelectorAll('a')) : [];
+        const contentSearchInput = document.getElementById('content-search');
+        const floatingSearchBtn = document.getElementById('floating-search-btn');
+        const floatingSearchClear = document.getElementById('floating-search-clear');
+        const sections = document.querySelectorAll('.md-content section');
+
+        function syncToc(query) {
+            if (!query) {
+                tocLinks.forEach(a => a.parentElement.classList.remove('hidden', 'search-match'));
+                return;
+            }
+            var q = query.toLowerCase();
+            tocLinks.forEach(function(a) {
+                var text = a.textContent.toLowerCase();
+                var href = (a.getAttribute('href') || '').replace('#', '').toLowerCase();
+                var sectionMatch = false;
+                if (href) {
+                    var sec = document.getElementById(href);
+                    if (sec && sec.style.display !== 'none') {
+                        sectionMatch = sec.textContent.toLowerCase().includes(q);
+                    }
+                }
+                var li = a.parentElement;
+                if (text.includes(q) || href.includes(q) || sectionMatch) {
+                    li.classList.remove('hidden');
+                    li.classList.add('search-match');
+                    var parent = li.parentElement ? li.parentElement.closest('li') : null;
+                    while (parent) {
+                        parent.classList.remove('hidden');
+                        parent = parent.parentElement ? parent.parentElement.closest('li') : null;
+                    }
+                } else {
+                    li.classList.add('hidden');
+                    li.classList.remove('search-match');
+                }
+            });
+        }
+
+        function highlightSections(query) {
+            sections.forEach(function(s) {
+                s.querySelectorAll('.search-highlight').forEach(function(el) {
+                    el.replaceWith(el.textContent);
+                });
+                s.normalize();
+            });
+            if (!query) return;
+            var walker = document.createTreeWalker(
+                document.querySelector('.md-content'),
+                NodeFilter.SHOW_TEXT,
+                null
+            );
+            var textNodes = [];
+            var node;
+            while (node = walker.nextNode()) {
+                if (!node.parentElement) continue;
+                if (node.parentElement.closest('.code-example, pre, code, .search-highlight')) continue;
+                var sec = node.parentElement.closest('.md-content section');
+                if (sec && sec.style.display === 'none') continue;
+                textNodes.push(node);
+            }
+            var escaped = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            var re = new RegExp('(' + escaped + ')', 'gi');
+            textNodes.forEach(function(textNode) {
+                var val = textNode.nodeValue;
+                re.lastIndex = 0;
+                if (!re.test(val)) return;
+                re.lastIndex = 0;
+                var frag = document.createDocumentFragment();
+                var lastIdx = 0;
+                var m;
+                while (m = re.exec(val)) {
+                    if (m.index > lastIdx) frag.appendChild(document.createTextNode(val.slice(lastIdx, m.index)));
+                    var span = document.createElement('span');
+                    span.className = 'search-highlight';
+                    span.textContent = m[0];
+                    frag.appendChild(span);
+                    lastIdx = re.lastIndex;
+                }
+                if (lastIdx < val.length) frag.appendChild(document.createTextNode(val.slice(lastIdx)));
+                textNode.replaceWith(frag);
+            });
+        }
+
+        var floatingSearchWrap = document.getElementById('floating-search');
+
+        function resetContentSearch() {
+            contentSearchInput.value = '';
+            sections.forEach(function(s) { s.style.display = ''; });
+            syncToc('');
+            highlightSections('');
+            if (floatingSearchWrap) floatingSearchWrap.classList.remove('has-query');
+        }
+
+        if (searchInput) {
+            searchInput.addEventListener('input', function() {
+                syncToc(this.value);
+            });
+        }
+
+        if (floatingSearchBtn) {
+            floatingSearchBtn.addEventListener('click', function() {
+                contentSearchInput.focus();
+            });
+        }
+
+        if (floatingSearchClear) {
+            floatingSearchClear.addEventListener('click', function() {
+                resetContentSearch();
+                contentSearchInput.blur();
+            });
+        }
+
+        if (contentSearchInput) {
+            contentSearchInput.addEventListener('input', function() {
+                var query = this.value.trim();
+                var q = query.toLowerCase();
+                if (floatingSearchWrap) {
+                    floatingSearchWrap.classList.toggle('has-query', !!query);
+                }
+                if (!q) {
+                    sections.forEach(function(s) { s.style.display = ''; });
+                    syncToc('');
+                    highlightSections('');
+                    return;
+                }
+                sections.forEach(function(s) {
+                    var text = s.textContent.toLowerCase();
+                    var id = (s.id || '').toLowerCase();
+                    s.style.display = (text.includes(q) || id.includes(q)) ? '' : 'none';
+                });
+                syncToc(query);
+                highlightSections(query);
+            });
+        }
+    })();
+    </script>
 </body>
 </html>

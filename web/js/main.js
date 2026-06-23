@@ -469,9 +469,36 @@ function renderMarkdown(markdown) {
     // Экранируем HTML в исходном тексте для безопасности
     // НО: сохраняем блоки кода отдельно, чтобы не сломать их
     const codeBlocks = [];
-    html = html.replace(/```([\w]*)\n([\s\S]*?)```/g, (_, lang, code) => {
+    const icoSlots = [];
+    html = html.replace(/```([\s\S]*?)\n([\s\S]*?)```/g, (_, header, code) => {
         const idx = codeBlocks.length;
-        codeBlocks.push(`<pre><code class="language-${lang}">${escapeHtml(code.trimEnd())}</code></pre>`);
+        let raw = code.trimEnd();
+        const hasIco = header.includes('-ico');
+        const sizeMatch = header.match(/-s(\d+)/);
+        const fontSize = sizeMatch ? sizeMatch[1] : '';
+        const limitMatch = header.match(/-l(\d+)/);
+        const lineHeight = limitMatch ? limitMatch[1] : '';
+        const lang = header.replace(/\s*-ico\s*/, '').replace(/\s*-s\d+\s*/, '').replace(/\s*-l\d+\s*/, '').trim();
+        if (hasIco) {
+            raw = raw.replace(/\[\[ico:'([^']+)'(?:-(\d+))?\]\]/g, (_, src, h) => {
+                const icoIdx = icoSlots.length;
+                const style = h
+                    ? `height:${h}px;width:auto;object-fit:contain;vertical-align:middle;display:inline-block;border-radius:0;`
+                    : 'width:36px;height:36px;object-fit:contain;vertical-align:middle;display:inline-block;border-radius:0;';
+                icoSlots.push(`<img class="md-ico md-ico-code" src="${escapeHtml(src)}" alt="" loading="lazy" style="${style}">`);
+                return `%%ICO_${icoIdx}%%`;
+            });
+        }
+        raw = escapeHtml(raw);
+        icoSlots.forEach((ico, i) => { raw = raw.replace(`%%ICO_${i}%%`, ico); });
+        let attrs = '';
+        if (fontSize) attrs = ` style="font-size:${fontSize}px"`;
+        const codeBlock = `<pre><code class="language-${lang}"${attrs}>${raw}</code></pre>`;
+        if (lineHeight) {
+            codeBlocks.push(`<div class="code-scroll" style="height:${lineHeight}px;overflow-y:auto">${codeBlock}</div>`);
+        } else {
+            codeBlocks.push(codeBlock);
+        }
         return `%%CODEBLOCK_${idx}%%`;
     });
 
@@ -612,9 +639,36 @@ function renderInlineContent(text) {
 
     // Сохраняем блоки кода
     const codeBlocks = [];
-    html = html.replace(/```([\w]*)\n([\s\S]*?)```/g, (_, lang, code) => {
+    const icoSlots = [];
+    html = html.replace(/```([\s\S]*?)\n([\s\S]*?)```/g, (_, header, code) => {
         const idx = codeBlocks.length;
-        codeBlocks.push(`<pre><code class="language-${lang}">${escapeHtml(code.trimEnd())}</code></pre>`);
+        let raw = code.trimEnd();
+        const hasIco = header.includes('-ico');
+        const sizeMatch = header.match(/-s(\d+)/);
+        const fontSize = sizeMatch ? sizeMatch[1] : '';
+        const limitMatch = header.match(/-l(\d+)/);
+        const lineHeight = limitMatch ? limitMatch[1] : '';
+        const lang = header.replace(/\s*-ico\s*/, '').replace(/\s*-s\d+\s*/, '').replace(/\s*-l\d+\s*/, '').trim();
+        if (hasIco) {
+            raw = raw.replace(/\[\[ico:'([^']+)'(?:-(\d+))?\]\]/g, (_, src, h) => {
+                const icoIdx = icoSlots.length;
+                const style = h
+                    ? `height:${h}px;width:auto;object-fit:contain;vertical-align:middle;display:inline-block;border-radius:0;`
+                    : 'width:36px;height:36px;object-fit:contain;vertical-align:middle;display:inline-block;border-radius:0;';
+                icoSlots.push(`<img class="md-ico md-ico-code" src="${escapeHtml(src)}" alt="" loading="lazy" style="${style}">`);
+                return `%%ICO_${icoIdx}%%`;
+            });
+        }
+        raw = escapeHtml(raw);
+        icoSlots.forEach((ico, i) => { raw = raw.replace(`%%ICO_${i}%%`, ico); });
+        let attrs = '';
+        if (fontSize) attrs = ` style="font-size:${fontSize}px"`;
+        const codeBlock = `<pre><code class="language-${lang}"${attrs}>${raw}</code></pre>`;
+        if (lineHeight) {
+            codeBlocks.push(`<div class="code-scroll" style="height:${lineHeight}px;overflow-y:auto">${codeBlock}</div>`);
+        } else {
+            codeBlocks.push(codeBlock);
+        }
         return `%%CODEBLOCK_${idx}%%`;
     });
     const inlineCodes = [];
