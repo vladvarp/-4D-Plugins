@@ -539,7 +539,10 @@ function renderTabsBlock(content) {
     });
 
     return `<div class="md-tabs">
-        <div class="md-tabs-nav" role="tablist">${tabs.map(t => t.nav).join('')}</div>
+        <div class="md-tabs-scroll-wrap">
+            <div class="md-tabs-scrollbar"><div class="md-tabs-scrollbar-thumb"></div></div>
+            <div class="md-tabs-nav" role="tablist">${tabs.map(t => t.nav).join('')}</div>
+        </div>
         <div class="md-tabs-panels">${tabs.map(t => t.panel).join('')}</div>
     </div>`;
 }
@@ -956,6 +959,60 @@ function initMdTabs(root) {
 
         const buttons = tabsEl.querySelectorAll('.md-tab-btn');
         const panels = tabsEl.querySelectorAll('.md-tab-panel');
+        const scrollWrap = tabsEl.querySelector('.md-tabs-scroll-wrap');
+        const nav = tabsEl.querySelector('.md-tabs-nav');
+        const scrollbar = tabsEl.querySelector('.md-tabs-scrollbar');
+        const thumb = tabsEl.querySelector('.md-tabs-scrollbar-thumb');
+
+        function updateScrollbar() {
+            if (!nav || !scrollbar || !thumb) return;
+            const overflow = nav.scrollWidth > nav.clientWidth;
+            scrollWrap.classList.toggle('has-overflow', overflow);
+            if (overflow) {
+                const ratio = nav.clientWidth / nav.scrollWidth;
+                const thumbW = Math.max(30, nav.clientWidth * ratio);
+                thumb.style.width = thumbW + 'px';
+                const maxScroll = nav.scrollWidth - nav.clientWidth;
+                const thumbPos = maxScroll > 0 ? (nav.scrollLeft / maxScroll) * (nav.clientWidth - thumbW) : 0;
+                thumb.style.transform = `translateX(${thumbPos}px)`;
+            }
+        }
+
+        if (nav) {
+            nav.addEventListener('scroll', updateScrollbar);
+
+            nav.addEventListener('wheel', e => {
+                if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
+                    const maxScroll = nav.scrollWidth - nav.clientWidth;
+                    if (maxScroll > 0) {
+                        e.preventDefault();
+                        nav.scrollLeft += e.deltaY;
+                    }
+                }
+            }, { passive: false });
+        }
+
+        if (thumb && nav) {
+            let dragging = false, startX = 0, startScroll = 0;
+
+            thumb.addEventListener('mousedown', e => {
+                dragging = true;
+                startX = e.clientX;
+                startScroll = nav.scrollLeft;
+                e.preventDefault();
+            });
+
+            document.addEventListener('mousemove', e => {
+                if (!dragging) return;
+                const dx = e.clientX - startX;
+                const ratio = nav.scrollWidth / nav.clientWidth;
+                nav.scrollLeft = startScroll + dx * ratio;
+            });
+
+            document.addEventListener('mouseup', () => { dragging = false; });
+        }
+
+        updateScrollbar();
 
         buttons.forEach(btn => {
             btn.addEventListener('click', () => {
@@ -970,6 +1027,8 @@ function initMdTabs(root) {
                 panels.forEach(panel => {
                     panel.classList.toggle('active', panel.dataset.tab === tabId);
                 });
+
+                updateScrollbar();
             });
         });
     });
