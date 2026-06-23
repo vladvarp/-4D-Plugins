@@ -26,14 +26,20 @@ import tempfile
 PLUGIN_ID_CMD = 1068903   # CommandData — кнопка в меню
 PLUGIN_ID_TAG = 1068904   # TagData     — тег
 
-PLUGIN_NAME_V = "Camera Visibility Tag v1.3.1"
+PLUGIN_NAME_V = "Camera Visibility Tag v1.4"
 TAG_NAME      = "Camera Visibility Tag"
 PLUGIN_HELP   = "Управление видимостью объекта по активной камере сцены"
 
 # ── ID пользовательских данных ────────────────────────────────────────────────
-UD_HIDE = 1   # InExcludeData — список скрытия
-UD_SHOW = 2   # InExcludeData — список показа
-UD_WARN = 3   # String        — текстовое предупреждение о конфликте
+UD_HIDE = 1
+UD_SHOW = 2
+UD_WARN = 3
+
+# Description-based parameter IDs
+CV_GRP_PARAMS = 2000
+CV_HIDE       = 2001
+CV_SHOW       = 2002
+CV_WARN       = 2003
 
 
 # ── Вспомогательные функции ───────────────────────────────────────────────────
@@ -53,56 +59,14 @@ def _get_stage_camera(doc):
     return bd.GetSceneCamera(doc)
 
 
-def _build_userdata(tag):
-    """
-    Создаёт структуру пользовательских данных на теге:
-      - Поле InExcludeData «Скрыть при камере»   (UD_HIDE = 1)
-      - Поле InExcludeData «Показать при камере» (UD_SHOW = 2)
-
-    Структура создаётся один раз при Init.
-    Возвращает True при успехе.
-    """
-    ud = tag.GetUserDataContainer()
-    if ud and len(ud) >= 3:
-        return True
-
-    # ── Поле «Скрыть при камере» ──────────────────────────────────────────────
-    # GetCustomDatatypeDefault принимает CUSTOMGUI_INEXCLUDE_LIST —
-    # именно так в C++ SDK: GetCustomDataTypeDefault(CUSTOMGUI_INEXCLUDE_LIST)
-    bc_hide = c4d.GetCustomDatatypeDefault(c4d.CUSTOMGUI_INEXCLUDE_LIST)
-    bc_hide[c4d.DESC_NAME]       = "Скрыть при камере"
-    bc_hide[c4d.DESC_SHORT_NAME] = "Скрыть"
-    tag.AddUserData(bc_hide)   # → UD_HIDE = 1
-
-    # ── Поле «Показать при камере» ────────────────────────────────────────────
-    bc_show = c4d.GetCustomDatatypeDefault(c4d.CUSTOMGUI_INEXCLUDE_LIST)
-    bc_show[c4d.DESC_NAME]       = "Показать при камере"
-    bc_show[c4d.DESC_SHORT_NAME] = "Показать"
-    tag.AddUserData(bc_show)   # → UD_SHOW = 2
-
-    # ── Поле предупреждения о конфликте ───────────────────────────────────────
-    # Статическое строковое поле; отображается только при наличии конфликта.
-    # DESC_EDITABLE = False делает поле read-only — только для вывода сообщения.
-    bc_warn = c4d.GetCustomDatatypeDefault(c4d.DTYPE_STRING)
-    bc_warn[c4d.DESC_NAME]       = "⚠ Конфликт камер"
-    bc_warn[c4d.DESC_SHORT_NAME] = "Конфликт"
-    bc_warn[c4d.DESC_EDITABLE]   = False
-    tag.AddUserData(bc_warn)   # → UD_WARN = 3
-    tag[c4d.ID_USERDATA, UD_WARN] = ""   # изначально пусто (скрытое)
-
-    return True
+def _set_visibility(obj, mode):
+    obj[c4d.ID_BASEOBJECT_VISIBILITY_EDITOR] = mode
+    obj[c4d.ID_BASEOBJECT_VISIBILITY_RENDER] = mode
 
 
-def _get_cameras_from_list(tag, doc, ud_id):
-    """
-    Читает объекты из InExcludeData-поля UserData с индексом ud_id.
-    Возвращает list объектов (пропускает None).
-    InExcludeData итерируется через GetObjectCount / ObjectFromIndex.
-    Примечание: c4d.BaseObject не поддерживает __hash__, поэтому
-    использовать set() нельзя — используем list и сравнение через ==.
-    """
+def _get_cameras_from_list(tag, doc, desc_id):
     cams = []
-    inexclude = tag[c4d.ID_USERDATA, ud_id]
+    inexclude = tag[desc_id]
     if not isinstance(inexclude, c4d.InExcludeData):
         return cams
     count = inexclude.GetObjectCount()
@@ -114,64 +78,73 @@ def _get_cameras_from_list(tag, doc, ud_id):
 
 
 def _validate_no_overlap(tag, doc):
-    """
-    Проверяет, что одна и та же камера не находится одновременно
-    в списке скрытия и в списке показа.
-    Если пересечение обнаружено — выводит предупреждение и возвращает False.
-    Возвращает True если конфликтов нет.
-    """
-    hide_cams = _get_cameras_from_list(tag, doc, UD_HIDE)
-    show_cams = _get_cameras_from_list(tag, doc, UD_SHOW)
+    hide_cams = _get_cameras_from_list(tag, doc, CV_HIDE)
+    show_cams = _get_cameras_from_list(tag, doc, CV_SHOW)
 
-    # Пересечение через явный цикл: c4d.BaseObject не поддерживает __hash__,
-    # поэтому set() и оператор & недоступны — сравниваем объекты через ==.
     overlap = [h for h in hide_cams if any(h == s for s in show_cams)]
     if overlap:
         names = ", ".join(o.GetName() for o in overlap)
-        # Записываем предупреждение в пользовательское поле тега
-        tag[c4d.ID_USERDATA, UD_WARN] = (
+        tag[CV_WARN] = (
             "⚠ Конфликт! Камер{} в обоих списках: {}".format(
                 "а" if len(overlap) == 1 else "ы", names
             )
         )
         return False
 
-    # Конфликтов нет — очищаем поле предупреждения
-    tag[c4d.ID_USERDATA, UD_WARN] = ""
+    tag[CV_WARN] = ""
     return True
-
-
-def _set_visibility(obj, mode):
-    """
-    Устанавливает видимость объекта для вьюпорта и рендера.
-    mode:
-      c4d.OBJECT_ON    → видим
-      c4d.OBJECT_OFF   → скрыт
-      c4d.OBJECT_UNDEF → не определено (наследует от родителя)
-    Внимание: в Python SDK используются OBJECT_*, а не MODE_* (C++ only).
-    """
-    obj[c4d.ID_BASEOBJECT_VISIBILITY_EDITOR] = mode
-    obj[c4d.ID_BASEOBJECT_VISIBILITY_RENDER] = mode
 
 
 # ── TagData ───────────────────────────────────────────────────────────────────
 
 class CameraVisibilityTag(c4d.plugins.TagData):
 
-    def Init(self, node):
-        _build_userdata(node)
+    def Init(self, node, isload=False):
+        if not isload:
+            node[CV_HIDE] = c4d.InExcludeData()
+            node[CV_SHOW] = c4d.InExcludeData()
+            node[CV_WARN] = ""
         return True
 
+    def GetDDescription(self, node, description, flags):
+        if not description.LoadDescription("Obase"):
+            return False, flags
+
+        bc = c4d.GetCustomDataTypeDefault(c4d.DTYPE_GROUP)
+        bc[c4d.DESC_NAME]    = "Параметры"
+        bc[c4d.DESC_COLUMNS] = 1
+        bc[c4d.DESC_DEFAULT] = 1
+        description.SetParameter(
+            c4d.DescID(c4d.DescLevel(CV_GRP_PARAMS, c4d.DTYPE_GROUP, 0)),
+            bc, c4d.ID_LISTHEAD)
+        gid = c4d.DescID(c4d.DescLevel(CV_GRP_PARAMS, c4d.DTYPE_GROUP, 0))
+
+        bc = c4d.GetCustomDataTypeDefault(c4d.CUSTOMDATATYPE_INEXCLUDE_LIST)
+        bc[c4d.DESC_NAME]    = "Скрыть при камере"
+        bc[c4d.DESC_ANIMATE] = c4d.DESC_ANIMATE_OFF
+        bc[c4d.DESC_EDITABLE] = True
+        description.SetParameter(
+            c4d.DescID(c4d.DescLevel(CV_HIDE, c4d.CUSTOMDATATYPE_INEXCLUDE_LIST, 0)),
+            bc, gid)
+
+        bc = c4d.GetCustomDataTypeDefault(c4d.CUSTOMDATATYPE_INEXCLUDE_LIST)
+        bc[c4d.DESC_NAME]    = "Показать при камере"
+        bc[c4d.DESC_ANIMATE] = c4d.DESC_ANIMATE_OFF
+        bc[c4d.DESC_EDITABLE] = True
+        description.SetParameter(
+            c4d.DescID(c4d.DescLevel(CV_SHOW, c4d.CUSTOMDATATYPE_INEXCLUDE_LIST, 0)),
+            bc, gid)
+
+        bc = c4d.GetCustomDataTypeDefault(c4d.DTYPE_STRING)
+        bc[c4d.DESC_NAME]    = "⚠ Конфликт камер"
+        bc[c4d.DESC_EDITABLE] = False
+        description.SetParameter(
+            c4d.DescID(c4d.DescLevel(CV_WARN, c4d.DTYPE_STRING, 0)),
+            bc, gid)
+
+        return True, flags | c4d.DESCFLAGS_DESC_LOADED
+
     def GetDirty(self, tag, doc):
-        """
-        Возвращает контрольную сумму активной камеры.
-        Если значение изменилось с прошлого вызова — C4D считает тег устаревшим
-        и запускает Execute заново. Без этого метода C4D не замечает смену
-        камеры в Stage-объекте и не пересчитывает тег.
-        id(cam) меняется при переключении на другой объект камеры;
-        cam.GetDirty() меняется при изменении параметров той же камеры.
-        Примечание: hash(cam) здесь нельзя — c4d.BaseObject не поддерживает __hash__.
-        """
         cam = _get_stage_camera(doc)
         if cam is not None:
             return cam.GetDirty(c4d.DIRTYFLAGS_ALL) + id(cam)
@@ -185,13 +158,11 @@ class CameraVisibilityTag(c4d.plugins.TagData):
         active_cam = _get_stage_camera(doc)
 
         if active_cam is None:
-            # Нет активной камеры — не определено
             _set_visibility(obj, c4d.OBJECT_UNDEF)
             return c4d.EXECUTIONRESULT_OK
 
-        # Читаем оба списка
-        hide_cams = _get_cameras_from_list(tag, doc, UD_HIDE)
-        show_cams = _get_cameras_from_list(tag, doc, UD_SHOW)
+        hide_cams = _get_cameras_from_list(tag, doc, CV_HIDE)
+        show_cams = _get_cameras_from_list(tag, doc, CV_SHOW)
 
         if active_cam in hide_cams:
             _set_visibility(obj, c4d.OBJECT_OFF)
@@ -203,17 +174,8 @@ class CameraVisibilityTag(c4d.plugins.TagData):
         return c4d.EXECUTIONRESULT_OK
 
     def Message(self, node, msg_type, data):
-        """
-        Отслеживаем изменение UserData для валидации пересечений.
-        c4d.MSG_DESCRIPTION_POSTSETPARAMETER (значение 19) — правильная
-        Python SDK константа, которая срабатывает после изменения параметра
-        пользователем в Attribute Manager (в т.ч. InExcludeData).
-        Числовой литерал 1000000008 (MSG_DESCRIPTION_POSTSETVALUE) — C++ only
-        и в Python не срабатывает.
-        """
         if msg_type == c4d.MSG_DESCRIPTION_POSTSETPARAMETER:
             _validate_no_overlap(node, c4d.documents.GetActiveDocument())
-
         return True
 
 
@@ -282,7 +244,7 @@ if __name__ == "__main__":
         str=TAG_NAME,
         info=c4d.TAG_EXPRESSION | c4d.TAG_VISIBLE,
         g=CameraVisibilityTag,
-        description="",
+        description="Obase",
         icon=ICON_PLG
     )
 
