@@ -14,7 +14,7 @@ import tempfile
 
 ID_TRICUBE = 1068871
 
-NAME_TRICUBE = "Tri Cube v1.5"
+NAME_TRICUBE = "Tri Cube v1.6"
 
 # ─── Description-based parameter IDs ──────────────────────────────────────────────────
 
@@ -471,8 +471,11 @@ class TriCubeObject(_MeshPrimitiveBase):
         bc[c4d.DESC_NAME]    = "Подразделения X"
         bc[c4d.DESC_DEFAULT] = 3
         bc[c4d.DESC_MIN]     = 1
-        bc[c4d.DESC_MAX]     = 50
+        bc[c4d.DESC_MAX]     = 500
         bc[c4d.DESC_STEP]    = 1
+        bc[c4d.DESC_CUSTOMGUI] = c4d.CUSTOMGUI_REALSLIDER
+        bc[c4d.DESC_MINSLIDER] = 1
+        bc[c4d.DESC_MAXSLIDER] = 20
         description.SetParameter(
             c4d.DescID(c4d.DescLevel(TC_D_SUB_X, c4d.DTYPE_LONG, 0)),
             bc, gid
@@ -484,6 +487,9 @@ class TriCubeObject(_MeshPrimitiveBase):
         bc[c4d.DESC_MIN]     = 1
         bc[c4d.DESC_MAX]     = 50
         bc[c4d.DESC_STEP]    = 1
+        bc[c4d.DESC_CUSTOMGUI] = c4d.CUSTOMGUI_REALSLIDER
+        bc[c4d.DESC_MINSLIDER] = 1
+        bc[c4d.DESC_MAXSLIDER] = 20
         description.SetParameter(
             c4d.DescID(c4d.DescLevel(TC_D_SUB_Y, c4d.DTYPE_LONG, 0)),
             bc, gid
@@ -495,6 +501,9 @@ class TriCubeObject(_MeshPrimitiveBase):
         bc[c4d.DESC_MIN]     = 1
         bc[c4d.DESC_MAX]     = 50
         bc[c4d.DESC_STEP]    = 1
+        bc[c4d.DESC_CUSTOMGUI] = c4d.CUSTOMGUI_REALSLIDER
+        bc[c4d.DESC_MINSLIDER] = 1
+        bc[c4d.DESC_MAXSLIDER] = 20
         description.SetParameter(
             c4d.DescID(c4d.DescLevel(TC_D_SUB_Z, c4d.DTYPE_LONG, 0)),
             bc, gid
@@ -531,6 +540,9 @@ class TriCubeObject(_MeshPrimitiveBase):
         bc[c4d.DESC_MAX]     = 10000.0
         bc[c4d.DESC_UNIT]    = c4d.DESC_UNIT_METER
         bc[c4d.DESC_STEP]    = 1.0
+        bc[c4d.DESC_CUSTOMGUI] = c4d.CUSTOMGUI_REALSLIDER
+        bc[c4d.DESC_MINSLIDER] = 0.0
+        bc[c4d.DESC_MAXSLIDER] = 50.0
         description.SetParameter(
             c4d.DescID(c4d.DescLevel(TC_D_STAR_OFFSET, c4d.DTYPE_REAL, 0)),
             bc, gid

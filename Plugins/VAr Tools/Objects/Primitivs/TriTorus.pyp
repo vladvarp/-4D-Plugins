@@ -48,14 +48,13 @@ import math
 import os
 import base64
 import tempfile
-import random
 
 # ══════════════════════════════════════════════════════════════════════════════
 #  Plugin ID & Name
 # ══════════════════════════════════════════════════════════════════════════════
 
 ID_TRITORUS  = 1068874
-NAME_TRITORUS = "Tri Torus v2.5"
+NAME_TRITORUS = "Tri Torus v2.6"
 
 # ══════════════════════════════════════════════════════════════════════════════
 #  Description Parameter IDs
@@ -123,67 +122,6 @@ DEFAULT_SPIRAL_DIRECTION = 0
 
 DEFAULT_PHONG_ANGLE = 45.0
 DEFAULT_PHONG_LIMIT = True
-
-# ══════════════════════════════════════════════════════════════════════════════
-#  Вспомогательные функции Description
-# ══════════════════════════════════════════════════════════════════════════════
-
-def _float_bc(name, default, minval, maxval, unit=c4d.DESC_UNIT_METER, step=1.0):
-    bc = c4d.GetCustomDatatypeDefault(c4d.DTYPE_REAL)
-    bc[c4d.DESC_NAME]       = name
-    bc[c4d.DESC_SHORT_NAME] = name
-    bc[c4d.DESC_DEFAULT]    = default
-    bc[c4d.DESC_MIN]        = minval
-    bc[c4d.DESC_MAX]        = maxval
-    bc[c4d.DESC_UNIT]       = unit
-    bc[c4d.DESC_STEP]       = step
-    bc[c4d.DESC_ANIMATE]    = c4d.DESC_ANIMATE_ON
-    return bc
-
-
-def _int_bc(name, default, minval, maxval):
-    bc = c4d.GetCustomDatatypeDefault(c4d.DTYPE_LONG)
-    bc[c4d.DESC_NAME]       = name
-    bc[c4d.DESC_SHORT_NAME] = name
-    bc[c4d.DESC_DEFAULT]    = default
-    bc[c4d.DESC_MIN]        = minval
-    bc[c4d.DESC_MAX]        = maxval
-    bc[c4d.DESC_STEP]       = 1
-    bc[c4d.DESC_ANIMATE]    = c4d.DESC_ANIMATE_ON
-    return bc
-
-
-def _bool_bc(name, default):
-    bc = c4d.GetCustomDatatypeDefault(c4d.DTYPE_BOOL)
-    bc[c4d.DESC_NAME]       = name
-    bc[c4d.DESC_SHORT_NAME] = name
-    bc[c4d.DESC_DEFAULT]    = default
-    bc[c4d.DESC_ANIMATE]    = c4d.DESC_ANIMATE_ON
-    return bc
-
-
-def _cycle_bc(name, default, items):
-    bc = c4d.GetCustomDatatypeDefault(c4d.DTYPE_LONG)
-    bc[c4d.DESC_NAME]       = name
-    bc[c4d.DESC_SHORT_NAME] = name
-    bc[c4d.DESC_DEFAULT]    = default
-    bc[c4d.DESC_ANIMATE]    = c4d.DESC_ANIMATE_ON
-    bc[c4d.DESC_CUSTOMGUI]  = c4d.CUSTOMGUI_CYCLE
-    cyc = c4d.BaseContainer()
-    for i, label in enumerate(items):
-        cyc[i] = label
-    bc[c4d.DESC_CYCLE] = cyc
-    return bc
-
-
-def _group_bc(name):
-    bc = c4d.GetCustomDatatypeDefault(c4d.DTYPE_GROUP)
-    bc[c4d.DESC_NAME]       = name
-    bc[c4d.DESC_SHORT_NAME] = name
-    bc[c4d.DESC_TITLEBAR]   = 1
-    bc[c4d.DESC_DEFAULT]    = 1
-    return bc
-
 
 # ══════════════════════════════════════════════════════════════════════════════
 #  Фонг-тег
@@ -627,107 +565,348 @@ class TriTorusObject(c4d.plugins.ObjectData):
         if not description.LoadDescription("Obase"):
             return False, flags
 
-        grp_base = c4d.DescID(c4d.DescLevel(TT_GRP_BASE, c4d.DTYPE_GROUP, 0))
-        bc = _group_bc("Основные")
-        description.SetParameter(grp_base, bc, c4d.ID_LISTHEAD)
+        # ── Основные ──
+        bc = c4d.GetCustomDatatypeDefault(c4d.DTYPE_GROUP)
+        bc[c4d.DESC_NAME]    = "Основные"
+        bc[c4d.DESC_COLUMNS] = 1
+        bc[c4d.DESC_DEFAULT] = 1
+        description.SetParameter(
+            c4d.DescID(c4d.DescLevel(TT_GRP_BASE, c4d.DTYPE_GROUP, 0)),
+            bc, c4d.ID_LISTHEAD
+        )
+        gid_base = c4d.DescID(c4d.DescLevel(TT_GRP_BASE, c4d.DTYPE_GROUP, 0))
 
-        bc = _float_bc("Радиус (большой)", DEFAULT_RADIUS_MAJOR, 1.0, 100000.0)
-        description.SetParameter(c4d.DescID(c4d.DescLevel(TT_RADIUS_MAJOR, c4d.DTYPE_REAL, 0)), bc, grp_base)
+        bc = c4d.GetCustomDataTypeDefault(c4d.DTYPE_REAL)
+        bc[c4d.DESC_NAME]      = "Радиус (большой)"
+        bc[c4d.DESC_DEFAULT]   = DEFAULT_RADIUS_MAJOR
+        bc[c4d.DESC_MIN]       = 1.0
+        bc[c4d.DESC_MAX]       = 100000.0
+        bc[c4d.DESC_UNIT]      = c4d.DESC_UNIT_METER
+        bc[c4d.DESC_STEP]      = 1.0
+        bc[c4d.DESC_ANIMATE]   = c4d.DESC_ANIMATE_ON
+        bc[c4d.DESC_CUSTOMGUI] = c4d.CUSTOMGUI_REALSLIDER
+        bc[c4d.DESC_MINSLIDER] = 10.0
+        bc[c4d.DESC_MAXSLIDER] = 300.0
+        description.SetParameter(
+            c4d.DescID(c4d.DescLevel(TT_RADIUS_MAJOR, c4d.DTYPE_REAL, 0)),
+            bc, gid_base
+        )
 
-        bc = _float_bc("Радиус (малый)", DEFAULT_RADIUS_MINOR, 0.1, 100000.0)
-        description.SetParameter(c4d.DescID(c4d.DescLevel(TT_RADIUS_MINOR, c4d.DTYPE_REAL, 0)), bc, grp_base)
+        bc = c4d.GetCustomDataTypeDefault(c4d.DTYPE_REAL)
+        bc[c4d.DESC_NAME]      = "Радиус (малый)"
+        bc[c4d.DESC_DEFAULT]   = DEFAULT_RADIUS_MINOR
+        bc[c4d.DESC_MIN]       = 0.1
+        bc[c4d.DESC_MAX]       = 100000.0
+        bc[c4d.DESC_UNIT]      = c4d.DESC_UNIT_METER
+        bc[c4d.DESC_STEP]      = 0.5
+        bc[c4d.DESC_ANIMATE]   = c4d.DESC_ANIMATE_ON
+        bc[c4d.DESC_CUSTOMGUI] = c4d.CUSTOMGUI_REALSLIDER
+        bc[c4d.DESC_MINSLIDER] = 1.0
+        bc[c4d.DESC_MAXSLIDER] = 100.0
+        description.SetParameter(
+            c4d.DescID(c4d.DescLevel(TT_RADIUS_MINOR, c4d.DTYPE_REAL, 0)),
+            bc, gid_base
+        )
 
-        bc = _int_bc("Сегменты (кольцо)", DEFAULT_SEGS_MAJOR, 3, 500)
-        description.SetParameter(c4d.DescID(c4d.DescLevel(TT_SEGS_MAJOR, c4d.DTYPE_LONG, 0)), bc, grp_base)
+        bc = c4d.GetCustomDataTypeDefault(c4d.DTYPE_LONG)
+        bc[c4d.DESC_NAME]      = "Сегменты (кольцо)"
+        bc[c4d.DESC_DEFAULT]   = DEFAULT_SEGS_MAJOR
+        bc[c4d.DESC_MIN]       = 3
+        bc[c4d.DESC_MAX]       = 1000
+        bc[c4d.DESC_STEP]      = 1
+        bc[c4d.DESC_ANIMATE]   = c4d.DESC_ANIMATE_ON
+        bc[c4d.DESC_CUSTOMGUI] = c4d.CUSTOMGUI_REALSLIDER
+        bc[c4d.DESC_MINSLIDER] = 3
+        bc[c4d.DESC_MAXSLIDER] = 100
+        description.SetParameter(
+            c4d.DescID(c4d.DescLevel(TT_SEGS_MAJOR, c4d.DTYPE_LONG, 0)),
+            bc, gid_base
+        )
 
-        bc = _int_bc("Сегменты (труба)", DEFAULT_SEGS_MINOR, 3, 500)
-        description.SetParameter(c4d.DescID(c4d.DescLevel(TT_SEGS_MINOR, c4d.DTYPE_LONG, 0)), bc, grp_base)
+        bc = c4d.GetCustomDataTypeDefault(c4d.DTYPE_LONG)
+        bc[c4d.DESC_NAME]      = "Сегменты (труба)"
+        bc[c4d.DESC_DEFAULT]   = DEFAULT_SEGS_MINOR
+        bc[c4d.DESC_MIN]       = 3
+        bc[c4d.DESC_MAX]       = 500
+        bc[c4d.DESC_STEP]      = 1
+        bc[c4d.DESC_ANIMATE]   = c4d.DESC_ANIMATE_ON
+        bc[c4d.DESC_CUSTOMGUI] = c4d.CUSTOMGUI_REALSLIDER
+        bc[c4d.DESC_MINSLIDER] = 3
+        bc[c4d.DESC_MAXSLIDER] = 100
+        description.SetParameter(
+            c4d.DescID(c4d.DescLevel(TT_SEGS_MINOR, c4d.DTYPE_LONG, 0)),
+            bc, gid_base
+        )
 
-        bc = _cycle_bc("Тип поверхности", DEFAULT_SURFACE_TYPE,
-                       ["Квадратная", "Треугольная", "Спиральная", "Диагональная"])
-        description.SetParameter(c4d.DescID(c4d.DescLevel(TT_SURFACE_TYPE, c4d.DTYPE_LONG, 0)), bc, grp_base)
+        bc = c4d.GetCustomDataTypeDefault(c4d.DTYPE_LONG)
+        bc[c4d.DESC_NAME]      = "Тип поверхности"
+        bc[c4d.DESC_DEFAULT]   = DEFAULT_SURFACE_TYPE
+        bc[c4d.DESC_ANIMATE]   = c4d.DESC_ANIMATE_ON
+        bc[c4d.DESC_CUSTOMGUI] = c4d.CUSTOMGUI_CYCLE
+        cyc = c4d.BaseContainer()
+        cyc[0] = "Квадратная"
+        cyc[1] = "Треугольная"
+        cyc[2] = "Спиральная"
+        cyc[3] = "Диагональная"
+        bc[c4d.DESC_CYCLE] = cyc
+        description.SetParameter(
+            c4d.DescID(c4d.DescLevel(TT_SURFACE_TYPE, c4d.DTYPE_LONG, 0)),
+            bc, gid_base
+        )
 
-        grp_deform = c4d.DescID(c4d.DescLevel(TT_GRP_DEFORM, c4d.DTYPE_GROUP, 0))
-        bc = _group_bc("Деформации")
-        description.SetParameter(grp_deform, bc, c4d.ID_LISTHEAD)
+        # ── Деформации ──
+        bc = c4d.GetCustomDatatypeDefault(c4d.DTYPE_GROUP)
+        bc[c4d.DESC_NAME]    = "Деформации"
+        bc[c4d.DESC_COLUMNS] = 1
+        bc[c4d.DESC_DEFAULT] = 1
+        description.SetParameter(
+            c4d.DescID(c4d.DescLevel(TT_GRP_DEFORM, c4d.DTYPE_GROUP, 0)),
+            bc, c4d.ID_LISTHEAD
+        )
+        gid_deform = c4d.DescID(c4d.DescLevel(TT_GRP_DEFORM, c4d.DTYPE_GROUP, 0))
 
-        bc = _float_bc("Кручение (Twist)", DEFAULT_TWIST,
-                       math.radians(-3600.0), math.radians(3600.0),
-                       unit=c4d.DESC_UNIT_DEGREE, step=math.radians(1.0))
-        description.SetParameter(c4d.DescID(c4d.DescLevel(TT_TWIST, c4d.DTYPE_REAL, 0)), bc, grp_deform)
+        bc = c4d.GetCustomDataTypeDefault(c4d.DTYPE_REAL)
+        bc[c4d.DESC_NAME]      = "Кручение (Twist)"
+        bc[c4d.DESC_DEFAULT]   = DEFAULT_TWIST
+        bc[c4d.DESC_MIN]       = math.radians(-3600.0)
+        bc[c4d.DESC_MAX]       = math.radians(3600.0)
+        bc[c4d.DESC_UNIT]      = c4d.DESC_UNIT_DEGREE
+        bc[c4d.DESC_STEP]      = math.radians(1.0)
+        bc[c4d.DESC_ANIMATE]   = c4d.DESC_ANIMATE_ON
+        bc[c4d.DESC_CUSTOMGUI] = c4d.CUSTOMGUI_REALSLIDER
+        bc[c4d.DESC_MINSLIDER] = math.radians(-90.0)
+        bc[c4d.DESC_MAXSLIDER] = math.radians(90.0)
+        description.SetParameter(
+            c4d.DescID(c4d.DescLevel(TT_TWIST, c4d.DTYPE_REAL, 0)),
+            bc, gid_deform
+        )
 
-        bc = _float_bc("Сужение X (Taper)", DEFAULT_TAPER_X,
-                       -2.0, 2.0, unit=c4d.DESC_UNIT_FLOAT, step=0.01)
-        description.SetParameter(c4d.DescID(c4d.DescLevel(TT_TAPER_X, c4d.DTYPE_REAL, 0)), bc, grp_deform)
+        for name, pid, default in [
+            ("Сужение X (Taper)", TT_TAPER_X, DEFAULT_TAPER_X),
+            ("Сужение Y (Taper)", TT_TAPER_Y, DEFAULT_TAPER_Y),
+        ]:
+            bc = c4d.GetCustomDataTypeDefault(c4d.DTYPE_REAL)
+            bc[c4d.DESC_NAME]      = name
+            bc[c4d.DESC_DEFAULT]   = default
+            bc[c4d.DESC_MIN]       = -2.0
+            bc[c4d.DESC_MAX]       = 2.0
+            bc[c4d.DESC_UNIT]      = c4d.DESC_UNIT_FLOAT
+            bc[c4d.DESC_STEP]      = 0.01
+            bc[c4d.DESC_ANIMATE]   = c4d.DESC_ANIMATE_ON
+            bc[c4d.DESC_CUSTOMGUI] = c4d.CUSTOMGUI_REALSLIDER
+            description.SetParameter(
+                c4d.DescID(c4d.DescLevel(pid, c4d.DTYPE_REAL, 0)),
+                bc, gid_deform
+            )
 
-        bc = _float_bc("Сужение Y (Taper)", DEFAULT_TAPER_Y,
-                       -2.0, 2.0, unit=c4d.DESC_UNIT_FLOAT, step=0.01)
-        description.SetParameter(c4d.DescID(c4d.DescLevel(TT_TAPER_Y, c4d.DTYPE_REAL, 0)), bc, grp_deform)
+        for name, pid, default in [
+            ("Масштаб X", TT_SCALE_X, DEFAULT_SCALE_X),
+            ("Масштаб Y", TT_SCALE_Y, DEFAULT_SCALE_Y),
+            ("Масштаб Z", TT_SCALE_Z, DEFAULT_SCALE_Z),
+        ]:
+            bc = c4d.GetCustomDataTypeDefault(c4d.DTYPE_REAL)
+            bc[c4d.DESC_NAME]      = name
+            bc[c4d.DESC_DEFAULT]   = default
+            bc[c4d.DESC_MIN]       = 0.01
+            bc[c4d.DESC_MAX]       = 10.0
+            bc[c4d.DESC_UNIT]      = c4d.DESC_UNIT_FLOAT
+            bc[c4d.DESC_STEP]      = 0.01
+            bc[c4d.DESC_ANIMATE]   = c4d.DESC_ANIMATE_ON
+            bc[c4d.DESC_CUSTOMGUI] = c4d.CUSTOMGUI_REALSLIDER
+            description.SetParameter(
+                c4d.DescID(c4d.DescLevel(pid, c4d.DTYPE_REAL, 0)),
+                bc, gid_deform
+            )
 
-        bc = _float_bc("Масштаб X", DEFAULT_SCALE_X,
-                       0.01, 10.0, unit=c4d.DESC_UNIT_FLOAT, step=0.01)
-        description.SetParameter(c4d.DescID(c4d.DescLevel(TT_SCALE_X, c4d.DTYPE_REAL, 0)), bc, grp_deform)
+        # ── Смещение поверхности ──
+        bc = c4d.GetCustomDatatypeDefault(c4d.DTYPE_GROUP)
+        bc[c4d.DESC_NAME]    = "Смещение поверхности"
+        bc[c4d.DESC_COLUMNS] = 1
+        bc[c4d.DESC_DEFAULT] = 1
+        description.SetParameter(
+            c4d.DescID(c4d.DescLevel(TT_GRP_DISP, c4d.DTYPE_GROUP, 0)),
+            bc, c4d.ID_LISTHEAD
+        )
+        gid_disp = c4d.DescID(c4d.DescLevel(TT_GRP_DISP, c4d.DTYPE_GROUP, 0))
 
-        bc = _float_bc("Масштаб Y", DEFAULT_SCALE_Y,
-                       0.01, 10.0, unit=c4d.DESC_UNIT_FLOAT, step=0.01)
-        description.SetParameter(c4d.DescID(c4d.DescLevel(TT_SCALE_Y, c4d.DTYPE_REAL, 0)), bc, grp_deform)
+        bc = c4d.GetCustomDataTypeDefault(c4d.DTYPE_LONG)
+        bc[c4d.DESC_NAME]      = "Тип смещения"
+        bc[c4d.DESC_DEFAULT]   = DEFAULT_DISP_TYPE
+        bc[c4d.DESC_ANIMATE]   = c4d.DESC_ANIMATE_ON
+        bc[c4d.DESC_CUSTOMGUI] = c4d.CUSTOMGUI_CYCLE
+        cyc = c4d.BaseContainer()
+        cyc[0] = "Нет"
+        cyc[1] = "Синусоида"
+        cyc[2] = "Шум Перлина"
+        cyc[3] = "Радиальное"
+        bc[c4d.DESC_CYCLE] = cyc
+        description.SetParameter(
+            c4d.DescID(c4d.DescLevel(TT_DISP_TYPE, c4d.DTYPE_LONG, 0)),
+            bc, gid_disp
+        )
 
-        bc = _float_bc("Масштаб Z", DEFAULT_SCALE_Z,
-                       0.01, 10.0, unit=c4d.DESC_UNIT_FLOAT, step=0.01)
-        description.SetParameter(c4d.DescID(c4d.DescLevel(TT_SCALE_Z, c4d.DTYPE_REAL, 0)), bc, grp_deform)
+        bc = c4d.GetCustomDataTypeDefault(c4d.DTYPE_REAL)
+        bc[c4d.DESC_NAME]      = "Амплитуда"
+        bc[c4d.DESC_DEFAULT]   = DEFAULT_DISP_AMP
+        bc[c4d.DESC_MIN]       = 0.0
+        bc[c4d.DESC_MAX]       = 10000.0
+        bc[c4d.DESC_UNIT]      = c4d.DESC_UNIT_METER
+        bc[c4d.DESC_STEP]      = 1.0
+        bc[c4d.DESC_ANIMATE]   = c4d.DESC_ANIMATE_ON
+        bc[c4d.DESC_CUSTOMGUI] = c4d.CUSTOMGUI_REALSLIDER
+        bc[c4d.DESC_MINSLIDER] = 0.0
+        bc[c4d.DESC_MAXSLIDER] = 50.0
+        description.SetParameter(
+            c4d.DescID(c4d.DescLevel(TT_DISP_AMP, c4d.DTYPE_REAL, 0)),
+            bc, gid_disp
+        )
 
-        grp_disp = c4d.DescID(c4d.DescLevel(TT_GRP_DISP, c4d.DTYPE_GROUP, 0))
-        bc = _group_bc("Смещение поверхности")
-        description.SetParameter(grp_disp, bc, c4d.ID_LISTHEAD)
+        bc = c4d.GetCustomDataTypeDefault(c4d.DTYPE_REAL)
+        bc[c4d.DESC_NAME]      = "Частота"
+        bc[c4d.DESC_DEFAULT]   = DEFAULT_DISP_FREQ
+        bc[c4d.DESC_MIN]       = 0.001
+        bc[c4d.DESC_MAX]       = 10.0
+        bc[c4d.DESC_UNIT]      = c4d.DESC_UNIT_FLOAT
+        bc[c4d.DESC_STEP]      = 0.01
+        bc[c4d.DESC_ANIMATE]   = c4d.DESC_ANIMATE_ON
+        bc[c4d.DESC_CUSTOMGUI] = c4d.CUSTOMGUI_REALSLIDER
+        description.SetParameter(
+            c4d.DescID(c4d.DescLevel(TT_DISP_FREQ, c4d.DTYPE_REAL, 0)),
+            bc, gid_disp
+        )
 
-        bc = _cycle_bc("Тип смещения", DEFAULT_DISP_TYPE,
-                       ["Нет", "Синусоида", "Шум Перлина", "Радиальное"])
-        description.SetParameter(c4d.DescID(c4d.DescLevel(TT_DISP_TYPE, c4d.DTYPE_LONG, 0)), bc, grp_disp)
+        bc = c4d.GetCustomDataTypeDefault(c4d.DTYPE_REAL)
+        bc[c4d.DESC_NAME]    = "Фаза (анимировать)"
+        bc[c4d.DESC_DEFAULT] = DEFAULT_DISP_PHASE
+        bc[c4d.DESC_MIN]     = -1000.0
+        bc[c4d.DESC_MAX]     = 1000.0
+        bc[c4d.DESC_UNIT]    = c4d.DESC_UNIT_FLOAT
+        bc[c4d.DESC_STEP]    = 0.01
+        bc[c4d.DESC_ANIMATE] = c4d.DESC_ANIMATE_ON
+        bc[c4d.DESC_CUSTOMGUI] = c4d.CUSTOMGUI_REALSLIDER
+        bc[c4d.DESC_MINSLIDER] = 0.0
+        bc[c4d.DESC_MAXSLIDER] = 10.0
+        description.SetParameter(
+            c4d.DescID(c4d.DescLevel(TT_DISP_PHASE, c4d.DTYPE_REAL, 0)),
+            bc, gid_disp
+        )
 
-        bc = _float_bc("Амплитуда", DEFAULT_DISP_AMP, 0.0, 10000.0)
-        description.SetParameter(c4d.DescID(c4d.DescLevel(TT_DISP_AMP, c4d.DTYPE_REAL, 0)), bc, grp_disp)
+        bc = c4d.GetCustomDataTypeDefault(c4d.DTYPE_LONG)
+        bc[c4d.DESC_NAME]      = "Октавы шума"
+        bc[c4d.DESC_DEFAULT]   = DEFAULT_DISP_OCTAVES
+        bc[c4d.DESC_MIN]       = 1
+        bc[c4d.DESC_MAX]       = 8
+        bc[c4d.DESC_STEP]      = 1
+        bc[c4d.DESC_ANIMATE]   = c4d.DESC_ANIMATE_ON
+        bc[c4d.DESC_CUSTOMGUI] = c4d.CUSTOMGUI_REALSLIDER
+        description.SetParameter(
+            c4d.DescID(c4d.DescLevel(TT_DISP_OCTAVES, c4d.DTYPE_LONG, 0)),
+            bc, gid_disp
+        )
 
-        bc = _float_bc("Частота", DEFAULT_DISP_FREQ,
-                       0.001, 10.0, unit=c4d.DESC_UNIT_FLOAT, step=0.01)
-        description.SetParameter(c4d.DescID(c4d.DescLevel(TT_DISP_FREQ, c4d.DTYPE_REAL, 0)), bc, grp_disp)
+        bc = c4d.GetCustomDataTypeDefault(c4d.DTYPE_REAL)
+        bc[c4d.DESC_NAME]      = "Лакунарность"
+        bc[c4d.DESC_DEFAULT]   = DEFAULT_DISP_LACUNARITY
+        bc[c4d.DESC_MIN]       = 1.0
+        bc[c4d.DESC_MAX]       = 8.0
+        bc[c4d.DESC_UNIT]      = c4d.DESC_UNIT_FLOAT
+        bc[c4d.DESC_STEP]      = 0.1
+        bc[c4d.DESC_ANIMATE]   = c4d.DESC_ANIMATE_ON
+        bc[c4d.DESC_CUSTOMGUI] = c4d.CUSTOMGUI_REALSLIDER
+        description.SetParameter(
+            c4d.DescID(c4d.DescLevel(TT_DISP_LACUNARITY, c4d.DTYPE_REAL, 0)),
+            bc, gid_disp
+        )
 
-        bc = _float_bc("Фаза (анимировать)", DEFAULT_DISP_PHASE,
-                       -1000.0, 1000.0, unit=c4d.DESC_UNIT_FLOAT, step=0.01)
-        description.SetParameter(c4d.DescID(c4d.DescLevel(TT_DISP_PHASE, c4d.DTYPE_REAL, 0)), bc, grp_disp)
+        bc = c4d.GetCustomDataTypeDefault(c4d.DTYPE_REAL)
+        bc[c4d.DESC_NAME]      = "Усиление (Gain)"
+        bc[c4d.DESC_DEFAULT]   = DEFAULT_DISP_GAIN
+        bc[c4d.DESC_MIN]       = 0.01
+        bc[c4d.DESC_MAX]       = 2.0
+        bc[c4d.DESC_UNIT]      = c4d.DESC_UNIT_FLOAT
+        bc[c4d.DESC_STEP]      = 0.01
+        bc[c4d.DESC_ANIMATE]   = c4d.DESC_ANIMATE_ON
+        bc[c4d.DESC_CUSTOMGUI] = c4d.CUSTOMGUI_REALSLIDER
+        description.SetParameter(
+            c4d.DescID(c4d.DescLevel(TT_DISP_GAIN, c4d.DTYPE_REAL, 0)),
+            bc, gid_disp
+        )
 
-        bc = _int_bc("Октавы шума", DEFAULT_DISP_OCTAVES, 1, 8)
-        description.SetParameter(c4d.DescID(c4d.DescLevel(TT_DISP_OCTAVES, c4d.DTYPE_LONG, 0)), bc, grp_disp)
+        # ── Спираль ──
+        bc = c4d.GetCustomDatatypeDefault(c4d.DTYPE_GROUP)
+        bc[c4d.DESC_NAME]    = "Спираль"
+        bc[c4d.DESC_COLUMNS] = 1
+        bc[c4d.DESC_DEFAULT] = 1
+        description.SetParameter(
+            c4d.DescID(c4d.DescLevel(TT_GRP_SPIRAL, c4d.DTYPE_GROUP, 0)),
+            bc, c4d.ID_LISTHEAD
+        )
+        gid_spiral = c4d.DescID(c4d.DescLevel(TT_GRP_SPIRAL, c4d.DTYPE_GROUP, 0))
 
-        bc = _float_bc("Лакунарность", DEFAULT_DISP_LACUNARITY,
-                       1.0, 8.0, unit=c4d.DESC_UNIT_FLOAT, step=0.1)
-        description.SetParameter(c4d.DescID(c4d.DescLevel(TT_DISP_LACUNARITY, c4d.DTYPE_REAL, 0)), bc, grp_disp)
+        bc = c4d.GetCustomDataTypeDefault(c4d.DTYPE_LONG)
+        bc[c4d.DESC_NAME]      = "Количество витков"
+        bc[c4d.DESC_DEFAULT]   = int(DEFAULT_SPIRAL_TURNS)
+        bc[c4d.DESC_MIN]       = 0
+        bc[c4d.DESC_MAX]       = 50
+        bc[c4d.DESC_STEP]      = 1
+        bc[c4d.DESC_ANIMATE]   = c4d.DESC_ANIMATE_ON
+        bc[c4d.DESC_CUSTOMGUI] = c4d.CUSTOMGUI_REALSLIDER
+        bc[c4d.DESC_MINSLIDER] = 0
+        bc[c4d.DESC_MAXSLIDER] = 10
+        description.SetParameter(
+            c4d.DescID(c4d.DescLevel(TT_SPIRAL_TURNS, c4d.DTYPE_LONG, 0)),
+            bc, gid_spiral
+        )
 
-        bc = _float_bc("Усиление (Gain)", DEFAULT_DISP_GAIN,
-                       0.01, 2.0, unit=c4d.DESC_UNIT_FLOAT, step=0.01)
-        description.SetParameter(c4d.DescID(c4d.DescLevel(TT_DISP_GAIN, c4d.DTYPE_REAL, 0)), bc, grp_disp)
+        bc = c4d.GetCustomDataTypeDefault(c4d.DTYPE_LONG)
+        bc[c4d.DESC_NAME]      = "Направление"
+        bc[c4d.DESC_DEFAULT]   = DEFAULT_SPIRAL_DIRECTION
+        bc[c4d.DESC_ANIMATE]   = c4d.DESC_ANIMATE_ON
+        bc[c4d.DESC_CUSTOMGUI] = c4d.CUSTOMGUI_CYCLE
+        cyc = c4d.BaseContainer()
+        cyc[0] = "По часовой"
+        cyc[1] = "Против часовой"
+        bc[c4d.DESC_CYCLE] = cyc
+        description.SetParameter(
+            c4d.DescID(c4d.DescLevel(TT_SPIRAL_DIRECTION, c4d.DTYPE_LONG, 0)),
+            bc, gid_spiral
+        )
 
-        grp_spiral = c4d.DescID(c4d.DescLevel(TT_GRP_SPIRAL, c4d.DTYPE_GROUP, 0))
-        bc = _group_bc("Спираль")
-        description.SetParameter(grp_spiral, bc, c4d.ID_LISTHEAD)
+        # ── Фонг ──
+        bc = c4d.GetCustomDatatypeDefault(c4d.DTYPE_GROUP)
+        bc[c4d.DESC_NAME]    = "Фонг"
+        bc[c4d.DESC_COLUMNS] = 1
+        bc[c4d.DESC_DEFAULT] = 1
+        description.SetParameter(
+            c4d.DescID(c4d.DescLevel(TT_GRP_PHONG, c4d.DTYPE_GROUP, 0)),
+            bc, c4d.ID_LISTHEAD
+        )
+        gid_phong = c4d.DescID(c4d.DescLevel(TT_GRP_PHONG, c4d.DTYPE_GROUP, 0))
 
-        bc = _int_bc("Количество витков", int(DEFAULT_SPIRAL_TURNS), 0, 50)
-        description.SetParameter(c4d.DescID(c4d.DescLevel(TT_SPIRAL_TURNS, c4d.DTYPE_LONG, 0)), bc, grp_spiral)
+        bc = c4d.GetCustomDataTypeDefault(c4d.DTYPE_REAL)
+        bc[c4d.DESC_NAME]      = "Угол фонга"
+        bc[c4d.DESC_DEFAULT]   = DEFAULT_PHONG_ANGLE
+        bc[c4d.DESC_MIN]       = 0.0
+        bc[c4d.DESC_MAX]       = math.radians(180.0)
+        bc[c4d.DESC_UNIT]      = c4d.DESC_UNIT_DEGREE
+        bc[c4d.DESC_STEP]      = math.radians(1.0)
+        bc[c4d.DESC_ANIMATE]   = c4d.DESC_ANIMATE_ON
+        bc[c4d.DESC_CUSTOMGUI] = c4d.CUSTOMGUI_REALSLIDER
+        bc[c4d.DESC_MINSLIDER] = 0.0
+        bc[c4d.DESC_MAXSLIDER] = 180.0
+        description.SetParameter(
+            c4d.DescID(c4d.DescLevel(TT_PHONG_ANGLE, c4d.DTYPE_REAL, 0)),
+            bc, gid_phong
+        )
 
-        bc = _cycle_bc("Направление", DEFAULT_SPIRAL_DIRECTION,
-                       ["По часовой", "Против часовой"])
-        description.SetParameter(c4d.DescID(c4d.DescLevel(TT_SPIRAL_DIRECTION, c4d.DTYPE_LONG, 0)), bc, grp_spiral)
-
-        grp_phong = c4d.DescID(c4d.DescLevel(TT_GRP_PHONG, c4d.DTYPE_GROUP, 0))
-        bc = _group_bc("Фонг")
-        description.SetParameter(grp_phong, bc, c4d.ID_LISTHEAD)
-
-        bc = _float_bc("Угол фонга (°)", DEFAULT_PHONG_ANGLE,
-                       0.0, math.radians(180.0), unit=c4d.DESC_UNIT_DEGREE,
-                       step=math.radians(1.0))
-        description.SetParameter(c4d.DescID(c4d.DescLevel(TT_PHONG_ANGLE, c4d.DTYPE_REAL, 0)), bc, grp_phong)
-
-        bc = _bool_bc("Ограничение угла", DEFAULT_PHONG_LIMIT)
-        description.SetParameter(c4d.DescID(c4d.DescLevel(TT_PHONG_LIMIT, c4d.DTYPE_BOOL, 0)), bc, grp_phong)
+        bc = c4d.GetCustomDataTypeDefault(c4d.DTYPE_BOOL)
+        bc[c4d.DESC_NAME]    = "Ограничение угла"
+        bc[c4d.DESC_DEFAULT] = DEFAULT_PHONG_LIMIT
+        bc[c4d.DESC_ANIMATE] = c4d.DESC_ANIMATE_ON
+        description.SetParameter(
+            c4d.DescID(c4d.DescLevel(TT_PHONG_LIMIT, c4d.DTYPE_BOOL, 0)),
+            bc, gid_phong
+        )
 
         return True, flags | c4d.DESCFLAGS_DESC_LOADED
 

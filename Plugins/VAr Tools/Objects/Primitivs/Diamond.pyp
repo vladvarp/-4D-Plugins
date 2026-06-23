@@ -32,7 +32,7 @@ if not hasattr(c4d, "DESC_UNIT_NONE"):
 # ─── Plugin ID & Name ────────────────────────────────────────────────────────
 
 ID_DIAMOND   = 1069031
-NAME_DIAMOND = "Diamond v2.1"
+NAME_DIAMOND = "Diamond v2.2"
 
 # ─── UserData SubID ───────────────────────────────────────────────────────────
 # SubID=1 зарезервирован под группу. Поля начинаются с 2.
@@ -75,129 +75,10 @@ CUT_HEART      = 9
 CUT_ROSE       = 10
 CUT_TRILLION   = 11
 
-
-
-# ─── Вспомогательные функции UserData ────────────────────────────────────────
-
-def _ud_descid(op, uid):
-    """Ищет UserData по SubID. Возвращает (DescID, BaseContainer) или (None, None)."""
-    for descid, bc in op.GetUserDataContainer():
-        if descid[1].id == uid:
-            return descid, bc
-    return None, None
-
-
-def _ud_get(op, uid, default=None):
-    did, _ = _ud_descid(op, uid)
-    if did is not None:
-        val = op[did]
-        if val is not None:
-            return val
-    return default
-
-
-def _add_group(op, name):
-    """Добавляет корневую группу UserData. Возвращает SubID группы."""
-    bc = c4d.GetCustomDatatypeDefault(c4d.DTYPE_GROUP)
-    bc[c4d.DESC_NAME]       = name
-    bc[c4d.DESC_SHORT_NAME] = name
-    bc[c4d.DESC_TITLEBAR]   = 1
-    bc[c4d.DESC_DEFAULT]    = 1  # развёрнута по умолчанию
-    did = op.AddUserData(bc)
-    return did[1].id
-
-
-def _add_in_group(op, grp_subid, bc):
-    """Добавляет элемент UserData внутрь группы с данным SubID."""
-    bc[c4d.DESC_PARENTGROUP] = c4d.DescID(
-        c4d.DescLevel(c4d.ID_USERDATA, c4d.DTYPE_SUBCONTAINER, 0),
-        c4d.DescLevel(grp_subid, c4d.DTYPE_GROUP, 0)
-    )
-    return op.AddUserData(bc)
-
-
-def _make_float_bc(name, default, minval, maxval,
-                   unit=c4d.DESC_UNIT_METER, step=1.0,
-                   slider_min=None, slider_max=None):
-    bc = c4d.GetCustomDatatypeDefault(c4d.DTYPE_REAL)
-    bc[c4d.DESC_NAME]       = name
-    bc[c4d.DESC_SHORT_NAME] = name
-    bc[c4d.DESC_DEFAULT]    = default
-    bc[c4d.DESC_MIN]        = minval
-    bc[c4d.DESC_MAX]        = maxval
-    bc[c4d.DESC_UNIT]       = unit
-    bc[c4d.DESC_STEP]       = step
-    bc[c4d.DESC_ANIMATE]    = c4d.DESC_ANIMATE_ON
-    bc[c4d.DESC_CUSTOMGUI]  = c4d.CUSTOMGUI_REALSLIDER
-    if slider_min is not None:
-        bc[c4d.DESC_MINSLIDER] = slider_min
-    if slider_max is not None:
-        bc[c4d.DESC_MAXSLIDER] = slider_max
-    return bc
-
-
-def _make_int_bc(name, default, minval, maxval):
-    bc = c4d.GetCustomDatatypeDefault(c4d.DTYPE_LONG)
-    bc[c4d.DESC_NAME]       = name
-    bc[c4d.DESC_SHORT_NAME] = name
-    bc[c4d.DESC_DEFAULT]    = default
-    bc[c4d.DESC_MIN]        = minval
-    bc[c4d.DESC_MAX]        = maxval
-    bc[c4d.DESC_STEP]       = 1
-    bc[c4d.DESC_ANIMATE]    = c4d.DESC_ANIMATE_ON
-    bc[c4d.DESC_CUSTOMGUI]  = c4d.CUSTOMGUI_REALSLIDER
-    return bc
-
-
-def _make_cycle_bc(name, default, items):
-    """Создаёт поле-выпадающий список (CUSTOMGUI_CYCLE)."""
-    bc = c4d.GetCustomDatatypeDefault(c4d.DTYPE_LONG)
-    bc[c4d.DESC_NAME]       = name
-    bc[c4d.DESC_SHORT_NAME] = name
-    bc[c4d.DESC_DEFAULT]    = default
-    bc[c4d.DESC_ANIMATE]    = c4d.DESC_ANIMATE_ON
-    bc[c4d.DESC_CUSTOMGUI]  = c4d.CUSTOMGUI_CYCLE
-    cycle_bc = c4d.BaseContainer()
-    for i, label in enumerate(items):
-        cycle_bc[i] = label
-    bc[c4d.DESC_CYCLE] = cycle_bc
-    return bc
-
-
-def _ud_already_created(op, first_field_uid):
-    did, _ = _ud_descid(op, first_field_uid)
-    return did is not None
-
-
-def _ud_set_default(op, uid, value):
-    did, _ = _ud_descid(op, uid)
-    if did is not None:
-        op[did] = value
-
-
 # ─── Математические утилиты ───────────────────────────────────────────────────
 
 def _lerp(a, b, t):
     return a + (b - a) * t
-
-
-def _circle_pts(n, radius, y, start_angle=0.0):
-    """n равномерных точек по окружности радиуса radius на высоте y."""
-    pts = []
-    for i in range(n):
-        a = start_angle + i / n * 2.0 * math.pi
-        pts.append(c4d.Vector(radius * math.cos(a), y, radius * math.sin(a)))
-    return pts
-
-
-def _ellipse_pts(n, rx, rz, y, start_angle=0.0):
-    """n равномерных точек по эллипсу (rx, rz) на высоте y."""
-    pts = []
-    for i in range(n):
-        a = start_angle + i / n * 2.0 * math.pi
-        pts.append(c4d.Vector(rx * math.cos(a), y, rz * math.sin(a)))
-    return pts
-
 
 def _make_poly_object(points, polys, name):
     """
@@ -220,11 +101,9 @@ def _quad(a, b, c, d):
     """Четырёхугольник (a→b→c→d)."""
     return c4d.CPolygon(a, b, c, d)
 
-
 def _tri(a, b, c):
     """Треугольник (a→b→c), четвёртая вершина дублирует третью."""
     return c4d.CPolygon(a, b, c, c)
-
 
 def _fan(hub, ring, start, closed=True):
     """
@@ -241,7 +120,6 @@ def _fan(hub, ring, start, closed=True):
         b = ring[(i + 1) % n]
         polys.append(_tri(hub, a, b))
     return polys
-
 
 def _band(ring_lo, ring_hi, closed=True):
     """
@@ -260,33 +138,6 @@ def _band(ring_lo, ring_hi, closed=True):
         d = ring_hi[i]
         polys.append(_quad(a, b, c, d))
     return polys
-
-
-def _band_mixed(ring_lo, ring_hi):
-    """
-    Полоса треугольников/квадов между кольцами разного размера
-    (ring_hi вдвое больше ring_lo).
-    Используется при переходе от площадки к короне у бриллианта.
-    """
-    polys = []
-    n_lo = len(ring_lo)
-    n_hi = len(ring_hi)
-    ratio = n_hi // n_lo   # обычно 2 или 4
-    for i in range(n_lo):
-        lo_a = ring_lo[i]
-        lo_b = ring_lo[(i + 1) % n_lo]
-        hi_start = i * ratio
-        for j in range(ratio):
-            hi_a = ring_hi[(hi_start + j) % n_hi]
-            hi_b = ring_hi[(hi_start + j + 1) % n_hi]
-            if j == 0:
-                polys.append(_tri(lo_a, hi_a, hi_b))
-            elif j == ratio - 1:
-                polys.append(_tri(lo_b, hi_a, hi_b))
-            else:
-                polys.append(_tri(hi_a, lo_a, hi_b))
-    return polys
-
 
 # ─── Огранки ─────────────────────────────────────────────────────────────────
 #
@@ -469,7 +320,6 @@ def build_brilliant(size, height, crown_h, girdle_h, segs, table_size, culet):
 
     return pts, polys
 
-
 def build_brilliant2(size, height, crown_h, girdle_h, segs, table_size, culet):
     """
     Бриллиант (Квадратная корона) — вариант с выровненным средним кольцом.
@@ -579,7 +429,6 @@ def build_brilliant2(size, height, crown_h, girdle_h, segs, table_size, culet):
 
     return pts, polys
 
-
 def build_princess(size, height, crown_h, girdle_h, table_size, culet, steps):
     """
     Огранка Принцесса (Princess Cut) — квадрат в плане.
@@ -681,7 +530,6 @@ def build_princess(size, height, crown_h, girdle_h, table_size, culet, steps):
     polys.append(_quad(table[3], table[2], table[1], table[0]))
 
     return pts, polys
-
 
 def build_emerald(size, height, crown_h, girdle_h, table_size, culet, steps):
     """
@@ -804,7 +652,6 @@ def build_emerald(size, height, crown_h, girdle_h, table_size, culet, steps):
 
     return pts, polys
 
-
 def build_marquise(size, height, crown_h, girdle_h, segs, table_size, culet):
     """
     Огранка Маркиза (Marquise / Navette) — эллиптическая, заострённая
@@ -901,7 +748,6 @@ def build_marquise(size, height, crown_h, girdle_h, segs, table_size, culet):
 
     return pts, polys
 
-
 def build_pear(size, height, crown_h, girdle_h, segs, table_size, culet):
     """
     Огранка Груша (Pear / Teardrop) — эллипс с острым кончиком с одной стороны
@@ -988,7 +834,6 @@ def build_pear(size, height, crown_h, girdle_h, segs, table_size, culet):
         polys.append(_tri(table_center, table[(i + 1) % segs], table[i]))
 
     return pts, polys
-
 
 def build_oval(size, height, crown_h, girdle_h, segs, table_size, culet):
     """
@@ -1080,7 +925,6 @@ def build_oval(size, height, crown_h, girdle_h, segs, table_size, culet):
         polys.append(_tri(table_center, table[(i + 1) % segs], table[i]))
 
     return pts, polys
-
 
 def build_cushion(size, height, crown_h, girdle_h, segs, table_size, culet):
     """
@@ -1180,7 +1024,6 @@ def build_cushion(size, height, crown_h, girdle_h, segs, table_size, culet):
         polys.append(_tri(table_center, table[(i + 1) % segs], table[i]))
 
     return pts, polys
-
 
 def build_asscher(size, height, crown_h, girdle_h, table_size, culet, steps):
     """
@@ -1291,7 +1134,6 @@ def build_asscher(size, height, crown_h, girdle_h, table_size, culet, steps):
 
     return pts, polys
 
-
 def build_heart(size, height, crown_h, girdle_h, segs, table_size, culet):
     """
     Огранка Сердце (Heart Cut).
@@ -1400,7 +1242,6 @@ def build_heart(size, height, crown_h, girdle_h, segs, table_size, culet):
 
     return pts, polys
 
-
 def build_rose(size, height, crown_h, girdle_h, segs, culet):
     """
     Огранка Роза (Rose Cut) — старинная плоскодонная огранка.
@@ -1469,7 +1310,6 @@ def build_rose(size, height, crown_h, girdle_h, segs, culet):
     polys += _fan(apex_idx, list(reversed(mid_ring)), 0)
 
     return pts, polys
-
 
 def build_trillion(size, height, crown_h, girdle_h, segs, table_size, culet):
     """
@@ -1572,7 +1412,6 @@ def build_trillion(size, height, crown_h, girdle_h, segs, table_size, culet):
 
     return pts, polys
 
-
 # ─── Диспетчер огранок ───────────────────────────────────────────────────────
 
 def build_diamond_mesh(cut, size, height, crown_h, girdle_h,
@@ -1610,7 +1449,6 @@ def build_diamond_mesh(cut, size, height, crown_h, girdle_h,
     else:
         return build_brilliant(size, height, crown_h, girdle_h,
                                segs, table_size, culet)
-
 
 # ─── Базовый класс плагина ───────────────────────────────────────────────────
 
@@ -1744,13 +1582,14 @@ class DiamondObject(_MeshPrimitiveBase):
         )
 
         bc = c4d.GetCustomDataTypeDefault(c4d.DTYPE_REAL)
-        bc[c4d.DESC_NAME]      = "Высота короны (%)"
+        bc[c4d.DESC_NAME]      = "Высота короны"
         bc[c4d.DESC_DEFAULT]   = 0.35
         bc[c4d.DESC_MIN]       = 0.05
         bc[c4d.DESC_MAX]       = 0.6
         bc[c4d.DESC_UNIT]      = c4d.DESC_UNIT_PERCENT
         bc[c4d.DESC_STEP]      = 0.01
         bc[c4d.DESC_ANIMATE]   = c4d.DESC_ANIMATE_ON
+        bc[c4d.DESC_CUSTOMGUI] = c4d.CUSTOMGUI_REALSLIDER
         description.SetParameter(
             c4d.DescID(c4d.DescLevel(DM_D_CROWN_H, c4d.DTYPE_REAL, 0)),
             bc, gid
@@ -1779,32 +1618,35 @@ class DiamondObject(_MeshPrimitiveBase):
         bc[c4d.DESC_MAX]       = 128
         bc[c4d.DESC_STEP]      = 1
         bc[c4d.DESC_ANIMATE]   = c4d.DESC_ANIMATE_ON
+        bc[c4d.DESC_CUSTOMGUI] = c4d.CUSTOMGUI_REALSLIDER
         description.SetParameter(
             c4d.DescID(c4d.DescLevel(DM_D_SEGS, c4d.DTYPE_LONG, 0)),
             bc, gid
         )
 
         bc = c4d.GetCustomDataTypeDefault(c4d.DTYPE_REAL)
-        bc[c4d.DESC_NAME]      = "Площадка (%)"
+        bc[c4d.DESC_NAME]      = "Площадка"
         bc[c4d.DESC_DEFAULT]   = 0.55
         bc[c4d.DESC_MIN]       = 0.05
         bc[c4d.DESC_MAX]       = 0.95
         bc[c4d.DESC_UNIT]      = c4d.DESC_UNIT_PERCENT
         bc[c4d.DESC_STEP]      = 0.01
         bc[c4d.DESC_ANIMATE]   = c4d.DESC_ANIMATE_ON
+        bc[c4d.DESC_CUSTOMGUI] = c4d.CUSTOMGUI_REALSLIDER
         description.SetParameter(
             c4d.DescID(c4d.DescLevel(DM_D_TABLE_SIZE, c4d.DTYPE_REAL, 0)),
             bc, gid
         )
 
         bc = c4d.GetCustomDataTypeDefault(c4d.DTYPE_REAL)
-        bc[c4d.DESC_NAME]      = "Калета (%)"
+        bc[c4d.DESC_NAME]      = "Калета"
         bc[c4d.DESC_DEFAULT]   = 0.0
         bc[c4d.DESC_MIN]       = 0.0
         bc[c4d.DESC_MAX]       = 0.3
         bc[c4d.DESC_UNIT]      = c4d.DESC_UNIT_PERCENT
         bc[c4d.DESC_STEP]      = 0.005
         bc[c4d.DESC_ANIMATE]   = c4d.DESC_ANIMATE_ON
+        bc[c4d.DESC_CUSTOMGUI] = c4d.CUSTOMGUI_REALSLIDER
         description.SetParameter(
             c4d.DescID(c4d.DescLevel(DM_D_CULET, c4d.DTYPE_REAL, 0)),
             bc, gid
@@ -1817,6 +1659,7 @@ class DiamondObject(_MeshPrimitiveBase):
         bc[c4d.DESC_MAX]       = 5
         bc[c4d.DESC_STEP]      = 1
         bc[c4d.DESC_ANIMATE]   = c4d.DESC_ANIMATE_ON
+        bc[c4d.DESC_CUSTOMGUI] = c4d.CUSTOMGUI_REALSLIDER
         description.SetParameter(
             c4d.DescID(c4d.DescLevel(DM_D_STEPS, c4d.DTYPE_LONG, 0)),
             bc, gid

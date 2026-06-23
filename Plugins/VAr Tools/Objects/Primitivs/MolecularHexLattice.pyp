@@ -37,8 +37,6 @@ import random
 import os
 import base64
 import tempfile
-import struct
-import zlib
 
 
 # ════════════════════════════════════════════════════════════════════════
@@ -46,7 +44,7 @@ import zlib
 # ════════════════════════════════════════════════════════════════════════
 
 ID_MOLHEXLATTICE  = 1068899
-NAME_MOLHEXLATTICE = "Molecular Hex Lattice v2.0"
+NAME_MOLHEXLATTICE = "Molecular Hex Lattice v2.1"
 
 # ════════════════════════════════════════════════════════════════════════
 #  Description IDs — группы (табы)
@@ -116,76 +114,6 @@ DEFAULT_BEVEL_SIZE    = 3.0
 DEFAULT_BEVEL_SUBDIV  = 0
 
 DEFAULT_HIDE_ISOLATED = True
-
-
-# ════════════════════════════════════════════════════════════════════════
-#  Description: вспомогательные функции построения параметров
-# ════════════════════════════════════════════════════════════════════════
-
-def _desc_add_group(description, grp_id, name):
-    bc = c4d.GetCustomDatatypeDefault(c4d.DTYPE_GROUP)
-    bc[c4d.DESC_NAME]       = name
-    bc[c4d.DESC_SHORT_NAME] = name
-    bc[c4d.DESC_TITLEBAR]   = 1
-    desc_id = c4d.DescID(c4d.DescLevel(grp_id, c4d.DTYPE_GROUP, 0))
-    description.SetParameter(desc_id, bc, c4d.ID_LISTHEAD)
-    return desc_id
-
-
-def _desc_add_float(description, param_id, name, default, minval, maxval,
-                    unit=c4d.DESC_UNIT_METER, step=1.0, parent_id=None):
-    bc = c4d.GetCustomDatatypeDefault(c4d.DTYPE_REAL)
-    bc[c4d.DESC_NAME]       = name
-    bc[c4d.DESC_SHORT_NAME] = name
-    bc[c4d.DESC_DEFAULT]    = default
-    bc[c4d.DESC_MIN]        = minval
-    bc[c4d.DESC_MAX]        = maxval
-    bc[c4d.DESC_UNIT]       = unit
-    bc[c4d.DESC_STEP]       = step
-    bc[c4d.DESC_ANIMATE]    = c4d.DESC_ANIMATE_ON
-    desc_id = c4d.DescID(c4d.DescLevel(param_id, c4d.DTYPE_REAL, 0))
-    description.SetParameter(desc_id, bc, parent_id)
-
-
-def _desc_add_int(description, param_id, name, default, minval, maxval,
-                  parent_id=None):
-    bc = c4d.GetCustomDatatypeDefault(c4d.DTYPE_LONG)
-    bc[c4d.DESC_NAME]       = name
-    bc[c4d.DESC_SHORT_NAME] = name
-    bc[c4d.DESC_DEFAULT]    = default
-    bc[c4d.DESC_MIN]        = minval
-    bc[c4d.DESC_MAX]        = maxval
-    bc[c4d.DESC_STEP]       = 1
-    bc[c4d.DESC_ANIMATE]    = c4d.DESC_ANIMATE_ON
-    desc_id = c4d.DescID(c4d.DescLevel(param_id, c4d.DTYPE_LONG, 0))
-    description.SetParameter(desc_id, bc, parent_id)
-
-
-def _desc_add_cycle(description, param_id, name, default, items,
-                    parent_id=None):
-    bc = c4d.GetCustomDatatypeDefault(c4d.DTYPE_LONG)
-    bc[c4d.DESC_NAME]       = name
-    bc[c4d.DESC_SHORT_NAME] = name
-    bc[c4d.DESC_DEFAULT]    = default
-    bc[c4d.DESC_ANIMATE]    = c4d.DESC_ANIMATE_ON
-    bc[c4d.DESC_CUSTOMGUI]  = c4d.CUSTOMGUI_CYCLE
-    cyc = c4d.BaseContainer()
-    for i, label in enumerate(items):
-        cyc[i] = label
-    bc[c4d.DESC_CYCLE] = cyc
-    desc_id = c4d.DescID(c4d.DescLevel(param_id, c4d.DTYPE_LONG, 0))
-    description.SetParameter(desc_id, bc, parent_id)
-
-
-def _desc_add_bool(description, param_id, name, default, parent_id=None):
-    bc = c4d.GetCustomDatatypeDefault(c4d.DTYPE_BOOL)
-    bc[c4d.DESC_NAME]       = name
-    bc[c4d.DESC_SHORT_NAME] = name
-    bc[c4d.DESC_DEFAULT]    = default
-    bc[c4d.DESC_ANIMATE]    = c4d.DESC_ANIMATE_ON
-    desc_id = c4d.DescID(c4d.DescLevel(param_id, c4d.DTYPE_BOOL, 0))
-    description.SetParameter(desc_id, bc, parent_id)
-
 
 # ════════════════════════════════════════════════════════════════════════
 #  Математика
@@ -836,64 +764,355 @@ class MolecularHexLatticeObject(c4d.plugins.ObjectData):
         if not description.LoadDescription("Obase"):
             return False, flags
 
-        grp_lat = c4d.DescID(c4d.DescLevel(MHL_GRP_LAT, c4d.DTYPE_GROUP, 0))
-        _desc_add_group(description, MHL_GRP_LAT, "Каркас (Lattice)")
-        _desc_add_float(description, ML_SIZE_X, "Размер X", DEFAULT_SIZE_X,
-                        10.0, 100000.0, parent_id=grp_lat)
-        _desc_add_float(description, ML_SIZE_Y, "Размер Y", DEFAULT_SIZE_Y,
-                        10.0, 100000.0, parent_id=grp_lat)
-        _desc_add_float(description, ML_SIZE_Z, "Размер Z", DEFAULT_SIZE_Z,
-                        10.0, 100000.0, parent_id=grp_lat)
-        _desc_add_float(description, ML_DENSITY, "Плотность (шаг сетки)", DEFAULT_DENSITY,
-                        10.0, 10000.0, parent_id=grp_lat)
-        _desc_add_float(description, ML_BOND_DENS, "Макс. длина связи", DEFAULT_BOND_DENS,
-                        10.0, 10000.0, parent_id=grp_lat)
-        _desc_add_int(description, ML_SEED, "Seed", DEFAULT_SEED,
-                      0, 99999, parent_id=grp_lat)
-        _desc_add_float(description, ML_JITTER, "Джиттер (шум позиций)", DEFAULT_JITTER,
-                        0.0, 5000.0, parent_id=grp_lat)
-        _desc_add_bool(description, ML_HIDE_ISOLATED, "Скрывать одиночные шары",
-                       DEFAULT_HIDE_ISOLATED, parent_id=grp_lat)
+        # ── Каркас (Lattice) ──
+        bc = c4d.GetCustomDatatypeDefault(c4d.DTYPE_GROUP)
+        bc[c4d.DESC_NAME]    = "Каркас (Lattice)"
+        bc[c4d.DESC_COLUMNS] = 1
+        bc[c4d.DESC_DEFAULT] = 1
+        description.SetParameter(
+            c4d.DescID(c4d.DescLevel(MHL_GRP_LAT, c4d.DTYPE_GROUP, 0)),
+            bc, c4d.ID_LISTHEAD
+        )
+        gid_lat = c4d.DescID(c4d.DescLevel(MHL_GRP_LAT, c4d.DTYPE_GROUP, 0))
 
-        grp_strip = c4d.DescID(c4d.DescLevel(MHL_GRP_STRIP, c4d.DTYPE_GROUP, 0))
-        _desc_add_group(description, MHL_GRP_STRIP, "Strip — волновое смещение")
-        _desc_add_float(description, ML_STRIP_AMP, "Амплитуда", DEFAULT_STRIP_AMP,
-                        0.0, 10000.0, parent_id=grp_strip)
-        _desc_add_float(description, ML_STRIP_FREQ, "Частота", DEFAULT_STRIP_FREQ,
-                        0.0001, 10.0, unit=c4d.DESC_UNIT_FLOAT, step=0.001,
-                        parent_id=grp_strip)
-        _desc_add_float(description, ML_STRIP_PHASE, "Фаза (анимировать)", DEFAULT_STRIP_PHASE,
-                        -1000.0, 1000.0, unit=c4d.DESC_UNIT_FLOAT, step=0.01,
-                        parent_id=grp_strip)
-        _desc_add_cycle(description, ML_STRIP_AXIS, "Ось волны", DEFAULT_STRIP_AXIS,
-                        ["X (смещение Y)", "Y (смещение X)", "Z (смещение Y)"],
-                        parent_id=grp_strip)
+        bc = c4d.GetCustomDataTypeDefault(c4d.DTYPE_REAL)
+        bc[c4d.DESC_NAME]      = "Размер X"
+        bc[c4d.DESC_DEFAULT]   = DEFAULT_SIZE_X
+        bc[c4d.DESC_MIN]       = 10.0
+        bc[c4d.DESC_MAX]       = 100000.0
+        bc[c4d.DESC_UNIT]      = c4d.DESC_UNIT_METER
+        bc[c4d.DESC_STEP]      = 1.0
+        bc[c4d.DESC_ANIMATE]   = c4d.DESC_ANIMATE_ON
+        description.SetParameter(
+            c4d.DescID(c4d.DescLevel(ML_SIZE_X, c4d.DTYPE_REAL, 0)),
+            bc, gid_lat
+        )
 
-        grp_sph = c4d.DescID(c4d.DescLevel(MHL_GRP_SPH, c4d.DTYPE_GROUP, 0))
-        _desc_add_group(description, MHL_GRP_SPH, "Шары  [M]")
-        _desc_add_float(description, ML_SPHERE_RADIUS, "Радиус шара", DEFAULT_SPHERE_RADIUS,
-                        1.0, 100000.0, parent_id=grp_sph)
-        _desc_add_int(description, ML_SPHERE_SUBDIV, "Подразделение", DEFAULT_SPHERE_SUBDIV,
-                      1, 4, parent_id=grp_sph)
-        _desc_add_float(description, ML_SPHERE_PHONG, "Фонг шаров (°)", DEFAULT_SPHERE_PHONG,
-                        0.0, math.radians(180.0), unit=c4d.DESC_UNIT_DEGREE,
-                        step=math.radians(1.0), parent_id=grp_sph)
+        bc = c4d.GetCustomDataTypeDefault(c4d.DTYPE_REAL)
+        bc[c4d.DESC_NAME]      = "Размер Y"
+        bc[c4d.DESC_DEFAULT]   = DEFAULT_SIZE_Y
+        bc[c4d.DESC_MIN]       = 10.0
+        bc[c4d.DESC_MAX]       = 100000.0
+        bc[c4d.DESC_UNIT]      = c4d.DESC_UNIT_METER
+        bc[c4d.DESC_STEP]      = 1.0
+        bc[c4d.DESC_ANIMATE]   = c4d.DESC_ANIMATE_ON
+        description.SetParameter(
+            c4d.DescID(c4d.DescLevel(ML_SIZE_Y, c4d.DTYPE_REAL, 0)),
+            bc, gid_lat
+        )
 
-        grp_tub = c4d.DescID(c4d.DescLevel(MHL_GRP_TUB, c4d.DTYPE_GROUP, 0))
-        _desc_add_group(description, MHL_GRP_TUB, "Трубки  [T]")
-        _desc_add_float(description, ML_TUBE_RADIUS, "Радиус трубки", DEFAULT_TUBE_RADIUS,
-                        0.5, 100000.0, parent_id=grp_tub)
-        _desc_add_int(description, ML_TUBE_SEGS_R, "Сегменты окружности", DEFAULT_TUBE_SEGS_R,
-                      3, 64, parent_id=grp_tub)
-        _desc_add_int(description, ML_TUBE_SEGS_H, "Сегменты длины", DEFAULT_TUBE_SEGS_H,
-                      1, 64, parent_id=grp_tub)
+        bc = c4d.GetCustomDataTypeDefault(c4d.DTYPE_REAL)
+        bc[c4d.DESC_NAME]      = "Размер Z"
+        bc[c4d.DESC_DEFAULT]   = DEFAULT_SIZE_Z
+        bc[c4d.DESC_MIN]       = 10.0
+        bc[c4d.DESC_MAX]       = 100000.0
+        bc[c4d.DESC_UNIT]      = c4d.DESC_UNIT_METER
+        bc[c4d.DESC_STEP]      = 1.0
+        bc[c4d.DESC_ANIMATE]   = c4d.DESC_ANIMATE_ON
+        description.SetParameter(
+            c4d.DescID(c4d.DescLevel(ML_SIZE_Z, c4d.DTYPE_REAL, 0)),
+            bc, gid_lat
+        )
 
-        grp_bev = c4d.DescID(c4d.DescLevel(MHL_GRP_BEV, c4d.DTYPE_GROUP, 0))
-        _desc_add_group(description, MHL_GRP_BEV, "Фаска  [F]")
-        _desc_add_float(description, ML_BEVEL_SIZE, "Размер фаски", DEFAULT_BEVEL_SIZE,
-                        0.0, 100000.0, parent_id=grp_bev)
-        _desc_add_int(description, ML_BEVEL_SUBDIV, "Подразделение фаски", DEFAULT_BEVEL_SUBDIV,
-                      0, 8, parent_id=grp_bev)
+        bc = c4d.GetCustomDataTypeDefault(c4d.DTYPE_REAL)
+        bc[c4d.DESC_NAME]      = "Плотность (шаг сетки)"
+        bc[c4d.DESC_DEFAULT]   = DEFAULT_DENSITY
+        bc[c4d.DESC_MIN]       = 10.0
+        bc[c4d.DESC_MAX]       = 10000.0
+        bc[c4d.DESC_UNIT]      = c4d.DESC_UNIT_METER
+        bc[c4d.DESC_STEP]      = 1.0
+        bc[c4d.DESC_ANIMATE]   = c4d.DESC_ANIMATE_ON
+        bc[c4d.DESC_CUSTOMGUI] = c4d.CUSTOMGUI_REALSLIDER
+        bc[c4d.DESC_MINSLIDER] = 10.0
+        bc[c4d.DESC_MAXSLIDER] = 500.0
+        description.SetParameter(
+            c4d.DescID(c4d.DescLevel(ML_DENSITY, c4d.DTYPE_REAL, 0)),
+            bc, gid_lat
+        )
+
+        bc = c4d.GetCustomDataTypeDefault(c4d.DTYPE_REAL)
+        bc[c4d.DESC_NAME]      = "Макс. длина связи"
+        bc[c4d.DESC_DEFAULT]   = DEFAULT_BOND_DENS
+        bc[c4d.DESC_MIN]       = 10.0
+        bc[c4d.DESC_MAX]       = 10000.0
+        bc[c4d.DESC_UNIT]      = c4d.DESC_UNIT_METER
+        bc[c4d.DESC_STEP]      = 1.0
+        bc[c4d.DESC_ANIMATE]   = c4d.DESC_ANIMATE_ON
+        bc[c4d.DESC_CUSTOMGUI] = c4d.CUSTOMGUI_REALSLIDER
+        bc[c4d.DESC_MINSLIDER] = 10.0
+        bc[c4d.DESC_MAXSLIDER] = 400.0
+        description.SetParameter(
+            c4d.DescID(c4d.DescLevel(ML_BOND_DENS, c4d.DTYPE_REAL, 0)),
+            bc, gid_lat
+        )
+
+        bc = c4d.GetCustomDataTypeDefault(c4d.DTYPE_LONG)
+        bc[c4d.DESC_NAME]      = "Seed"
+        bc[c4d.DESC_DEFAULT]   = DEFAULT_SEED
+        bc[c4d.DESC_MIN]       = 0
+        bc[c4d.DESC_MAX]       = 99999
+        bc[c4d.DESC_STEP]      = 1
+        bc[c4d.DESC_ANIMATE]   = c4d.DESC_ANIMATE_ON
+        description.SetParameter(
+            c4d.DescID(c4d.DescLevel(ML_SEED, c4d.DTYPE_LONG, 0)),
+            bc, gid_lat
+        )
+
+        bc = c4d.GetCustomDataTypeDefault(c4d.DTYPE_REAL)
+        bc[c4d.DESC_NAME]      = "Джиттер (шум позиций)"
+        bc[c4d.DESC_DEFAULT]   = DEFAULT_JITTER
+        bc[c4d.DESC_MIN]       = 0.0
+        bc[c4d.DESC_MAX]       = 5000.0
+        bc[c4d.DESC_UNIT]      = c4d.DESC_UNIT_METER
+        bc[c4d.DESC_STEP]      = 1.0
+        bc[c4d.DESC_ANIMATE]   = c4d.DESC_ANIMATE_ON
+        bc[c4d.DESC_CUSTOMGUI] = c4d.CUSTOMGUI_REALSLIDER
+        bc[c4d.DESC_MINSLIDER] = 0.0
+        bc[c4d.DESC_MAXSLIDER] = 500.0
+        description.SetParameter(
+            c4d.DescID(c4d.DescLevel(ML_JITTER, c4d.DTYPE_REAL, 0)),
+            bc, gid_lat
+        )
+
+        bc = c4d.GetCustomDataTypeDefault(c4d.DTYPE_BOOL)
+        bc[c4d.DESC_NAME]    = "Скрывать одиночные шары"
+        bc[c4d.DESC_DEFAULT] = DEFAULT_HIDE_ISOLATED
+        bc[c4d.DESC_ANIMATE] = c4d.DESC_ANIMATE_ON
+        description.SetParameter(
+            c4d.DescID(c4d.DescLevel(ML_HIDE_ISOLATED, c4d.DTYPE_BOOL, 0)),
+            bc, gid_lat
+        )
+
+        # ── Strip — волновое смещение ──
+        bc = c4d.GetCustomDatatypeDefault(c4d.DTYPE_GROUP)
+        bc[c4d.DESC_NAME]    = "Strip — волновое смещение"
+        bc[c4d.DESC_COLUMNS] = 1
+        bc[c4d.DESC_DEFAULT] = 1
+        description.SetParameter(
+            c4d.DescID(c4d.DescLevel(MHL_GRP_STRIP, c4d.DTYPE_GROUP, 0)),
+            bc, c4d.ID_LISTHEAD
+        )
+        gid_strip = c4d.DescID(c4d.DescLevel(MHL_GRP_STRIP, c4d.DTYPE_GROUP, 0))
+
+        bc = c4d.GetCustomDataTypeDefault(c4d.DTYPE_REAL)
+        bc[c4d.DESC_NAME]      = "Амплитуда"
+        bc[c4d.DESC_DEFAULT]   = DEFAULT_STRIP_AMP
+        bc[c4d.DESC_MIN]       = 0.0
+        bc[c4d.DESC_MAX]       = 10000.0
+        bc[c4d.DESC_UNIT]      = c4d.DESC_UNIT_METER
+        bc[c4d.DESC_STEP]      = 1.0
+        bc[c4d.DESC_ANIMATE]   = c4d.DESC_ANIMATE_ON
+        bc[c4d.DESC_CUSTOMGUI] = c4d.CUSTOMGUI_REALSLIDER
+        bc[c4d.DESC_MINSLIDER] = 0.0
+        bc[c4d.DESC_MAXSLIDER] = 500.0
+        description.SetParameter(
+            c4d.DescID(c4d.DescLevel(ML_STRIP_AMP, c4d.DTYPE_REAL, 0)),
+            bc, gid_strip
+        )
+
+        bc = c4d.GetCustomDataTypeDefault(c4d.DTYPE_REAL)
+        bc[c4d.DESC_NAME]      = "Частота"
+        bc[c4d.DESC_DEFAULT]   = DEFAULT_STRIP_FREQ
+        bc[c4d.DESC_MIN]       = 0.0001
+        bc[c4d.DESC_MAX]       = 10.0
+        bc[c4d.DESC_UNIT]      = c4d.DESC_UNIT_FLOAT
+        bc[c4d.DESC_STEP]      = 0.001
+        bc[c4d.DESC_ANIMATE]   = c4d.DESC_ANIMATE_ON
+        bc[c4d.DESC_CUSTOMGUI] = c4d.CUSTOMGUI_REALSLIDER
+        bc[c4d.DESC_MINSLIDER] = 0.0001
+        bc[c4d.DESC_MAXSLIDER] = 10.0
+        description.SetParameter(
+            c4d.DescID(c4d.DescLevel(ML_STRIP_FREQ, c4d.DTYPE_REAL, 0)),
+            bc, gid_strip
+        )
+
+        bc = c4d.GetCustomDataTypeDefault(c4d.DTYPE_REAL)
+        bc[c4d.DESC_NAME]    = "Фаза (анимировать)"
+        bc[c4d.DESC_DEFAULT] = DEFAULT_STRIP_PHASE
+        bc[c4d.DESC_MIN]     = -1000.0
+        bc[c4d.DESC_MAX]     = 1000.0
+        bc[c4d.DESC_UNIT]    = c4d.DESC_UNIT_FLOAT
+        bc[c4d.DESC_STEP]    = 0.01
+        bc[c4d.DESC_ANIMATE] = c4d.DESC_ANIMATE_ON
+        bc[c4d.DESC_CUSTOMGUI] = c4d.CUSTOMGUI_REALSLIDER
+        bc[c4d.DESC_MINSLIDER] = -10
+        bc[c4d.DESC_MAXSLIDER] = 10
+        description.SetParameter(
+            c4d.DescID(c4d.DescLevel(ML_STRIP_PHASE, c4d.DTYPE_REAL, 0)),
+            bc, gid_strip
+        )
+
+        bc = c4d.GetCustomDataTypeDefault(c4d.DTYPE_LONG)
+        bc[c4d.DESC_NAME]      = "Ось волны"
+        bc[c4d.DESC_DEFAULT]   = DEFAULT_STRIP_AXIS
+        bc[c4d.DESC_ANIMATE]   = c4d.DESC_ANIMATE_ON
+        bc[c4d.DESC_CUSTOMGUI] = c4d.CUSTOMGUI_CYCLE
+        cyc = c4d.BaseContainer()
+        cyc[0] = "X (смещение Y)"
+        cyc[1] = "Y (смещение X)"
+        cyc[2] = "Z (смещение Y)"
+        bc[c4d.DESC_CYCLE] = cyc
+        description.SetParameter(
+            c4d.DescID(c4d.DescLevel(ML_STRIP_AXIS, c4d.DTYPE_LONG, 0)),
+            bc, gid_strip
+        )
+
+        # ── Шары [M] ──
+        bc = c4d.GetCustomDatatypeDefault(c4d.DTYPE_GROUP)
+        bc[c4d.DESC_NAME]    = "Шары  [M]"
+        bc[c4d.DESC_COLUMNS] = 1
+        bc[c4d.DESC_DEFAULT] = 1
+        description.SetParameter(
+            c4d.DescID(c4d.DescLevel(MHL_GRP_SPH, c4d.DTYPE_GROUP, 0)),
+            bc, c4d.ID_LISTHEAD
+        )
+        gid_sph = c4d.DescID(c4d.DescLevel(MHL_GRP_SPH, c4d.DTYPE_GROUP, 0))
+
+        bc = c4d.GetCustomDataTypeDefault(c4d.DTYPE_REAL)
+        bc[c4d.DESC_NAME]    = "Радиус шара"
+        bc[c4d.DESC_DEFAULT] = DEFAULT_SPHERE_RADIUS
+        bc[c4d.DESC_MIN]     = 1.0
+        bc[c4d.DESC_MAX]     = 100000.0
+        bc[c4d.DESC_UNIT]    = c4d.DESC_UNIT_METER
+        bc[c4d.DESC_STEP]    = 1.0
+        bc[c4d.DESC_ANIMATE] = c4d.DESC_ANIMATE_ON
+        bc[c4d.DESC_CUSTOMGUI] = c4d.CUSTOMGUI_REALSLIDER
+        bc[c4d.DESC_MINSLIDER] = 10
+        bc[c4d.DESC_MAXSLIDER] = 100
+        description.SetParameter(
+            c4d.DescID(c4d.DescLevel(ML_SPHERE_RADIUS, c4d.DTYPE_REAL, 0)),
+            bc, gid_sph
+        )
+
+        bc = c4d.GetCustomDataTypeDefault(c4d.DTYPE_LONG)
+        bc[c4d.DESC_NAME]      = "Подразделение"
+        bc[c4d.DESC_DEFAULT]   = DEFAULT_SPHERE_SUBDIV
+        bc[c4d.DESC_MIN]       = 1
+        bc[c4d.DESC_MAX]       = 4
+        bc[c4d.DESC_STEP]      = 1
+        bc[c4d.DESC_ANIMATE]   = c4d.DESC_ANIMATE_ON
+        bc[c4d.DESC_CUSTOMGUI] = c4d.CUSTOMGUI_REALSLIDER
+        bc[c4d.DESC_MINSLIDER] = 1
+        bc[c4d.DESC_MAXSLIDER] = 4
+        description.SetParameter(
+            c4d.DescID(c4d.DescLevel(ML_SPHERE_SUBDIV, c4d.DTYPE_LONG, 0)),
+            bc, gid_sph
+        )
+
+        bc = c4d.GetCustomDataTypeDefault(c4d.DTYPE_REAL)
+        bc[c4d.DESC_NAME]    = "Фонг шаров"
+        bc[c4d.DESC_DEFAULT] = DEFAULT_SPHERE_PHONG
+        bc[c4d.DESC_MIN]     = 0.0
+        bc[c4d.DESC_MAX]     = math.radians(180.0)
+        bc[c4d.DESC_UNIT]    = c4d.DESC_UNIT_DEGREE
+        bc[c4d.DESC_STEP]    = math.radians(1.0)
+        bc[c4d.DESC_ANIMATE] = c4d.DESC_ANIMATE_ON
+        bc[c4d.DESC_CUSTOMGUI] = c4d.CUSTOMGUI_REALSLIDER
+        bc[c4d.DESC_MINSLIDER] = 0.0
+        bc[c4d.DESC_MAXSLIDER] = 180.0
+        description.SetParameter(
+            c4d.DescID(c4d.DescLevel(ML_SPHERE_PHONG, c4d.DTYPE_REAL, 0)),
+            bc, gid_sph
+        )
+
+        # ── Трубки [T] ──
+        bc = c4d.GetCustomDatatypeDefault(c4d.DTYPE_GROUP)
+        bc[c4d.DESC_NAME]    = "Трубки  [T]"
+        bc[c4d.DESC_COLUMNS] = 1
+        bc[c4d.DESC_DEFAULT] = 1
+        description.SetParameter(
+            c4d.DescID(c4d.DescLevel(MHL_GRP_TUB, c4d.DTYPE_GROUP, 0)),
+            bc, c4d.ID_LISTHEAD
+        )
+        gid_tub = c4d.DescID(c4d.DescLevel(MHL_GRP_TUB, c4d.DTYPE_GROUP, 0))
+
+        bc = c4d.GetCustomDataTypeDefault(c4d.DTYPE_REAL)
+        bc[c4d.DESC_NAME]    = "Радиус трубки"
+        bc[c4d.DESC_DEFAULT] = DEFAULT_TUBE_RADIUS
+        bc[c4d.DESC_MIN]     = 0.5
+        bc[c4d.DESC_MAX]     = 100000.0
+        bc[c4d.DESC_UNIT]    = c4d.DESC_UNIT_METER
+        bc[c4d.DESC_STEP]    = 0.5
+        bc[c4d.DESC_ANIMATE] = c4d.DESC_ANIMATE_ON
+        bc[c4d.DESC_CUSTOMGUI] = c4d.CUSTOMGUI_REALSLIDER
+        bc[c4d.DESC_MINSLIDER] = 0.5
+        bc[c4d.DESC_MAXSLIDER] = 100
+        description.SetParameter(
+            c4d.DescID(c4d.DescLevel(ML_TUBE_RADIUS, c4d.DTYPE_REAL, 0)),
+            bc, gid_tub
+        )
+
+        bc = c4d.GetCustomDataTypeDefault(c4d.DTYPE_LONG)
+        bc[c4d.DESC_NAME]      = "Сегменты окружности"
+        bc[c4d.DESC_DEFAULT]   = DEFAULT_TUBE_SEGS_R
+        bc[c4d.DESC_MIN]       = 3
+        bc[c4d.DESC_MAX]       = 300
+        bc[c4d.DESC_STEP]      = 1
+        bc[c4d.DESC_ANIMATE]   = c4d.DESC_ANIMATE_ON
+        bc[c4d.DESC_CUSTOMGUI] = c4d.CUSTOMGUI_REALSLIDER
+        bc[c4d.DESC_MINSLIDER] = 3
+        bc[c4d.DESC_MAXSLIDER] = 20
+        description.SetParameter(
+            c4d.DescID(c4d.DescLevel(ML_TUBE_SEGS_R, c4d.DTYPE_LONG, 0)),
+            bc, gid_tub
+        )
+
+        bc = c4d.GetCustomDataTypeDefault(c4d.DTYPE_LONG)
+        bc[c4d.DESC_NAME]      = "Сегменты длины"
+        bc[c4d.DESC_DEFAULT]   = DEFAULT_TUBE_SEGS_H
+        bc[c4d.DESC_MIN]       = 1
+        bc[c4d.DESC_MAX]       = 300
+        bc[c4d.DESC_STEP]      = 1
+        bc[c4d.DESC_ANIMATE]   = c4d.DESC_ANIMATE_ON
+        bc[c4d.DESC_CUSTOMGUI] = c4d.CUSTOMGUI_REALSLIDER
+        bc[c4d.DESC_MINSLIDER] = 1
+        bc[c4d.DESC_MAXSLIDER] = 20
+        description.SetParameter(
+            c4d.DescID(c4d.DescLevel(ML_TUBE_SEGS_H, c4d.DTYPE_LONG, 0)),
+            bc, gid_tub
+        )
+
+        # ── Фаска [F] ──
+        bc = c4d.GetCustomDatatypeDefault(c4d.DTYPE_GROUP)
+        bc[c4d.DESC_NAME]    = "Фаска  [F]"
+        bc[c4d.DESC_COLUMNS] = 1
+        bc[c4d.DESC_DEFAULT] = 1
+        description.SetParameter(
+            c4d.DescID(c4d.DescLevel(MHL_GRP_BEV, c4d.DTYPE_GROUP, 0)),
+            bc, c4d.ID_LISTHEAD
+        )
+        gid_bev = c4d.DescID(c4d.DescLevel(MHL_GRP_BEV, c4d.DTYPE_GROUP, 0))
+
+        bc = c4d.GetCustomDataTypeDefault(c4d.DTYPE_REAL)
+        bc[c4d.DESC_NAME]    = "Размер фаски"
+        bc[c4d.DESC_DEFAULT] = DEFAULT_BEVEL_SIZE
+        bc[c4d.DESC_MIN]     = 0.0
+        bc[c4d.DESC_MAX]     = 100000.0
+        bc[c4d.DESC_UNIT]    = c4d.DESC_UNIT_METER
+        bc[c4d.DESC_STEP]    = 1.0
+        bc[c4d.DESC_ANIMATE] = c4d.DESC_ANIMATE_ON
+        bc[c4d.DESC_CUSTOMGUI] = c4d.CUSTOMGUI_REALSLIDER
+        bc[c4d.DESC_MINSLIDER] = 1
+        bc[c4d.DESC_MAXSLIDER] = 30
+        description.SetParameter(
+            c4d.DescID(c4d.DescLevel(ML_BEVEL_SIZE, c4d.DTYPE_REAL, 0)),
+            bc, gid_bev
+        )
+
+        bc = c4d.GetCustomDataTypeDefault(c4d.DTYPE_LONG)
+        bc[c4d.DESC_NAME]      = "Подразделение фаски"
+        bc[c4d.DESC_DEFAULT]   = DEFAULT_BEVEL_SUBDIV
+        bc[c4d.DESC_MIN]       = 0
+        bc[c4d.DESC_MAX]       = 8
+        bc[c4d.DESC_STEP]      = 1
+        bc[c4d.DESC_ANIMATE]   = c4d.DESC_ANIMATE_ON
+        bc[c4d.DESC_CUSTOMGUI] = c4d.CUSTOMGUI_REALSLIDER
+        bc[c4d.DESC_MINSLIDER] = 0
+        bc[c4d.DESC_MAXSLIDER] = 8
+        description.SetParameter(
+            c4d.DescID(c4d.DescLevel(ML_BEVEL_SUBDIV, c4d.DTYPE_LONG, 0)),
+            bc, gid_bev
+        )
 
         return True, flags | c4d.DESCFLAGS_DESC_LOADED
 

@@ -14,7 +14,7 @@ import tempfile
 
 ID_DIAMONDCYLINDER = 1068873
 
-NAME_DIAMONDCYLINDER = "Diamond Cylinder v1.7"
+NAME_DIAMONDCYLINDER = "Diamond Cylinder v1.8"
 
 # ─── Description-based parameter IDs ──────────────────────────────────────────────────
 
@@ -411,8 +411,11 @@ class DiamondCylinderObject(_MeshPrimitiveBase):
         bc[c4d.DESC_NAME]    = "Сегменты (окружность)"
         bc[c4d.DESC_DEFAULT] = 12
         bc[c4d.DESC_MIN]     = 3
-        bc[c4d.DESC_MAX]     = 200
+        bc[c4d.DESC_MAX]     = 500
         bc[c4d.DESC_STEP]    = 1
+        bc[c4d.DESC_CUSTOMGUI] = c4d.CUSTOMGUI_REALSLIDER
+        bc[c4d.DESC_MINSLIDER] = 3
+        bc[c4d.DESC_MAXSLIDER] = 50
         description.SetParameter(
             c4d.DescID(c4d.DescLevel(DC_D_SEGS_R, c4d.DTYPE_LONG, 0)),
             bc, gid
@@ -422,8 +425,11 @@ class DiamondCylinderObject(_MeshPrimitiveBase):
         bc[c4d.DESC_NAME]    = "Сегменты (высота)"
         bc[c4d.DESC_DEFAULT] = 6
         bc[c4d.DESC_MIN]     = 1
-        bc[c4d.DESC_MAX]     = 200
+        bc[c4d.DESC_MAX]     = 500
         bc[c4d.DESC_STEP]    = 1
+        bc[c4d.DESC_CUSTOMGUI] = c4d.CUSTOMGUI_REALSLIDER
+        bc[c4d.DESC_MINSLIDER] = 3
+        bc[c4d.DESC_MAXSLIDER] = 50
         description.SetParameter(
             c4d.DescID(c4d.DescLevel(DC_D_SEGS_H, c4d.DTYPE_LONG, 0)),
             bc, gid
@@ -453,12 +459,15 @@ class DiamondCylinderObject(_MeshPrimitiveBase):
         )
 
         bc = c4d.GetCustomDataTypeDefault(c4d.DTYPE_REAL)
-        bc[c4d.DESC_NAME]    = "Скрутка (°)"
+        bc[c4d.DESC_NAME]    = "Скрутка"
         bc[c4d.DESC_DEFAULT] = 0.0
         bc[c4d.DESC_MIN]     = math.radians(-3600.0)
         bc[c4d.DESC_MAX]     = math.radians(3600.0)
         bc[c4d.DESC_UNIT]    = c4d.DESC_UNIT_DEGREE
         bc[c4d.DESC_STEP]    = math.radians(0.1)
+        bc[c4d.DESC_CUSTOMGUI] = c4d.CUSTOMGUI_REALSLIDER
+        bc[c4d.DESC_MINSLIDER] = math.radians(-180.0)
+        bc[c4d.DESC_MAXSLIDER] = math.radians(180.0)
         description.SetParameter(
             c4d.DescID(c4d.DescLevel(DC_D_TWIST, c4d.DTYPE_REAL, 0)),
             bc, gid
@@ -475,10 +484,13 @@ class DiamondCylinderObject(_MeshPrimitiveBase):
         bc = c4d.GetCustomDataTypeDefault(c4d.DTYPE_REAL)
         bc[c4d.DESC_NAME]    = "Величина смещения"
         bc[c4d.DESC_DEFAULT] = 20.0
-        bc[c4d.DESC_MIN]     = 0.0
+        bc[c4d.DESC_MIN]     = -100000.0
         bc[c4d.DESC_MAX]     = 100000.0
         bc[c4d.DESC_UNIT]    = c4d.DESC_UNIT_METER
         bc[c4d.DESC_STEP]    = 1.0
+        bc[c4d.DESC_CUSTOMGUI] = c4d.CUSTOMGUI_REALSLIDER
+        bc[c4d.DESC_MINSLIDER] = -50
+        bc[c4d.DESC_MAXSLIDER] = 150
         description.SetParameter(
             c4d.DescID(c4d.DescLevel(DC_D_STAR_OFFSET, c4d.DTYPE_REAL, 0)),
             bc, gid

@@ -14,7 +14,7 @@ import tempfile
 
 ID_HEXSPHERE = 1068872
 
-NAME_HEXSPHERE = "Hex Sphere v1.3"
+NAME_HEXSPHERE = "Hex Sphere v1.4"
 
 # ─── UserData SubID (общая схема: SubID=1 — группа, поля с 2) ────────────────
 
@@ -30,84 +30,6 @@ HS_GRP        = 2000
 HS_D_RADIUS   = 2001
 HS_D_SUBDIV   = 2002
 HS_D_SIDES    = 2003
-
-
-# ─── Вспомогательные функции UserData ────────────────────────────────────────
-
-def _ud_descid(op, uid):
-    """Ищет UserData по SubID. Возвращает (DescID, BaseContainer) или (None, None)."""
-    for descid, bc in op.GetUserDataContainer():
-        if descid[1].id == uid:
-            return descid, bc
-    return None, None
-
-
-def _ud_get(op, uid, default=None):
-    did, _ = _ud_descid(op, uid)
-    if did is not None:
-        val = op[did]
-        if val is not None:
-            return val
-    return default
-
-
-def _add_group(op, name):
-    """Добавляет корневую группу UserData. Возвращает SubID группы."""
-    bc = c4d.GetCustomDatatypeDefault(c4d.DTYPE_GROUP)
-    bc[c4d.DESC_NAME]       = name
-    bc[c4d.DESC_SHORT_NAME] = name
-    bc[c4d.DESC_TITLEBAR]   = 1
-    bc[c4d.DESC_DEFAULT]    = 1  # развёрнута по умолчанию
-    did = op.AddUserData(bc)
-    return did[1].id   # [1] — SubID, [0] — ID_USERDATA(700)
-
-
-def _add_in_group(op, grp_subid, bc):
-    """Добавляет элемент UserData внутрь группы с данным SubID."""
-    bc[c4d.DESC_PARENTGROUP] = c4d.DescID(
-        c4d.DescLevel(c4d.ID_USERDATA, c4d.DTYPE_SUBCONTAINER, 0),
-        c4d.DescLevel(grp_subid, c4d.DTYPE_GROUP, 0)
-    )
-    return op.AddUserData(bc)
-
-
-def _make_float_bc(name, default, minval, maxval, unit=c4d.DESC_UNIT_METER):
-    bc = c4d.GetCustomDatatypeDefault(c4d.DTYPE_REAL)
-    bc[c4d.DESC_NAME]       = name
-    bc[c4d.DESC_SHORT_NAME] = name
-    bc[c4d.DESC_DEFAULT]    = default
-    bc[c4d.DESC_MIN]        = minval
-    bc[c4d.DESC_MAX]        = maxval
-    bc[c4d.DESC_UNIT]       = unit
-    bc[c4d.DESC_STEP]       = 1.0
-    bc[c4d.DESC_ANIMATE]    = c4d.DESC_ANIMATE_ON
-    return bc
-
-
-def _make_int_bc(name, default, minval, maxval):
-    bc = c4d.GetCustomDatatypeDefault(c4d.DTYPE_LONG)
-    bc[c4d.DESC_NAME]       = name
-    bc[c4d.DESC_SHORT_NAME] = name
-    bc[c4d.DESC_DEFAULT]    = default
-    bc[c4d.DESC_MIN]        = minval
-    bc[c4d.DESC_MAX]        = maxval
-    bc[c4d.DESC_STEP]       = 1
-    bc[c4d.DESC_ANIMATE]    = c4d.DESC_ANIMATE_ON
-    return bc
-
-
-def _ud_already_created(op, first_field_uid):
-    """Проверяет, созданы ли уже UserData по наличию поля с данным SubID."""
-    did, _ = _ud_descid(op, first_field_uid)
-    return did is not None
-
-
-def _ud_set_default(op, uid, value):
-    """Устанавливает значение поля UserData по SubID."""
-    did, _ = _ud_descid(op, uid)
-    if did is not None:
-        op[did] = value
-
 
 # ─── Математика: общие утилиты ────────────────────────────────────────────────
 
@@ -584,6 +506,9 @@ class HexSphereObject(_MeshPrimitiveBase):
         bc[c4d.DESC_MAX]       = 5
         bc[c4d.DESC_STEP]      = 1
         bc[c4d.DESC_ANIMATE]   = c4d.DESC_ANIMATE_ON
+        bc[c4d.DESC_CUSTOMGUI] = c4d.CUSTOMGUI_REALSLIDER
+        bc[c4d.DESC_MINSLIDER] = 1
+        bc[c4d.DESC_MAXSLIDER] = 5
         description.SetParameter(
             c4d.DescID(c4d.DescLevel(HS_D_SUBDIV, c4d.DTYPE_LONG, 0)),
             bc, gid
@@ -596,6 +521,9 @@ class HexSphereObject(_MeshPrimitiveBase):
         bc[c4d.DESC_MAX]       = 16
         bc[c4d.DESC_STEP]      = 1
         bc[c4d.DESC_ANIMATE]   = c4d.DESC_ANIMATE_ON
+        bc[c4d.DESC_CUSTOMGUI] = c4d.CUSTOMGUI_REALSLIDER
+        bc[c4d.DESC_MINSLIDER] = 3
+        bc[c4d.DESC_MAXSLIDER] = 16
         description.SetParameter(
             c4d.DescID(c4d.DescLevel(HS_D_SIDES, c4d.DTYPE_LONG, 0)),
             bc, gid

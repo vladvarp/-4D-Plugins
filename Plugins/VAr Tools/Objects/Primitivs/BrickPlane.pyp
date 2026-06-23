@@ -16,7 +16,7 @@ import random
 
 ID_BRICKPLANE = 1068875
 
-NAME_BRICKPLANE = "Brick Plane v1.7"
+NAME_BRICKPLANE = "Brick Plane v1.8"
 
 # ─── UserData SubID (общая схема: SubID=1 — группа, поля с 2) ────────────────
 
@@ -50,99 +50,6 @@ BP_D_SEGS_H   = 1004
 BP_D_PATTERN  = 1005
 BP_D_OFFSET   = 1006
 BP_D_MORTAR   = 1007
-
-
-# ─── Вспомогательные функции UserData ────────────────────────────────────────
-
-def _ud_descid(op, uid):
-    """Ищет UserData по SubID. Возвращает (DescID, BaseContainer) или (None, None)."""
-    for descid, bc in op.GetUserDataContainer():
-        if descid[1].id == uid:
-            return descid, bc
-    return None, None
-
-
-def _ud_get(op, uid, default=None):
-    did, _ = _ud_descid(op, uid)
-    if did is not None:
-        val = op[did]
-        if val is not None:
-            return val
-    return default
-
-
-def _add_group(op, name):
-    """Добавляет корневую группу UserData. Возвращает SubID группы."""
-    bc = c4d.GetCustomDatatypeDefault(c4d.DTYPE_GROUP)
-    bc[c4d.DESC_NAME]       = name
-    bc[c4d.DESC_SHORT_NAME] = name
-    bc[c4d.DESC_TITLEBAR]   = 1
-    bc[c4d.DESC_DEFAULT]    = 1  # развёрнута по умолчанию
-    did = op.AddUserData(bc)
-    return did[1].id   # [1] — SubID, [0] — ID_USERDATA(700)
-
-
-def _add_in_group(op, grp_subid, bc):
-    """Добавляет элемент UserData внутрь группы с данным SubID."""
-    bc[c4d.DESC_PARENTGROUP] = c4d.DescID(
-        c4d.DescLevel(c4d.ID_USERDATA, c4d.DTYPE_SUBCONTAINER, 0),
-        c4d.DescLevel(grp_subid, c4d.DTYPE_GROUP, 0)
-    )
-    return op.AddUserData(bc)
-
-
-def _make_float_bc(name, default, minval, maxval, unit=c4d.DESC_UNIT_METER, step=1.0):
-    bc = c4d.GetCustomDatatypeDefault(c4d.DTYPE_REAL)
-    bc[c4d.DESC_NAME]       = name
-    bc[c4d.DESC_SHORT_NAME] = name
-    bc[c4d.DESC_DEFAULT]    = default
-    bc[c4d.DESC_MIN]        = minval
-    bc[c4d.DESC_MAX]        = maxval
-    bc[c4d.DESC_UNIT]       = unit
-    bc[c4d.DESC_STEP]       = step
-    bc[c4d.DESC_ANIMATE]    = c4d.DESC_ANIMATE_ON
-    return bc
-
-
-def _make_int_bc(name, default, minval, maxval):
-    bc = c4d.GetCustomDatatypeDefault(c4d.DTYPE_LONG)
-    bc[c4d.DESC_NAME]       = name
-    bc[c4d.DESC_SHORT_NAME] = name
-    bc[c4d.DESC_DEFAULT]    = default
-    bc[c4d.DESC_MIN]        = minval
-    bc[c4d.DESC_MAX]        = maxval
-    bc[c4d.DESC_STEP]       = 1
-    bc[c4d.DESC_ANIMATE]    = c4d.DESC_ANIMATE_ON
-    return bc
-
-
-def _make_cycle_bc(name, default, items_dict):
-    """Создаёт UserData типа Cycle (выпадающий список)."""
-    bc = c4d.GetCustomDatatypeDefault(c4d.DTYPE_LONG)
-    bc[c4d.DESC_NAME]       = name
-    bc[c4d.DESC_SHORT_NAME] = name
-    bc[c4d.DESC_DEFAULT]    = default
-    bc[c4d.DESC_CUSTOMGUI]  = c4d.CUSTOMGUI_CYCLE
-    cycle_bc = c4d.BaseContainer()
-    for k, v in items_dict.items():
-        cycle_bc[k] = v
-    bc[c4d.DESC_CYCLE]      = cycle_bc
-    bc[c4d.DESC_ANIMATE]    = c4d.DESC_ANIMATE_ON
-    return bc
-
-
-def _ud_already_created(op, first_field_uid):
-    """Проверяет, созданы ли уже UserData по наличию поля с данным SubID."""
-    did, _ = _ud_descid(op, first_field_uid)
-    return did is not None
-
-
-def _ud_set_default(op, uid, value):
-    """Устанавливает значение поля UserData по SubID."""
-    did, _ = _ud_descid(op, uid)
-    if did is not None:
-        op[did] = value
-
 
 # ─── Генераторы мешей ─────────────────────────────────────────────────────────
 
@@ -521,45 +428,6 @@ def _build_basket_weave(width, height, segs_w, segs_h, mortar_frac=0.0):
 
     return verts, polys
 
-
-def _inset_polys(verts, polys, hm_x, hm_y):
-    """
-    Вспомогательная функция для running bond: создаёт уникальные вершины
-    для каждого полигона с inset (швом) по X и Z.
-    Для running bond вершины шаренные, поэтому нужна перестройка.
-    """
-    new_verts = []
-    new_polys = []
-    for poly in polys:
-        if isinstance(poly, c4d.CPolygon):
-            idx = [poly.a, poly.b, poly.c, poly.d]
-            is_tri = (poly.c == poly.d)
-        else:
-            idx = list(poly)
-            is_tri = False
-
-        pts = [c4d.Vector(verts[i]) for i in idx]
-        # Центр полигона
-        n = len(pts) if not is_tri else 3
-        cx = sum(p.x for p in pts[:n]) / n
-        cz = sum(p.z for p in pts[:n]) / n
-        # Inset: сдвигаем каждую вершину к центру (уменьшаем кирпич)
-        new_pts = []
-        for p in pts[:n]:
-            dx = -hm_x if p.x >= cx else hm_x
-            dz = -hm_y if p.z >= cz else hm_y
-            new_pts.append(c4d.Vector(p.x + dx, p.y, p.z + dz))
-
-        base = len(new_verts)
-        new_verts.extend(new_pts)
-        if n == 3:
-            new_polys.append(c4d.CPolygon(base, base+1, base+2, base+2))
-        else:
-            new_polys.append(c4d.CPolygon(base, base+1, base+2, base+3))
-
-    return new_verts, new_polys
-
-
 # ─── Создание PolygonObject из вершин и полигонов ─────────────────────────────
 
 def _make_poly_object(points, polys, name):
@@ -689,6 +557,9 @@ class BrickPlaneObject(_MeshPrimitiveBase):
         bc[c4d.DESC_MIN]     = 1
         bc[c4d.DESC_MAX]     = 200
         bc[c4d.DESC_STEP]    = 1
+        bc[c4d.DESC_CUSTOMGUI] = c4d.CUSTOMGUI_REALSLIDER
+        bc[c4d.DESC_MINSLIDER] = 1
+        bc[c4d.DESC_MAXSLIDER] = 50
         description.SetParameter(
             c4d.DescID(c4d.DescLevel(BP_D_SEGS_W, c4d.DTYPE_LONG, 0)),
             bc, gid
@@ -700,6 +571,9 @@ class BrickPlaneObject(_MeshPrimitiveBase):
         bc[c4d.DESC_MIN]     = 1
         bc[c4d.DESC_MAX]     = 200
         bc[c4d.DESC_STEP]    = 1
+        bc[c4d.DESC_CUSTOMGUI] = c4d.CUSTOMGUI_REALSLIDER
+        bc[c4d.DESC_MINSLIDER] = 1
+        bc[c4d.DESC_MAXSLIDER] = 50
         description.SetParameter(
             c4d.DescID(c4d.DescLevel(BP_D_SEGS_H, c4d.DTYPE_LONG, 0)),
             bc, gid
@@ -729,6 +603,9 @@ class BrickPlaneObject(_MeshPrimitiveBase):
         bc[c4d.DESC_MAX]     = 10000.0
         bc[c4d.DESC_UNIT]    = c4d.DESC_UNIT_METER
         bc[c4d.DESC_STEP]    = 1.0
+        bc[c4d.DESC_CUSTOMGUI] = c4d.CUSTOMGUI_REALSLIDER
+        bc[c4d.DESC_MINSLIDER] = 0.0
+        bc[c4d.DESC_MAXSLIDER] = 100.0
         description.SetParameter(
             c4d.DescID(c4d.DescLevel(BP_D_OFFSET, c4d.DTYPE_REAL, 0)),
             bc, gid
@@ -741,6 +618,9 @@ class BrickPlaneObject(_MeshPrimitiveBase):
         bc[c4d.DESC_MAX]     = 0.4
         bc[c4d.DESC_UNIT]    = c4d.DESC_UNIT_FLOAT
         bc[c4d.DESC_STEP]    = 0.005
+        bc[c4d.DESC_CUSTOMGUI] = c4d.CUSTOMGUI_REALSLIDER
+        bc[c4d.DESC_MINSLIDER] = 0.0
+        bc[c4d.DESC_MAXSLIDER] = 0.4
         description.SetParameter(
             c4d.DescID(c4d.DescLevel(BP_D_MORTAR, c4d.DTYPE_REAL, 0)),
             bc, gid
