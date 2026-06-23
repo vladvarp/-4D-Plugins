@@ -15,7 +15,7 @@ from urllib.parse import unquote, quote
 import ctypes
 
 PROGRAM_NAME = "4D Plugin Installer"
-PROGRAM_VER  = "v1.7"
+PROGRAM_VER  = "v2.0"
 
 # Скрываем консольное окно для всех дочерних процессов на Windows
 CREATE_NO_WINDOW = 0x08000000
@@ -307,24 +307,22 @@ def sparse_clone_folder(repo_url: str, folder_path: str, dest: str, progress_cb)
     git = git_exe()
     tmp_dir = tempfile.mkdtemp()
     try:
-        progress_cb(f"Инициализирую репозиторий…")
-        _run([git, "init", tmp_dir], check=True, capture_output=True)
-        _run([git, "-C", tmp_dir, "remote", "add", "origin", repo_url],
-                       check=True, capture_output=True)
-        _run([git, "-C", tmp_dir, "config", "core.sparseCheckout", "true"],
-                       check=True, capture_output=True)
-
-        sparse_file = Path(tmp_dir) / ".git" / "info" / "sparse-checkout"
-        # Записываем декодированный путь — git понимает пробелы
-        sparse_file.write_text(folder_path + "/\n", encoding="utf-8")
-
-        progress_cb(f"Скачиваю «{folder_path}»…")
+        progress_cb(f"Клонирую репозиторий…")
         result = _run(
-            [git, "-C", tmp_dir, "pull", "--depth=1", "origin", "main"],
+            [git, "clone", "--filter=blob:none", "--sparse", "--depth=1",
+             "--branch", "main", repo_url, tmp_dir],
             capture_output=True, text=True
         )
         if result.returncode != 0:
-            raise RuntimeError(f"git pull вернул ошибку:\n{result.stderr}")
+            raise RuntimeError(f"git clone вернул ошибку:\n{result.stderr}")
+
+        progress_cb(f"Скачиваю «{folder_path}»…")
+        result = _run(
+            [git, "-C", tmp_dir, "sparse-checkout", "set", folder_path],
+            capture_output=True, text=True
+        )
+        if result.returncode != 0:
+            raise RuntimeError(f"sparse-checkout set вернул ошибку:\n{result.stderr}")
 
         src = Path(tmp_dir) / folder_path
         if not src.exists():
