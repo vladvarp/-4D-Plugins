@@ -783,6 +783,28 @@ function applyStandardMarkdown(html) {
     return html;
 }
 
+function renderIcoInline(text) {
+    let r = text;
+    r = r.replace(/\[\[ico:'([^']+)'-(x|\d+)(?:-c([1-3]))?\]\]/g, (_, src, size, align) => {
+        const ac = align ? ` md-ico-wrap-${['','left','center','right'][align]}` : '';
+        const wo = align ? `<span class="md-ico-wrap${ac}">` : '';
+        const wc = align ? '</span>' : '';
+        if (size === 'x') return `${wo}<img class="md-ico" src="${escapeHtml(src)}" alt="" loading="lazy" style="object-fit:contain;vertical-align:middle;display:inline-block;border-radius:0;">${wc}`;
+        const h = parseInt(size);
+        return `${wo}<img class="md-ico" src="${escapeHtml(src)}" height="${h}" alt="" loading="lazy" style="height:${h}px;width:auto;object-fit:contain;vertical-align:middle;display:inline-block;border-radius:0;">${wc}`;
+    });
+    r = r.replace(/\[\[ico:'([^']+)'\[|:](\d+)[x*](\d+)(?:-c([1-3]))?\]\]/g, (_, src, w, h, align) => {
+        const ac = align ? ` md-ico-wrap-${['','left','center','right'][align]}` : '';
+        const wo = align ? `<span class="md-ico-wrap${ac}">` : '';
+        const wc = align ? '</span>' : '';
+        return `${wo}<img class="md-ico" src="${escapeHtml(src)}" width="${parseInt(w)}" height="${parseInt(h)}" alt="" loading="lazy" style="width:${parseInt(w)}px;height:${parseInt(h)}px;object-fit:contain;vertical-align:middle;display:inline-block;border-radius:0;">${wc}`;
+    });
+    r = r.replace(/\[\[ico:'([^']+)'\]\]/g, (_, src) => {
+        return `<img class="md-ico" src="${escapeHtml(src)}" width="24" height="24" alt="" loading="lazy" style="width:36px;height:36px;object-fit:contain;vertical-align:middle;display:inline-block;border-radius:0;">`;
+    });
+    return r;
+}
+
 // Инлайн-синтаксис: [[badge:...]], [[button:...]], [[kbd:...]]
 function renderInlineSyntax(html) {
     // Бейдж: [[badge:тип|текст]] или [[badge:текст]]
@@ -808,6 +830,100 @@ function renderInlineSyntax(html) {
             return kbd + sep;
         }).join('');
     });
+
+    // Поле ввода: [[tif:'value'-t'0'-p'%'-s150-sc300-d0/100-st0,5-r0]]
+    // Ручной поиск закрывающих ]] с учётом вложенных [[
+    (function() {
+        const TAG = '[[tif:';
+        let idx = html.indexOf(TAG);
+        while (idx !== -1) {
+            let depth = 1;
+            let i = idx + 2;
+            let end = -1;
+            while (i < html.length - 1) {
+                if (html[i] === '[' && html[i + 1] === '[') { depth++; i++; }
+                else if (html[i] === ']' && html[i + 1] === ']') { depth--; i++; if (depth === 0) { end = i + 1; break; } }
+                i++;
+            }
+            if (end === -1) break;
+
+            const inner = html.substring(idx + 6, end - 2);
+            const vm = inner.match(/^'([^']*)'/);
+            const value = vm ? vm[1] : '';
+            const rest = vm ? inner.slice(vm[0].length) : '';
+
+            function extractP(str) {
+                const pi = str.indexOf("-p'");
+                if (pi === -1) return undefined;
+                const start = pi + 3;
+                let d = 0;
+                for (let j = start; j < str.length; j++) {
+                    if (str.substring(j, j + 7) === "[[ico:'") { d++; j += 6; continue; }
+                    if (d > 0 && str[j] === ']' && str[j + 1] === ']') { d--; j++; continue; }
+                    if (d === 0 && str[j] === "'" && (str[j + 1] === '-' || str[j + 1] === ']')) return str.substring(start, j);
+                }
+                return str.substring(start);
+            }
+
+            function extractParam(str, name) {
+                const m = str.match(new RegExp(`-${name}'([^']*)'`));
+                return m ? m[1] : undefined;
+            }
+
+            const type = extractParam(rest, 't');
+            const suffix = extractP(rest);
+            const wM = rest.match(/-s(\d+)/);
+            const w = wM ? wM[1] : undefined;
+            const scWM = rest.match(/-sc(\d*)/);
+            const scW = scWM ? scWM[1] : undefined;
+            const dM = rest.match(/-d(-?[\d.,]+\/-?[\d.,]+)/);
+            const range = dM ? dM[1] : undefined;
+            const stM = rest.match(/-st([\d.,]+)/);
+            const step = stM ? stM[1] : undefined;
+            const rM = rest.match(/-r([01])/);
+            const readOnly = rM ? rM[1] : undefined;
+
+            const id = 'tif-' + Math.random().toString(36).substr(2, 6);
+            let inputType = 'text';
+            let inputMode = '';
+            if (type === '0') { inputType = 'number'; inputMode = 'numeric'; }
+            else if (type && /[\d.,]+\/[\d.,]+/.test(type)) { inputType = 'number'; inputMode = 'decimal'; }
+            else if (type && /^\d+,\d+$/.test(type)) { inputType = 'number'; inputMode = 'decimal'; }
+            else if (type && /^\d+\.\d+$/.test(type)) { inputType = 'number'; inputMode = 'decimal'; }
+
+            const typeAttr = inputType === 'number' ? ` type="number" inputmode="${inputMode}"` : ` type="text"`;
+            const disabled = readOnly === '0' ? ' disabled' : '';
+            const style = w ? ` style="width:${parseInt(w)}px"` : '';
+
+            let suffixContent = '';
+            if (suffix) {
+                if (suffix.indexOf('[[ico:') !== -1) {
+                    suffixContent = renderIcoInline(suffix);
+                } else {
+                    suffixContent = escapeHtml(suffix);
+                }
+            }
+            const suffixHtml = suffixContent ? `<span class="md-tif-suffix">${suffixContent}</span>` : '';
+
+            let sliderHtml = '';
+            if (scW !== undefined) {
+                let min = 0, max = 100, stepVal = 1;
+                if (range) {
+                    const parts = range.split('/');
+                    min = parseFloat(parts[0].replace(',', '.'));
+                    max = parseFloat(parts[1].replace(',', '.'));
+                }
+                if (step) stepVal = parseFloat(step.replace(',', '.'));
+                const sliderWidth = scW ? ` width:${parseInt(scW)}px` : '';
+                sliderHtml = `<input type="range" class="md-tif-slider" id="${id}-slider" min="${min}" max="${max}" step="${stepVal}" value="${escapeHtml(value)}"${sliderWidth ? ` style="${sliderWidth.trim()}"` : ''}${disabled}>`;
+            }
+
+            const suffixPos = suffixContent ? suffixHtml : '';
+            const replacement = `<span class="md-tif-wrap"><input${typeAttr} class="md-tif" id="${id}" value="${escapeHtml(value)}"${style}${disabled}>${suffixPos}${sliderHtml}</span>`;
+            html = html.substring(0, idx) + replacement + html.substring(end);
+            idx = html.indexOf(TAG, idx + replacement.length);
+        }
+    })();
 
     // Иконка/изображение: [[ico:'path/to/img.png'|WxH]] или [[ico:'path':WxH]]
     // Примеры: [[ico:'plugins/icon.png'|32x32]]  [[ico:'img/logo.svg':64*64]]  [[ico:'img/pic.jpg'|120x80]]
@@ -889,39 +1005,6 @@ function renderInlineSyntax(html) {
         const height = h ? parseInt(h) : 30;
         const hexHtml = showCode ? `<span class="md-color-hex">#${hex}</span>` : '';
         return `<span class="md-color-wrap"><input type="color" class="md-color" id="${id}" value="#${hex}" style="width:${width}px;height:${height}px">${hexHtml}</span>`;
-    });
-
-    // Поле ввода: [[tif:'value'-t'0'-p'%'-s150-sc300-d0/100-st0,5-r0]]
-    html = html.replace(/\[\[tif:'([^']*)'(?:-t'([^']*)')?(?:-p'([^']*)')?(?:-s(\d+))?(?:-sc(\d*))?(?:-d(-?[\d.,]+\/-?[\d.,]+))?(?:-st([\d.,]+))?(?:-r([01]))?\]\]/g, (_, value, type, suffix, w, scW, range, step, readOnly) => {
-        const id = 'tif-' + Math.random().toString(36).substr(2, 6);
-        let inputType = 'text';
-        let pattern = '';
-        let inputMode = '';
-        if (type === '0') { inputType = 'number'; inputMode = 'numeric'; pattern = '[0-9]*'; }
-        else if (type && /[\d.,]+\/[\d.,]+/.test(type)) { inputType = 'number'; inputMode = 'decimal'; }
-        else if (type && /^\d+,\d+$/.test(type)) { inputType = 'number'; inputMode = 'decimal'; }
-        else if (type && /^\d+\.\d+$/.test(type)) { inputType = 'number'; inputMode = 'decimal'; }
-
-        const typeAttr = inputType === 'number' ? ` type="number" inputmode="${inputMode}"` : ` type="text"`;
-        const disabled = readOnly === '0' ? ' disabled' : '';
-        const style = w ? ` style="width:${parseInt(w)}px"` : '';
-        const suffixHtml = suffix ? `<span class="md-tif-suffix">${escapeHtml(suffix)}</span>` : '';
-
-        let sliderHtml = '';
-        if (scW !== undefined) {
-            let min = 0, max = 100, stepVal = 1;
-            if (range) {
-                const parts = range.split('/');
-                min = parseFloat(parts[0].replace(',', '.'));
-                max = parseFloat(parts[1].replace(',', '.'));
-            }
-            if (step) stepVal = parseFloat(step.replace(',', '.'));
-            const sliderWidth = scW ? ` width:${parseInt(scW)}px` : '';
-            sliderHtml = `<input type="range" class="md-tif-slider" id="${id}-slider" min="${min}" max="${max}" step="${stepVal}" value="${escapeHtml(value)}"${sliderWidth ? ` style="${sliderWidth.trim()}"` : ''}${disabled}>`;
-        }
-
-        const suffixPos = suffix ? suffixHtml : '';
-        return `<span class="md-tif-wrap"><input${typeAttr} class="md-tif" id="${id}" value="${escapeHtml(value)}"${style}${disabled}>${suffixPos}${sliderHtml}</span>`;
     });
 
     return html;
