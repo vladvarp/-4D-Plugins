@@ -18,15 +18,20 @@ import tempfile
 PLUGIN_ID_CMD = 1068900   # CommandData — кнопка в меню
 PLUGIN_ID_TAG = 1068901   # TagData     — тег
 
-PLUGIN_NAME_V = "Child Selector Tag v1.1.1"
+PLUGIN_NAME_V = "Child Selector Tag v1.2"
 TEG_NAME      = "Child Selector Tag"
 PLUGIN_HELP   = "Добавить тег выбора дочернего объекта"
 
 # ── ID пользовательских данных (UserData) ─────────────────────────────────────
-# Индексы фиксированы: создаём данные в строго определённом порядке.
-UD_DROPDOWN = 1   # выпадающий список дочерних объектов
-UD_NAME     = 2   # имя выбранного объекта
-UD_LINK     = 3   # ссылка на выбранный объект
+UD_DROPDOWN = 1
+UD_NAME     = 2
+UD_LINK     = 3
+
+# Description-based parameter IDs
+CS_GRP_PARAMS = 2000
+CS_DROPDOWN   = 2001
+CS_NAME       = 2002
+CS_LINK       = 2003
 
 def _get_direct_children(obj):
     """Возвращает список прямых дочерних объектов (depth=1)."""
@@ -38,90 +43,65 @@ def _get_direct_children(obj):
     return children
 
 
-def _build_userdata(tag):
-    """
-    Создаёт три поля пользовательских данных на теге если их ещё нет.
-    Порядок важен: UD_DROPDOWN=1, UD_NAME=2, UD_LINK=3.
-    Возвращает True если данные созданы или уже существуют.
-    """
-    ud = tag.GetUserDataContainer()
-    if ud and len(ud) >= 3:
-        return True  # данные уже созданы
-
-    # ── 1. Выпадающий список ──────────────────────────────────────────────────
-    bc_drop = c4d.GetCustomDatatypeDefault(c4d.DTYPE_LONG)
-    bc_drop[c4d.DESC_NAME]      = "Объект"
-    bc_drop[c4d.DESC_SHORT_NAME]= "Объект"
-    bc_drop[c4d.DESC_CUSTOMGUI] = c4d.CUSTOMGUI_CYCLE
-    bc_drop[c4d.DESC_DEFAULT]   = 0
-    cycle_bc = c4d.BaseContainer()
-    cycle_bc.SetString(0, "— нет дочерних —")
-    bc_drop[c4d.DESC_CYCLE] = cycle_bc
-    tag.AddUserData(bc_drop)
-
-    # ── 2. Имя ────────────────────────────────────────────────────────────────
-    bc_name = c4d.GetCustomDatatypeDefault(c4d.DTYPE_STRING)
-    bc_name[c4d.DESC_NAME]      = "Имя"
-    bc_name[c4d.DESC_SHORT_NAME]= "Имя"
-    bc_name[c4d.DESC_DEFAULT]   = ""
-    bc_name[c4d.DESC_EDITABLE]  = False   # только для чтения
-    tag.AddUserData(bc_name)
-
-    # ── 3. Связь ──────────────────────────────────────────────────────────────
-    bc_link = c4d.GetCustomDatatypeDefault(c4d.DTYPE_BASELISTLINK)
-    bc_link[c4d.DESC_NAME]      = "Связь"
-    bc_link[c4d.DESC_SHORT_NAME]= "Связь"
-    bc_link[c4d.DESC_CUSTOMGUI] = c4d.CUSTOMGUI_LINKBOX
-    tag.AddUserData(bc_link)
-
-    return True
-
-
-# ── TagData ───────────────────────────────────────────────────────────────────
-
 class ChildSelectorTag(c4d.plugins.TagData):
 
     def __init__(self):
-        self._cached_names = None  # кеш имён детей для избежания лишних пересозданий
+        self._cached_names = None
 
-    def Init(self, node):
-        # При инициализации создаём пользовательские данные
-        _build_userdata(node)
+    def Init(self, node, isload=False):
+        if not isload:
+            node[CS_DROPDOWN] = 0
+            node[CS_NAME] = ""
+            node[CS_LINK] = None
         self._cached_names = None
         return True
 
-    def _rebuild_cycle(self, tag, children):
-        """
-        Пересоздаёт DESC_CYCLE в UserData поле UD_DROPDOWN через SetUserDataContainer.
-        Это единственный рабочий способ обновить CYCLE динамически в R26.
-        Сохраняет текущий индекс выбора.
-        """
-        # Сохраняем текущий выбор перед пересозданием
-        current_idx = tag[c4d.ID_USERDATA, UD_DROPDOWN] or 0
+    def GetDDescription(self, node, description, flags):
+        if not description.LoadDescription("Obase"):
+            return False, flags
 
-        cycle_bc = c4d.BaseContainer()
+        bc = c4d.GetCustomDataTypeDefault(c4d.DTYPE_GROUP)
+        bc[c4d.DESC_NAME]    = "Параметры"
+        bc[c4d.DESC_COLUMNS] = 1
+        bc[c4d.DESC_DEFAULT] = 1
+        description.SetParameter(
+            c4d.DescID(c4d.DescLevel(CS_GRP_PARAMS, c4d.DTYPE_GROUP, 0)),
+            bc, c4d.ID_LISTHEAD)
+        gid = c4d.DescID(c4d.DescLevel(CS_GRP_PARAMS, c4d.DTYPE_GROUP, 0))
+
+        children = _get_direct_children(node.GetObject()) if node.GetObject() else []
+        bc = c4d.GetCustomDataTypeDefault(c4d.DTYPE_LONG)
+        bc[c4d.DESC_NAME]      = "Объект"
+        bc[c4d.DESC_CUSTOMGUI] = c4d.CUSTOMGUI_CYCLE
+        bc[c4d.DESC_DEFAULT]   = 0
+        cyc = c4d.BaseContainer()
         if children:
             for i, child in enumerate(children):
-                cycle_bc.SetString(i, child.GetName())
+                cyc[i] = child.GetName()
         else:
-            cycle_bc.SetString(0, "— нет дочерних —")
+            cyc[0] = "— нет дочерних —"
+        bc[c4d.DESC_CYCLE] = cyc
+        description.SetParameter(
+            c4d.DescID(c4d.DescLevel(CS_DROPDOWN, c4d.DTYPE_LONG, 0)),
+            bc, gid)
 
-        # Обновляем DESC_CYCLE через SetUserDataContainer
-        for ud_id, ud_bc in tag.GetUserDataContainer():
-            if ud_id[1].id == UD_DROPDOWN:
-                ud_bc[c4d.DESC_CYCLE] = cycle_bc
-                tag.SetUserDataContainer(ud_id, ud_bc)
-                break
+        bc = c4d.GetCustomDataTypeDefault(c4d.DTYPE_STRING)
+        bc[c4d.DESC_NAME]    = "Имя"
+        bc[c4d.DESC_EDITABLE] = False
+        description.SetParameter(
+            c4d.DescID(c4d.DescLevel(CS_NAME, c4d.DTYPE_STRING, 0)),
+            bc, gid)
 
-        # Восстанавливаем индекс (зажимаем в допустимые пределы)
-        max_idx = max(0, len(children) - 1) if children else 0
-        tag[c4d.ID_USERDATA, UD_DROPDOWN] = min(current_idx, max_idx)
+        bc = c4d.GetCustomDataTypeDefault(c4d.DTYPE_BASELISTLINK)
+        bc[c4d.DESC_NAME]      = "Связь"
+        bc[c4d.DESC_CUSTOMGUI] = c4d.CUSTOMGUI_LINKBOX
+        description.SetParameter(
+            c4d.DescID(c4d.DescLevel(CS_LINK, c4d.DTYPE_BASELISTLINK, 0)),
+            bc, gid)
+
+        return True, flags | c4d.DESCFLAGS_DESC_LOADED
 
     def Execute(self, tag, doc, op, bt, priority, flags):
-        """
-        Обновляем CYCLE и поля Имя/Связь при каждом тике.
-        CYCLE пересоздаётся только при изменении состава дочерних объектов.
-        """
         obj = tag.GetObject()
         if obj is None:
             return c4d.EXECUTIONRESULT_OK
@@ -129,27 +109,23 @@ class ChildSelectorTag(c4d.plugins.TagData):
         children = _get_direct_children(obj)
         names = [c.GetName() for c in children]
 
-        # Пересоздаём CYCLE только если состав детей изменился
         if names != self._cached_names:
             self._cached_names = names
-            self._rebuild_cycle(tag, children)
             c4d.EventAdd()
 
-        idx = tag[c4d.ID_USERDATA, UD_DROPDOWN]
+        idx = tag[CS_DROPDOWN]
 
         if children and idx is not None and 0 <= idx < len(children):
             selected = children[idx]
-            # Авто-обновление имени и ссылки
-            tag[c4d.ID_USERDATA, UD_NAME] = selected.GetName()
-            tag[c4d.ID_USERDATA, UD_LINK] = selected
+            tag[CS_NAME] = selected.GetName()
+            tag[CS_LINK] = selected
         else:
-            tag[c4d.ID_USERDATA, UD_NAME] = ""
-            tag[c4d.ID_USERDATA, UD_LINK] = None
+            tag[CS_NAME] = ""
+            tag[CS_LINK] = None
 
         return c4d.EXECUTIONRESULT_OK
 
     def Message(self, node, type, data):
-        """Реагируем на изменение пользовательских данных — обновляем AM."""
         if type == c4d.MSG_DESCRIPTION_COMMAND:
             c4d.EventAdd()
         return True
@@ -218,7 +194,7 @@ if __name__ == "__main__":
         str=TEG_NAME,
         info=c4d.TAG_EXPRESSION | c4d.TAG_VISIBLE,
         g=ChildSelectorTag,
-        description="",
+        description="Obase",
         icon=ICON_PLG
     )
 
