@@ -13,19 +13,30 @@ __res__ = c4d.plugins.GeResource()
 __res__.Init(os.path.dirname(__file__))
 
 PLUGIN_ID   = 1068852
-PLUGIN_NAME = "Hierarchy Filter v1.4.1"
+PLUGIN_NAME = "Hierarchy Filter v1.5"
 OBJECT_NAME = "Hierarchy Filter"
 PLUGIN_HELP = "Объект-фильтр иерархии для использования в Xpresso"
 
-# SubID UserData
+# SubID UserData (legacy, kept for reference)
 UD_OBJECT_TYPE    = 1
 UD_TRAVERSE_MODE  = 2
 UD_DEPTH          = 4
 UD_PARENT_OBJ     = 3
-UD_INEXCLUDE      = 5   # Результат фильтрации (только чтение)
-UD_IE2_INEX_MODE  = 6   # Включить / Исключить
-UD_IE2_OBJ_MODE   = 7   # Объект / Тип
-UD_INEXCLUDE2     = 8   # Второй InExclude (пользовательский)
+UD_INEXCLUDE      = 5
+UD_IE2_INEX_MODE  = 6
+UD_IE2_OBJ_MODE   = 7
+UD_INEXCLUDE2     = 8
+
+# Description-based parameter IDs
+HF_GRP_PARAMS  = 2000
+HF_OBJECT_TYPE = 2001
+HF_TRAVERSE_MODE = 2002
+HF_DEPTH       = 2003
+HF_PARENT_OBJ  = 2004
+HF_INEXCLUDE   = 2005
+HF_IE2_INEX_MODE = 2006
+HF_IE2_OBJ_MODE  = 2007
+HF_INEXCLUDE2  = 2008
 
 MODE_ALL       = 0
 MODE_RECURSIVE = 1
@@ -59,7 +70,6 @@ def _collect_direct_children(obj):
 
 
 def _collect_recursive(obj, depth=0, max_depth=-1):
-    """Возвращает список (object, depth_level)."""
     result = []
     child = obj.GetDown()
     while child:
@@ -71,10 +81,6 @@ def _collect_recursive(obj, depth=0, max_depth=-1):
 
 
 def _collect_parents_recursive(obj, depth=0, max_depth=-1):
-    """
-    Собирает все объекты у которых есть хоть один ребёнок, рекурсивно по всей иерархии.
-    Возвращает список (object, depth_level).
-    """
     result = []
     child = obj.GetDown()
     while child:
@@ -90,228 +96,97 @@ def _has_children(obj):
     return obj.GetDown() is not None
 
 
-def _ud_descid(op, uid):
-    for descid, bc in op.GetUserDataContainer():
-        if descid[1].id == uid:
-            return descid, bc
-    return None, None
+def _get_type_items(op):
+    children = _collect_direct_children(op)
+    seen = {}
+    for obj in children:
+        tid = obj.GetType()
+        if tid not in seen:
+            seen[tid] = _get_type_name(obj)
+        for sub, _ in _collect_recursive(obj):
+            stid = sub.GetType()
+            if stid not in seen:
+                seen[stid] = _get_type_name(sub)
+    return ["Все типы"] + sorted(seen.values())
 
 
-def _ud_get(op, uid):
-    did, _ = _ud_descid(op, uid)
-    if did is not None:
-        return op[did]
-    return None
+def _get_parent_items(op):
+    all_parents = _collect_parents_recursive(op)
+    labels = [op.GetName()]
+    for obj, depth in all_parents:
+        prefix = "-" * (depth + 1)
+        labels.append(prefix + " " + obj.GetName())
+    return labels
 
 
-# ─── Менеджер UserData ────────────────────────────────────────────────────────
+def _apply_filter(op):
+    traverse_mode = op[HF_TRAVERSE_MODE] if op[HF_TRAVERSE_MODE] is not None else MODE_ALL
+    depth_val     = op[HF_DEPTH] if op[HF_DEPTH] is not None else 3
+    type_idx      = op[HF_OBJECT_TYPE] if op[HF_OBJECT_TYPE] is not None else 0
+    parent_idx    = op[HF_PARENT_OBJ] if op[HF_PARENT_OBJ] is not None else 0
+    ie2_inex_mode = op[HF_IE2_INEX_MODE] if op[HF_IE2_INEX_MODE] is not None else IE2_EXCLUDE
+    ie2_obj_mode  = op[HF_IE2_OBJ_MODE] if op[HF_IE2_OBJ_MODE] is not None else IE2_OBJECT
+    ie2_data      = op[HF_INEXCLUDE2]
 
-class UserDataManager:
+    children = _collect_direct_children(op)
 
-    TRAVERSE_LABELS = [
-        "Все объекты",
-        "Рекурсивно",
-    ]
+    seen = {}
+    for obj in children:
+        tid = obj.GetType()
+        if tid not in seen:
+            seen[tid] = _get_type_name(obj)
+        for sub, _ in _collect_recursive(obj):
+            stid = sub.GetType()
+            if stid not in seen:
+                seen[stid] = _get_type_name(sub)
 
-    IE2_INEX_LABELS = ["Учета", "Исключения"]
-    IE2_OBJ_LABELS  = ["Объект", "Тип"]
+    sorted_types = sorted(seen.items(), key=lambda x: x[1])
+    filter_type_id = None
+    if type_idx > 0 and (type_idx - 1) < len(sorted_types):
+        filter_type_id = sorted_types[type_idx - 1][0]
 
-    def __init__(self, op):
-        self.op = op
+    all_parents = _collect_parents_recursive(op)
+    if parent_idx > 0 and (parent_idx - 1) < len(all_parents):
+        start_obj = all_parents[parent_idx - 1][0]
+    else:
+        start_obj = op
 
-    # ── Фабрики ───────────────────────────────────────────────────────────────
+    candidates = []
+    if traverse_mode == MODE_ALL:
+        for obj, _ in _collect_recursive(op):
+            candidates.append(obj)
+    elif traverse_mode == MODE_RECURSIVE:
+        for obj, _ in _collect_recursive(start_obj, max_depth=depth_val):
+            candidates.append(obj)
 
-    def _cycle_bc(self, name, items):
-        bc = c4d.GetCustomDatatypeDefault(c4d.DTYPE_LONG)
-        bc[c4d.DESC_NAME]       = name
-        bc[c4d.DESC_SHORT_NAME] = name
-        bc[c4d.DESC_CUSTOMGUI]  = c4d.CUSTOMGUI_CYCLE
-        cycle_bc = c4d.BaseContainer()
-        for i, label in enumerate(items):
-            cycle_bc[i] = label
-        bc[c4d.DESC_CYCLE]   = cycle_bc
-        bc[c4d.DESC_ANIMATE] = c4d.DESC_ANIMATE_ON
-        return bc
+    if filter_type_id is not None:
+        candidates = [o for o in candidates if o.GetType() == filter_type_id]
 
-    def _int_bc(self, name, default=3, minval=1, maxval=99):
-        bc = c4d.GetCustomDatatypeDefault(c4d.DTYPE_LONG)
-        bc[c4d.DESC_NAME]       = name
-        bc[c4d.DESC_SHORT_NAME] = name
-        bc[c4d.DESC_MIN]        = minval
-        bc[c4d.DESC_MAX]        = maxval
-        bc[c4d.DESC_DEFAULT]    = default
-        bc[c4d.DESC_ANIMATE]    = c4d.DESC_ANIMATE_ON
-        return bc
+    if ie2_data is not None:
+        count = ie2_data.GetObjectCount()
+        ie2_objects = []
+        ie2_types   = set()
+        for i in range(count):
+            obj = ie2_data.ObjectFromIndex(op.GetDocument(), i)
+            if obj:
+                ie2_objects.append(obj)
+                ie2_types.add(obj.GetType())
 
-    def _inexclude_bc(self, name, editable=False):
-        bc = c4d.GetCustomDatatypeDefault(c4d.CUSTOMDATATYPE_INEXCLUDE_LIST)
-        bc[c4d.DESC_NAME]       = name
-        bc[c4d.DESC_SHORT_NAME] = name
-        bc[c4d.DESC_ANIMATE]    = c4d.DESC_ANIMATE_OFF
-        bc[c4d.DESC_EDITABLE]   = editable
-        return bc
-
-    # ── Создание ──────────────────────────────────────────────────────────────
-
-    def ensure_created(self):
-        did, _ = _ud_descid(self.op, UD_OBJECT_TYPE)
-        if did is not None:
-            return
-
-        # 1. Тип объекта
-        self.op.AddUserData(self._cycle_bc("Тип объекта", ["Все типы"]))
-        # 2. Режим обхода
-        self.op.AddUserData(self._cycle_bc("Режим обхода", self.TRAVERSE_LABELS))
-        # 4. Родительский объект
-        self.op.AddUserData(self._cycle_bc("Рекурсивно начиная с", [self.op.GetName()]))
-
-        # 3. Глубина
-        self.op.AddUserData(self._int_bc("Рекурсивная глубина", default=3))
-
-        # 5. Результат фильтрации — только чтение
-        self.op.AddUserData(self._inexclude_bc(" ", editable=False))
-        # 6. Включить / Исключить
-        self.op.AddUserData(self._cycle_bc("Метод", self.IE2_INEX_LABELS))
-        # 7. Объект / Тип
-        self.op.AddUserData(self._cycle_bc("Режим фильтра", self.IE2_OBJ_LABELS))
-        # 8. Второй InExclude — пользователь заполняет сам
-        self.op.AddUserData(self._inexclude_bc(" ", editable=True))
-
-        # Значения по умолчанию
-        did, _ = _ud_descid(self.op, UD_TRAVERSE_MODE)
-        if did:
-            self.op[did] = MODE_ALL
-        did, _ = _ud_descid(self.op, UD_DEPTH)
-        if did:
-            self.op[did] = 3
-        did, _ = _ud_descid(self.op, UD_IE2_INEX_MODE)
-        if did:
-            self.op[did] = IE2_EXCLUDE
-
-    # ── Обновление дропдаунов ─────────────────────────────────────────────────
-
-    def _update_cycle(self, uid, items):
-        did, bc = _ud_descid(self.op, uid)
-        if did is None:
-            return
-        cycle_bc = c4d.BaseContainer()
-        for i, label in enumerate(items):
-            cycle_bc[i] = label
-        bc[c4d.DESC_CYCLE] = cycle_bc
-        self.op.SetUserDataContainer(did, bc)
-
-    def refresh_dropdowns(self):
-        children = _collect_direct_children(self.op)
-
-        # Dropdown 1 — типы из всей иерархии
-        seen = {}
-        for obj in children:
-            tid = obj.GetType()
-            if tid not in seen:
-                seen[tid] = _get_type_name(obj)
-            for sub, _ in _collect_recursive(obj):
-                stid = sub.GetType()
-                if stid not in seen:
-                    seen[stid] = _get_type_name(sub)
-
-        type_labels = ["Все типы"] + sorted(seen.values())
-        self._update_cycle(UD_OBJECT_TYPE, type_labels)
-
-        # Dropdown 4 — все родители по всей глубине иерархии
-        # Глубина показывается через префикс "-", "--", "---" и т.д.
-        all_parents = _collect_parents_recursive(self.op)
-        parent_labels = [self.op.GetName()]
-        for obj, depth in all_parents:
-            prefix = "-" * (depth + 1)
-            label = prefix + " " + obj.GetName()
-            parent_labels.append(label)
-        self._update_cycle(UD_PARENT_OBJ, parent_labels)
-
-    # ── Применение фильтра → InExclude 1 (только чтение) ─────────────────────
-
-    def apply_filter(self):
-        did_ie, _ = _ud_descid(self.op, UD_INEXCLUDE)
-        if did_ie is None:
-            return
-
-        traverse_mode = _ud_get(self.op, UD_TRAVERSE_MODE) or MODE_ALL
-        depth_val     = _ud_get(self.op, UD_DEPTH) or 3
-        type_idx      = _ud_get(self.op, UD_OBJECT_TYPE) or 0
-        parent_idx    = _ud_get(self.op, UD_PARENT_OBJ) or 0
-
-        # Второй InExclude — фильтр включения/исключения
-        ie2_inex_mode = _ud_get(self.op, UD_IE2_INEX_MODE) or IE2_INCLUDE
-        ie2_obj_mode  = _ud_get(self.op, UD_IE2_OBJ_MODE)  or IE2_OBJECT
-        did_ie2, _    = _ud_descid(self.op, UD_INEXCLUDE2)
-        ie2_data      = self.op[did_ie2] if did_ie2 else None
-
-        children = _collect_direct_children(self.op)
-
-        # Карта тип → имя для фильтра
-        seen = {}
-        for obj in children:
-            tid = obj.GetType()
-            if tid not in seen:
-                seen[tid] = _get_type_name(obj)
-            for sub, _ in _collect_recursive(obj):
-                stid = sub.GetType()
-                if stid not in seen:
-                    seen[stid] = _get_type_name(sub)
-
-        sorted_types = sorted(seen.items(), key=lambda x: x[1])
-        filter_type_id = None
-        if type_idx > 0 and (type_idx - 1) < len(sorted_types):
-            filter_type_id = sorted_types[type_idx - 1][0]
-
-        # Стартовый объект из Dropdown 4 (с учётом всей иерархии родителей)
-        all_parents = _collect_parents_recursive(self.op)
-        if parent_idx > 0 and (parent_idx - 1) < len(all_parents):
-            start_obj = all_parents[parent_idx - 1][0]
+        if ie2_inex_mode == IE2_INCLUDE:
+            if ie2_obj_mode == IE2_OBJECT:
+                candidates = [o for o in candidates if any(o.IsInstanceOf(e.GetType()) and o == e for e in ie2_objects)]
+            else:
+                candidates = [o for o in candidates if o.GetType() in ie2_types]
         else:
-            start_obj = self.op
+            if ie2_obj_mode == IE2_OBJECT:
+                candidates = [o for o in candidates if not any(o == e for e in ie2_objects)]
+            else:
+                candidates = [o for o in candidates if o.GetType() not in ie2_types]
 
-        # Сбор кандидатов
-        candidates = []
-        if traverse_mode == MODE_ALL:
-            for obj, _ in _collect_recursive(self.op):
-                candidates.append(obj)
-        elif traverse_mode == MODE_RECURSIVE:
-            for obj, _ in _collect_recursive(start_obj, max_depth=depth_val):
-                candidates.append(obj)
-
-        # Фильтр по типу (Dropdown 1)
-        if filter_type_id is not None:
-            candidates = [o for o in candidates if o.GetType() == filter_type_id]
-
-        # Применяем второй InExclude
-        if ie2_data is not None:
-            count = ie2_data.GetObjectCount()
-            ie2_objects = []
-            ie2_types   = set()
-            for i in range(count):
-                obj = ie2_data.ObjectFromIndex(self.op.GetDocument(), i)
-                if obj:
-                    ie2_objects.append(obj)
-                    ie2_types.add(obj.GetType())
-
-            if ie2_inex_mode == IE2_INCLUDE:
-                # Оставляем только те что в списке
-                if ie2_obj_mode == IE2_OBJECT:
-                    candidates = [o for o in candidates if any(o.IsInstanceOf(e.GetType()) and o == e for e in ie2_objects)]
-                else:  # IE2_TYPE
-                    candidates = [o for o in candidates if o.GetType() in ie2_types]
-            else:  # IE2_EXCLUDE
-                # Убираем те что в списке
-                if ie2_obj_mode == IE2_OBJECT:
-                    candidates = [o for o in candidates if not any(o == e for e in ie2_objects)]
-                else:  # IE2_TYPE
-                    candidates = [o for o in candidates if o.GetType() not in ie2_types]
-
-        # Записываем в InExclude 1
-        ie_data = c4d.InExcludeData()
-        for obj in candidates:
-            ie_data.InsertObject(obj, 1)
-        self.op[did_ie] = ie_data
+    ie_data = c4d.InExcludeData()
+    for obj in candidates:
+        ie_data.InsertObject(obj, 1)
+    op[HF_INEXCLUDE] = ie_data
 
 
 # ─── ObjectData Plugin ───────────────────────────────────────────────────────
@@ -319,72 +194,139 @@ class UserDataManager:
 class HierarchyFilterObject(c4d.plugins.ObjectData):
 
     def Init(self, op, isload=False):
-        udm = UserDataManager(op)
-        udm.ensure_created()
+        if not isload:
+            op.SetName(OBJECT_NAME)
+            op[HF_OBJECT_TYPE]  = 0
+            op[HF_TRAVERSE_MODE] = MODE_ALL
+            op[HF_DEPTH]        = 3
+            op[HF_PARENT_OBJ]   = 0
+            op[HF_IE2_INEX_MODE] = IE2_EXCLUDE
+            op[HF_IE2_OBJ_MODE]  = IE2_OBJECT
         return True
 
     def GetDDescription(self, op, description, flags):
-        if not description.LoadDescription(op.GetType()):
+        if not description.LoadDescription("Obase"):
             return False, flags
 
-        udm = UserDataManager(op)
-        udm.ensure_created()
-        udm.refresh_dropdowns()
+        bc = c4d.GetCustomDataTypeDefault(c4d.DTYPE_GROUP)
+        bc[c4d.DESC_NAME]    = "Параметры"
+        bc[c4d.DESC_COLUMNS] = 1
+        bc[c4d.DESC_DEFAULT] = 1
+        description.SetParameter(
+            c4d.DescID(c4d.DescLevel(HF_GRP_PARAMS, c4d.DTYPE_GROUP, 0)),
+            bc, c4d.ID_LISTHEAD)
+        gid = c4d.DescID(c4d.DescLevel(HF_GRP_PARAMS, c4d.DTYPE_GROUP, 0))
 
-        traverse_mode = _ud_get(op, UD_TRAVERSE_MODE)
-        if traverse_mode is None:
-            traverse_mode = MODE_ALL
+        type_items = _get_type_items(op)
+        bc = c4d.GetCustomDataTypeDefault(c4d.DTYPE_LONG)
+        bc[c4d.DESC_NAME]      = "Тип объекта"
+        bc[c4d.DESC_CUSTOMGUI] = c4d.CUSTOMGUI_CYCLE
+        bc[c4d.DESC_DEFAULT]   = 0
+        cyc = c4d.BaseContainer()
+        for i, label in enumerate(type_items):
+            cyc[i] = label
+        bc[c4d.DESC_CYCLE] = cyc
+        description.SetParameter(
+            c4d.DescID(c4d.DescLevel(HF_OBJECT_TYPE, c4d.DTYPE_LONG, 0)),
+            bc, gid)
 
+        bc = c4d.GetCustomDataTypeDefault(c4d.DTYPE_LONG)
+        bc[c4d.DESC_NAME]      = "Режим обхода"
+        bc[c4d.DESC_CUSTOMGUI] = c4d.CUSTOMGUI_CYCLE
+        bc[c4d.DESC_DEFAULT]   = MODE_ALL
+        cyc = c4d.BaseContainer()
+        cyc[0] = "Все объекты"
+        cyc[1] = "Рекурсивно"
+        bc[c4d.DESC_CYCLE] = cyc
+        description.SetParameter(
+            c4d.DescID(c4d.DescLevel(HF_TRAVERSE_MODE, c4d.DTYPE_LONG, 0)),
+            bc, gid)
+
+        traverse_mode = op[HF_TRAVERSE_MODE] if op[HF_TRAVERSE_MODE] is not None else MODE_ALL
         is_all_mode = (traverse_mode == MODE_ALL)
 
-        for descid, bc in op.GetUserDataContainer():
-            uid = descid[1].id
+        parent_items = _get_parent_items(op)
+        bc = c4d.GetCustomDataTypeDefault(c4d.DTYPE_LONG)
+        bc[c4d.DESC_NAME]      = "Рекурсивно начиная с"
+        bc[c4d.DESC_CUSTOMGUI] = c4d.CUSTOMGUI_CYCLE
+        bc[c4d.DESC_DEFAULT]   = 0
+        bc[c4d.DESC_EDITABLE]  = not is_all_mode
+        cyc = c4d.BaseContainer()
+        for i, label in enumerate(parent_items):
+            cyc[i] = label
+        bc[c4d.DESC_CYCLE] = cyc
+        description.SetParameter(
+            c4d.DescID(c4d.DescLevel(HF_PARENT_OBJ, c4d.DTYPE_LONG, 0)),
+            bc, gid)
 
-            if uid == UD_DEPTH:
-                # Неактивны при "Все объекты", активны при "Рекурсивно"
-                bc[c4d.DESC_EDITABLE] = not is_all_mode
-                description.SetParameter(descid, bc, c4d.DESCID_ROOT)
+        bc = c4d.GetCustomDataTypeDefault(c4d.DTYPE_LONG)
+        bc[c4d.DESC_NAME]    = "Рекурсивная глубина"
+        bc[c4d.DESC_DEFAULT] = 3
+        bc[c4d.DESC_MIN]     = 1
+        bc[c4d.DESC_MAX]     = 99
+        bc[c4d.DESC_EDITABLE] = not is_all_mode
+        description.SetParameter(
+            c4d.DescID(c4d.DescLevel(HF_DEPTH, c4d.DTYPE_LONG, 0)),
+            bc, gid)
 
-            elif uid == UD_PARENT_OBJ:
-                # Неактивны при "Все объекты", активны при "Рекурсивно"
-                bc[c4d.DESC_EDITABLE] = not is_all_mode
-                description.SetParameter(descid, bc, c4d.DESCID_ROOT)
+        bc = c4d.GetCustomDataTypeDefault(c4d.CUSTOMDATATYPE_INEXCLUDE_LIST)
+        bc[c4d.DESC_NAME]    = " "
+        bc[c4d.DESC_ANIMATE] = c4d.DESC_ANIMATE_OFF
+        bc[c4d.DESC_EDITABLE] = False
+        description.SetParameter(
+            c4d.DescID(c4d.DescLevel(HF_INEXCLUDE, c4d.CUSTOMDATATYPE_INEXCLUDE_LIST, 0)),
+            bc, gid)
+
+        bc = c4d.GetCustomDataTypeDefault(c4d.DTYPE_LONG)
+        bc[c4d.DESC_NAME]      = "Метод"
+        bc[c4d.DESC_CUSTOMGUI] = c4d.CUSTOMGUI_CYCLE
+        bc[c4d.DESC_DEFAULT]   = IE2_EXCLUDE
+        cyc = c4d.BaseContainer()
+        cyc[0] = "Учета"
+        cyc[1] = "Исключения"
+        bc[c4d.DESC_CYCLE] = cyc
+        description.SetParameter(
+            c4d.DescID(c4d.DescLevel(HF_IE2_INEX_MODE, c4d.DTYPE_LONG, 0)),
+            bc, gid)
+
+        bc = c4d.GetCustomDataTypeDefault(c4d.DTYPE_LONG)
+        bc[c4d.DESC_NAME]      = "Режим фильтра"
+        bc[c4d.DESC_CUSTOMGUI] = c4d.CUSTOMGUI_CYCLE
+        bc[c4d.DESC_DEFAULT]   = IE2_OBJECT
+        cyc = c4d.BaseContainer()
+        cyc[0] = "Объект"
+        cyc[1] = "Тип"
+        bc[c4d.DESC_CYCLE] = cyc
+        description.SetParameter(
+            c4d.DescID(c4d.DescLevel(HF_IE2_OBJ_MODE, c4d.DTYPE_LONG, 0)),
+            bc, gid)
+
+        bc = c4d.GetCustomDataTypeDefault(c4d.CUSTOMDATATYPE_INEXCLUDE_LIST)
+        bc[c4d.DESC_NAME]    = " "
+        bc[c4d.DESC_ANIMATE] = c4d.DESC_ANIMATE_OFF
+        bc[c4d.DESC_EDITABLE] = True
+        description.SetParameter(
+            c4d.DescID(c4d.DescLevel(HF_INEXCLUDE2, c4d.CUSTOMDATATYPE_INEXCLUDE_LIST, 0)),
+            bc, gid)
 
         return True, flags | c4d.DESCFLAGS_DESC_LOADED
 
     def Message(self, op, type_, data):
-
         if type_ == c4d.MSG_MENUPREPARE:
             if op.GetName() == PLUGIN_NAME:
                 op.SetName(OBJECT_NAME)
 
         if type_ == c4d.MSG_DESCRIPTION_POSTSETPARAMETER:
-            # Откатываем ручное редактирование первого InExclude
-            if data and "descid" in data:
-                changed_id = data["descid"]
-                if changed_id and changed_id[1].id == UD_INEXCLUDE:
-                    udm = UserDataManager(op)
-                    udm.apply_filter()
-                    return True
-            udm = UserDataManager(op)
-            udm.ensure_created()
-            udm.refresh_dropdowns()
-            udm.apply_filter()
+            _apply_filter(op)
+            return True
 
-        elif type_ in (c4d.MSG_UPDATE,
-                    c4d.MSG_DOCUMENTINFO):
-            udm = UserDataManager(op)
-            udm.ensure_created()
-            udm.refresh_dropdowns()
-            udm.apply_filter()
+        elif type_ in (c4d.MSG_UPDATE, c4d.MSG_DOCUMENTINFO):
+            _apply_filter(op)
 
         return True
 
     def GetVirtualObjects(self, op, hh):
-        udm = UserDataManager(op)
-        udm.ensure_created()
-        udm.refresh_dropdowns()
-        udm.apply_filter()
+        _apply_filter(op)
         return c4d.BaseObject(c4d.Onull)
 
     def CheckDirty(self, op, doc):
@@ -422,7 +364,7 @@ if __name__ == "__main__":
         id          = PLUGIN_ID,
         str         = PLUGIN_NAME,
         g           = HierarchyFilterObject,
-        description = "",
+        description = "Obase",
         icon        = _make_icon(),
         info        = c4d.OBJECT_GENERATOR | c4d.OBJECT_INPUT,
     )
