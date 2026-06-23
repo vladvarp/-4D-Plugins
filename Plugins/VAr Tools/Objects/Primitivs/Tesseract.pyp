@@ -23,7 +23,7 @@ import tempfile
 # ══════════════════════════════════════════════════════════════════════════════
 
 ID_TESSERACT = 1068993
-NAME_TESSERACT = "Tesseract v1.5"
+NAME_TESSERACT = "Tesseract v1.6"
 
 # ══════════════════════════════════════════════════════════════════════════════
 #  Description-based parameter IDs
@@ -109,6 +109,19 @@ def _float_bc(name, default, minval, maxval, unit=c4d.DESC_UNIT_METER, step=1.0)
     bc[c4d.DESC_UNIT]       = unit
     bc[c4d.DESC_STEP]       = step
     bc[c4d.DESC_ANIMATE]    = c4d.DESC_ANIMATE_ON
+    bc[c4d.DESC_CUSTOMGUI]  = c4d.CUSTOMGUI_REALSLIDER
+    return bc
+
+def _float_bc_nosl(name, default, minval, maxval, unit=c4d.DESC_UNIT_METER, step=1.0):
+    bc = c4d.GetCustomDatatypeDefault(c4d.DTYPE_REAL)
+    bc[c4d.DESC_NAME]       = name
+    bc[c4d.DESC_SHORT_NAME] = name
+    bc[c4d.DESC_DEFAULT]    = default
+    bc[c4d.DESC_MIN]        = minval
+    bc[c4d.DESC_MAX]        = maxval
+    bc[c4d.DESC_UNIT]       = unit
+    bc[c4d.DESC_STEP]       = step
+    bc[c4d.DESC_ANIMATE]    = c4d.DESC_ANIMATE_ON
     return bc
 
 
@@ -121,6 +134,7 @@ def _int_bc(name, default, minval, maxval):
     bc[c4d.DESC_MAX]        = maxval
     bc[c4d.DESC_STEP]       = 1
     bc[c4d.DESC_ANIMATE]    = c4d.DESC_ANIMATE_ON
+    bc[c4d.DESC_CUSTOMGUI]  = c4d.CUSTOMGUI_REALSLIDER
     return bc
 
 
@@ -159,10 +173,10 @@ def _setup_description(description):
                              bc, c4d.ID_LISTHEAD)
 
     description.SetParameter(c4d.DescID(c4d.DescLevel(TS_SIZE, c4d.DTYPE_REAL, 0)),
-                             _float_bc("Размер", DEFAULT_SIZE, 10.0, 5000.0),
+                             _float_bc_nosl("Размер", DEFAULT_SIZE, 10.0, 5000.0),
                              c4d.DescID(c4d.DescLevel(TS_GRP_CORE, c4d.DTYPE_GROUP, 0)))
     description.SetParameter(c4d.DescID(c4d.DescLevel(TS_PROJ_DIST, c4d.DTYPE_REAL, 0)),
-                             _float_bc("Расстояние проекции", DEFAULT_PROJ_DIST, 50.0, 10000.0),
+                             _float_bc_nosl("Расстояние проекции", DEFAULT_PROJ_DIST, 50.0, 10000.0),
                              c4d.DescID(c4d.DescLevel(TS_GRP_CORE, c4d.DTYPE_GROUP, 0)))
     description.SetParameter(c4d.DescID(c4d.DescLevel(TS_DISPLAY, c4d.DTYPE_LONG, 0)),
                              _cycle_bc("Отображение", DEFAULT_DISPLAY,
@@ -242,7 +256,7 @@ def _setup_description(description):
                                        unit=c4d.DESC_UNIT_FLOAT, step=0.1),
                              c4d.DescID(c4d.DescLevel(TS_GRP_ANIM, c4d.DTYPE_GROUP, 0)))
     description.SetParameter(c4d.DescID(c4d.DescLevel(TS_ANIM_PHASE, c4d.DTYPE_REAL, 0)),
-                             _float_bc("Фаза", DEFAULT_ANIM_PHASE, -10000.0, 10000.0,
+                             _float_bc_nosl("Фаза", DEFAULT_ANIM_PHASE, -10000.0, 10000.0,
                                        unit=c4d.DESC_UNIT_FLOAT, step=0.01),
                              c4d.DescID(c4d.DescLevel(TS_GRP_ANIM, c4d.DTYPE_GROUP, 0)))
 
@@ -565,12 +579,12 @@ def _build_tesseract(op):
             t = doc.GetTime().Get()
         else:
             t = 0.0
-        rot_xy += speed_xy * t
-        rot_xz += speed_xz * t
-        rot_xw += speed_xw * t
-        rot_yz += speed_yz * t
-        rot_yw += speed_yw * t
-        rot_zw += speed_zw * t
+        rot_xy += speed_xy * t + phase
+        rot_xz += speed_xz * t + phase
+        rot_xw += speed_xw * t + phase
+        rot_yz += speed_yz * t + phase
+        rot_yw += speed_yw * t + phase
+        rot_zw += speed_zw * t + phase
 
     # ── 4D → 3D ──────────────────────────────────────────────────────────
     mat = _build_rotation_matrix(rot_xy, rot_xz, rot_xw, rot_yz, rot_yw, rot_zw)
