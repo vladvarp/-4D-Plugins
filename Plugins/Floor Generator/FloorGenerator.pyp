@@ -37,7 +37,7 @@ import tempfile
 # ══════════════════════════════════════════════════════════════════════════════
 
 ID_FLOORGEN   = 1068969
-NAME_FLOORGEN = "Floor Generator v2.7.1"
+NAME_FLOORGEN = "Floor Generator v2.8"
 
 # ══════════════════════════════════════════════════════════════════════════════
 #  Паттерны
@@ -52,44 +52,42 @@ PAT_NAMES = ["Шеврон", "Паркет", "Соты", "Ёлка"]
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-#  UserData SubID — порядок вызовов AddUserData
+#  Description Parameter IDs
 # ══════════════════════════════════════════════════════════════════════════════
 
 # Группа «Паттерн»
-UD_G_PAT    = 1
-FG_PATTERN  = 2
-FG_TILE_W   = 3
-FG_TILE_H   = 4
-FG_PAT_X    = 5
-FG_PAT_Y    = 6
-FG_ANGLE    = 7
-FG_OFFSET   = 8
-FG_SEED     = 9
-FG_PARQ_RAND_W = 10
+FG_GRP_PAT      = 2000
+FG_PATTERN      = 2100
+FG_TILE_W       = 2101
+FG_TILE_H       = 2102
+FG_PAT_X        = 2103
+FG_PAT_Y        = 2104
+FG_ANGLE        = 2105
+FG_OFFSET       = 2106
+FG_SEED         = 2107
+FG_PARQ_RAND_W  = 2108
 
 # Группа «Толщина и фаска»
-UD_G_THK    = 11
-FG_THICKNESS = 12
-FG_BEVEL    = 13
+FG_GRP_THK      = 2001
+FG_THICKNESS    = 2110
+FG_BEVEL        = 2111
 
 # Группа «Швы»
-UD_G_SEAM   = 14
-FG_SEAM_ON  = 15
-FG_SEAM_W   = 16
+FG_GRP_SEAM     = 2002
+FG_SEAM_ON      = 2120
+FG_SEAM_W       = 2121
 
 # Группа «UV»
-UD_G_UV     = 17
-FG_UV_SX    = 18
-FG_UV_SY    = 19
-FG_UV_ROT   = 20
-FG_UV_RAND  = 21
-FG_UV_RANDR = 22
-FG_UV_RANDOFF   = 23
-FG_UV_RANDOFF_X = 24
-FG_UV_RANDOFF_Y = 25
-FG_UV_RAND_SEED = 26
-
-FG_FIRST_PARAM = FG_PATTERN
+FG_GRP_UV       = 2003
+FG_UV_SX        = 2130
+FG_UV_SY        = 2131
+FG_UV_ROT       = 2132
+FG_UV_RAND      = 2133
+FG_UV_RANDR     = 2134
+FG_UV_RANDOFF   = 2135
+FG_UV_RANDOFF_X = 2136
+FG_UV_RANDOFF_Y = 2137
+FG_UV_RAND_SEED = 2138
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -125,47 +123,17 @@ DEF_PARQ_RAND_W = 0.0
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-#  UserData helpers (following MHL pattern)
+#  Вспомогательные функции Description
 # ══════════════════════════════════════════════════════════════════════════════
 
-def _ud_descid(op, uid):
-    for descid, bc in op.GetUserDataContainer():
-        if descid[1].id == uid:
-            return descid, bc
-    return None, None
-
-def _ud_get(op, uid, default=None):
-    did, _ = _ud_descid(op, uid)
-    if did is not None:
-        val = op[did]
-        if val is not None:
-            return val
-    return default
-
-def _ud_set(op, uid, value):
-    did, _ = _ud_descid(op, uid)
-    if did is not None:
-        op[did] = value
-
-def _ud_exists(op, uid):
-    did, _ = _ud_descid(op, uid)
-    return did is not None
-
-def _add_group(op, name):
+def _group_bc(name):
     bc = c4d.GetCustomDatatypeDefault(c4d.DTYPE_GROUP)
     bc[c4d.DESC_NAME]       = name
     bc[c4d.DESC_SHORT_NAME] = name
     bc[c4d.DESC_TITLEBAR]   = 1
     bc[c4d.DESC_DEFAULT]    = 1
-    did = op.AddUserData(bc)
-    return did[1].id
+    return bc
 
-def _add_in_group(op, grp_subid, bc):
-    bc[c4d.DESC_PARENTGROUP] = c4d.DescID(
-        c4d.DescLevel(c4d.ID_USERDATA, c4d.DTYPE_SUBCONTAINER, 0),
-        c4d.DescLevel(grp_subid, c4d.DTYPE_GROUP, 0)
-    )
-    return op.AddUserData(bc)
 
 def _float_bc(name, default, minval, maxval, unit=c4d.DESC_UNIT_METER, step=1.0):
     bc = c4d.GetCustomDatatypeDefault(c4d.DTYPE_REAL)
@@ -179,6 +147,7 @@ def _float_bc(name, default, minval, maxval, unit=c4d.DESC_UNIT_METER, step=1.0)
     bc[c4d.DESC_ANIMATE]    = c4d.DESC_ANIMATE_ON
     return bc
 
+
 def _int_bc(name, default, minval, maxval):
     bc = c4d.GetCustomDatatypeDefault(c4d.DTYPE_LONG)
     bc[c4d.DESC_NAME]       = name
@@ -190,6 +159,7 @@ def _int_bc(name, default, minval, maxval):
     bc[c4d.DESC_ANIMATE]    = c4d.DESC_ANIMATE_ON
     return bc
 
+
 def _bool_bc(name, default):
     bc = c4d.GetCustomDatatypeDefault(c4d.DTYPE_BOOL)
     bc[c4d.DESC_NAME]       = name
@@ -197,6 +167,7 @@ def _bool_bc(name, default):
     bc[c4d.DESC_DEFAULT]    = default
     bc[c4d.DESC_ANIMATE]    = c4d.DESC_ANIMATE_ON
     return bc
+
 
 def _cycle_bc(name, default, items):
     bc = c4d.GetCustomDatatypeDefault(c4d.DTYPE_LONG)
@@ -1428,29 +1399,29 @@ def _build_floor(op):
 
     normal, origin, boundary_2d, u_axis, v_axis, holes_2d = info
 
-    pattern    = int(_ud_get(op, FG_PATTERN,   DEF_PATTERN))
-    tile_w     = max(1.0, float(_ud_get(op, FG_TILE_W,    DEF_TILE_W)))
-    tile_h     = max(1.0, float(_ud_get(op, FG_TILE_H,    DEF_TILE_H)))
-    pat_x      = float(_ud_get(op, FG_PAT_X,  DEF_PAT_X))
-    pat_y      = float(_ud_get(op, FG_PAT_Y,  DEF_PAT_Y))
-    angle      = float(_ud_get(op, FG_ANGLE,  DEF_ANGLE))
-    offset     = float(_ud_get(op, FG_OFFSET, DEF_OFFSET))
-    seed       = int(_ud_get(op, FG_SEED,     DEF_SEED))
-    thickness  = max(0.001, float(_ud_get(op, FG_THICKNESS, DEF_THICKNESS)))
-    bevel      = max(0.0, float(_ud_get(op, FG_BEVEL, DEF_BEVEL)))
-    seam_on    = bool(_ud_get(op, FG_SEAM_ON, DEF_SEAM_ON))
-    seam_w     = max(0.0, float(_ud_get(op, FG_SEAM_W, DEF_SEAM_W)))
+    pattern    = int(op[FG_PATTERN])
+    tile_w     = max(1.0, float(op[FG_TILE_W]))
+    tile_h     = max(1.0, float(op[FG_TILE_H]))
+    pat_x      = float(op[FG_PAT_X])
+    pat_y      = float(op[FG_PAT_Y])
+    angle      = float(op[FG_ANGLE])
+    offset     = float(op[FG_OFFSET])
+    seed       = int(op[FG_SEED])
+    thickness  = max(0.001, float(op[FG_THICKNESS]))
+    bevel      = max(0.0, float(op[FG_BEVEL]))
+    seam_on    = bool(op[FG_SEAM_ON])
+    seam_w     = max(0.0, float(op[FG_SEAM_W]))
 
-    uv_sx      = max(0.1, float(_ud_get(op, FG_UV_SX, DEF_UV_SX)))
-    uv_sy      = max(0.1, float(_ud_get(op, FG_UV_SY, DEF_UV_SY)))
-    uv_rot     = float(_ud_get(op, FG_UV_ROT, DEF_UV_ROT))
-    uv_rand    = bool(_ud_get(op, FG_UV_RAND, DEF_UV_RAND))
-    uv_rand_r  = float(_ud_get(op, FG_UV_RANDR, DEF_UV_RANDR))
-    uv_rand_off    = bool(_ud_get(op, FG_UV_RANDOFF, DEF_UV_RANDOFF))
-    uv_rand_off_x  = float(_ud_get(op, FG_UV_RANDOFF_X, DEF_UV_RANDOFF_X))
-    uv_rand_off_y  = float(_ud_get(op, FG_UV_RANDOFF_Y, DEF_UV_RANDOFF_Y))
-    uv_rand_seed   = int(_ud_get(op, FG_UV_RAND_SEED, DEF_UV_RAND_SEED))
-    parq_rand_w    = float(_ud_get(op, FG_PARQ_RAND_W, DEF_PARQ_RAND_W)) / 100.0
+    uv_sx      = max(0.1, float(op[FG_UV_SX]))
+    uv_sy      = max(0.1, float(op[FG_UV_SY]))
+    uv_rot     = float(op[FG_UV_ROT])
+    uv_rand    = bool(op[FG_UV_RAND])
+    uv_rand_r  = float(op[FG_UV_RANDR])
+    uv_rand_off    = bool(op[FG_UV_RANDOFF])
+    uv_rand_off_x  = float(op[FG_UV_RANDOFF_X])
+    uv_rand_off_y  = float(op[FG_UV_RANDOFF_Y])
+    uv_rand_seed   = int(op[FG_UV_RAND_SEED])
+    parq_rand_w    = float(op[FG_PARQ_RAND_W]) / 100.0
 
     fills_p1_2d = []
     fills_p2_2d = []
@@ -1652,94 +1623,39 @@ def _build_floor(op):
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-#  UserData: создание интерфейса
-# ══════════════════════════════════════════════════════════════════════════════
-
-def _create_userdata(op):
-    g1 = _add_group(op, "Паттерн (P) (P1) (P2)")
-    _add_in_group(op, g1, _cycle_bc("Тип", DEF_PATTERN, PAT_NAMES))
-    _add_in_group(op, g1, _float_bc("Ширина плитки", DEF_TILE_W, 1.0, 10000.0))
-    _add_in_group(op, g1, _float_bc("Длина плитки", DEF_TILE_H, 1.0, 10000.0))
-    _add_in_group(op, g1, _float_bc("Смещение X", DEF_PAT_X,
-                  -10000.0, 10000.0, c4d.DESC_UNIT_METER, 1.0))
-    _add_in_group(op, g1, _float_bc("Смещение Y", DEF_PAT_Y,
-                  -10000.0, 10000.0, c4d.DESC_UNIT_METER, 1.0))
-    _add_in_group(op, g1, _float_bc("Угол поворота", DEF_ANGLE,
-                  -180.0, 180.0, c4d.DESC_UNIT_DEGREE, math.radians(1.0)))
-    _add_in_group(op, g1, _float_bc("Смещение рядов", DEF_OFFSET,
-                  0.0, 1.0, c4d.DESC_UNIT_PERCENT, 0.01))
-    _add_in_group(op, g1, _int_bc("Зерно", DEF_SEED, 0, 99999))
-    _add_in_group(op, g1, _float_bc("Разброс ширины", DEF_PARQ_RAND_W,
-                  0.0, 100.0, c4d.DESC_UNIT_REAL, 1.0))
-
-    g2 = _add_group(op, "Толщина и фаска (S)")
-    _add_in_group(op, g2, _float_bc("Толщина", DEF_THICKNESS, 0.001, 1000.0))
-    _add_in_group(op, g2, _float_bc("Фаска", DEF_BEVEL, 0.0, 100.0))
-
-    g3 = _add_group(op, "Швы")
-    _add_in_group(op, g3, _bool_bc("Швы включены", DEF_SEAM_ON))
-    _add_in_group(op, g3, _float_bc("Ширина шва", DEF_SEAM_W, 0.0, 50.0))
-
-    g4 = _add_group(op, "UV")
-    _add_in_group(op, g4, _float_bc("Ширина UV", DEF_UV_SX, 0.1, 10000.0))
-    _add_in_group(op, g4, _float_bc("Длина UV", DEF_UV_SY, 0.1, 10000.0))
-    _add_in_group(op, g4, _float_bc("Угол UV", DEF_UV_ROT,
-                  -180.0, 180.0, c4d.DESC_UNIT_DEGREE, math.radians(1.0)))
-    _add_in_group(op, g4, _bool_bc("Рандом угла UV", DEF_UV_RAND))
-    _add_in_group(op, g4, _float_bc("Диапазон рандома", DEF_UV_RANDR,
-                  0.0, 180.0, c4d.DESC_UNIT_DEGREE, math.radians(1.0)))
-    _add_in_group(op, g4, _bool_bc("Рандом смещения UV", DEF_UV_RANDOFF))
-    _add_in_group(op, g4, _float_bc("Смещение X", DEF_UV_RANDOFF_X,
-                  0.0, 10000.0, c4d.DESC_UNIT_METER, 1.0))
-    _add_in_group(op, g4, _float_bc("Смещение Y", DEF_UV_RANDOFF_Y,
-                  0.0, 10000.0, c4d.DESC_UNIT_METER, 1.0))
-    _add_in_group(op, g4, _int_bc("Сид смещения", DEF_UV_RAND_SEED, 0, 99999))
-
-
-def _set_defaults(op):
-    _ud_set(op, FG_PATTERN,   DEF_PATTERN)
-    _ud_set(op, FG_TILE_W,    DEF_TILE_W)
-    _ud_set(op, FG_TILE_H,    DEF_TILE_H)
-    _ud_set(op, FG_PAT_X,     DEF_PAT_X)
-    _ud_set(op, FG_PAT_Y,     DEF_PAT_Y)
-    _ud_set(op, FG_ANGLE,     DEF_ANGLE)
-    _ud_set(op, FG_OFFSET,    DEF_OFFSET)
-    _ud_set(op, FG_SEED,      DEF_SEED)
-    _ud_set(op, FG_PARQ_RAND_W, DEF_PARQ_RAND_W)
-    _ud_set(op, FG_THICKNESS, DEF_THICKNESS)
-    _ud_set(op, FG_BEVEL,     DEF_BEVEL)
-    _ud_set(op, FG_SEAM_ON,   DEF_SEAM_ON)
-    _ud_set(op, FG_SEAM_W,    DEF_SEAM_W)
-    _ud_set(op, FG_UV_SX,     DEF_UV_SX)
-    _ud_set(op, FG_UV_SY,     DEF_UV_SY)
-    _ud_set(op, FG_UV_ROT,    DEF_UV_ROT)
-    _ud_set(op, FG_UV_RAND,   DEF_UV_RAND)
-    _ud_set(op, FG_UV_RANDR,  DEF_UV_RANDR)
-    _ud_set(op, FG_UV_RANDOFF,    DEF_UV_RANDOFF)
-    _ud_set(op, FG_UV_RANDOFF_X,  DEF_UV_RANDOFF_X)
-    _ud_set(op, FG_UV_RANDOFF_Y,  DEF_UV_RANDOFF_Y)
-    _ud_set(op, FG_UV_RAND_SEED,  DEF_UV_RAND_SEED)
-
-
-# ══════════════════════════════════════════════════════════════════════════════
 #  Plugin class
 # ══════════════════════════════════════════════════════════════════════════════
 
 class FloorGeneratorObject(c4d.plugins.ObjectData):
 
-    def _ensure_ud(self, op):
-        if not _ud_exists(op, FG_FIRST_PARAM):
-            _create_userdata(op)
-            _set_defaults(op)
-
     def Init(self, op, isload=False):
         if not isload:
             op.SetName("Floor Generator")
-        self._ensure_ud(op)
+            op[FG_PATTERN]      = DEF_PATTERN
+            op[FG_TILE_W]       = DEF_TILE_W
+            op[FG_TILE_H]       = DEF_TILE_H
+            op[FG_PAT_X]        = DEF_PAT_X
+            op[FG_PAT_Y]        = DEF_PAT_Y
+            op[FG_ANGLE]        = DEF_ANGLE
+            op[FG_OFFSET]       = DEF_OFFSET
+            op[FG_SEED]         = DEF_SEED
+            op[FG_PARQ_RAND_W]  = DEF_PARQ_RAND_W
+            op[FG_THICKNESS]    = DEF_THICKNESS
+            op[FG_BEVEL]        = DEF_BEVEL
+            op[FG_SEAM_ON]      = DEF_SEAM_ON
+            op[FG_SEAM_W]       = DEF_SEAM_W
+            op[FG_UV_SX]        = DEF_UV_SX
+            op[FG_UV_SY]        = DEF_UV_SY
+            op[FG_UV_ROT]       = DEF_UV_ROT
+            op[FG_UV_RAND]      = DEF_UV_RAND
+            op[FG_UV_RANDR]     = DEF_UV_RANDR
+            op[FG_UV_RANDOFF]   = DEF_UV_RANDOFF
+            op[FG_UV_RANDOFF_X] = DEF_UV_RANDOFF_X
+            op[FG_UV_RANDOFF_Y] = DEF_UV_RANDOFF_Y
+            op[FG_UV_RAND_SEED] = DEF_UV_RAND_SEED
         return True
 
     def GetVirtualObjects(self, op, hh):
-        self._ensure_ud(op)
         try:
             result = _build_floor(op)
         except Exception as e:
@@ -1750,9 +1666,100 @@ class FloorGeneratorObject(c4d.plugins.ObjectData):
         return result
 
     def GetDDescription(self, op, description, flags):
-        if not description.LoadDescription(op.GetType()):
+        if not description.LoadDescription("Obase"):
             return False, flags
-        self._ensure_ud(op)
+
+        grp_pat = c4d.DescID(c4d.DescLevel(FG_GRP_PAT, c4d.DTYPE_GROUP, 0))
+        bc = _group_bc("Паттерн (P) (P1) (P2)")
+        description.SetParameter(grp_pat, bc, c4d.ID_LISTHEAD)
+
+        bc = _cycle_bc("Тип", DEF_PATTERN, PAT_NAMES)
+        description.SetParameter(c4d.DescID(c4d.DescLevel(FG_PATTERN, c4d.DTYPE_LONG, 0)), bc, grp_pat)
+
+        bc = _float_bc("Ширина плитки", DEF_TILE_W, 1.0, 10000.0)
+        description.SetParameter(c4d.DescID(c4d.DescLevel(FG_TILE_W, c4d.DTYPE_REAL, 0)), bc, grp_pat)
+
+        bc = _float_bc("Длина плитки", DEF_TILE_H, 1.0, 10000.0)
+        description.SetParameter(c4d.DescID(c4d.DescLevel(FG_TILE_H, c4d.DTYPE_REAL, 0)), bc, grp_pat)
+
+        bc = _float_bc("Смещение X", DEF_PAT_X,
+                       -10000.0, 10000.0, c4d.DESC_UNIT_METER, 1.0)
+        description.SetParameter(c4d.DescID(c4d.DescLevel(FG_PAT_X, c4d.DTYPE_REAL, 0)), bc, grp_pat)
+
+        bc = _float_bc("Смещение Y", DEF_PAT_Y,
+                       -10000.0, 10000.0, c4d.DESC_UNIT_METER, 1.0)
+        description.SetParameter(c4d.DescID(c4d.DescLevel(FG_PAT_Y, c4d.DTYPE_REAL, 0)), bc, grp_pat)
+
+        bc = _float_bc("Угол поворота", DEF_ANGLE,
+                       -180.0, 180.0, c4d.DESC_UNIT_DEGREE, math.radians(1.0))
+        description.SetParameter(c4d.DescID(c4d.DescLevel(FG_ANGLE, c4d.DTYPE_REAL, 0)), bc, grp_pat)
+
+        bc = _float_bc("Смещение рядов", DEF_OFFSET,
+                       0.0, 1.0, c4d.DESC_UNIT_PERCENT, 0.01)
+        description.SetParameter(c4d.DescID(c4d.DescLevel(FG_OFFSET, c4d.DTYPE_REAL, 0)), bc, grp_pat)
+
+        bc = _int_bc("Зерно", DEF_SEED, 0, 99999)
+        description.SetParameter(c4d.DescID(c4d.DescLevel(FG_SEED, c4d.DTYPE_LONG, 0)), bc, grp_pat)
+
+        bc = _float_bc("Разброс ширины", DEF_PARQ_RAND_W,
+                       0.0, 100.0, c4d.DESC_UNIT_REAL, 1.0)
+        description.SetParameter(c4d.DescID(c4d.DescLevel(FG_PARQ_RAND_W, c4d.DTYPE_REAL, 0)), bc, grp_pat)
+
+        grp_thk = c4d.DescID(c4d.DescLevel(FG_GRP_THK, c4d.DTYPE_GROUP, 0))
+        bc = _group_bc("Толщина и фаска (S)")
+        description.SetParameter(grp_thk, bc, c4d.ID_LISTHEAD)
+
+        bc = _float_bc("Толщина", DEF_THICKNESS, 0.001, 1000.0)
+        description.SetParameter(c4d.DescID(c4d.DescLevel(FG_THICKNESS, c4d.DTYPE_REAL, 0)), bc, grp_thk)
+
+        bc = _float_bc("Фаска", DEF_BEVEL, 0.0, 100.0)
+        description.SetParameter(c4d.DescID(c4d.DescLevel(FG_BEVEL, c4d.DTYPE_REAL, 0)), bc, grp_thk)
+
+        grp_seam = c4d.DescID(c4d.DescLevel(FG_GRP_SEAM, c4d.DTYPE_GROUP, 0))
+        bc = _group_bc("Швы")
+        description.SetParameter(grp_seam, bc, c4d.ID_LISTHEAD)
+
+        bc = _bool_bc("Швы включены", DEF_SEAM_ON)
+        description.SetParameter(c4d.DescID(c4d.DescLevel(FG_SEAM_ON, c4d.DTYPE_BOOL, 0)), bc, grp_seam)
+
+        bc = _float_bc("Ширина шва", DEF_SEAM_W, 0.0, 50.0)
+        description.SetParameter(c4d.DescID(c4d.DescLevel(FG_SEAM_W, c4d.DTYPE_REAL, 0)), bc, grp_seam)
+
+        grp_uv = c4d.DescID(c4d.DescLevel(FG_GRP_UV, c4d.DTYPE_GROUP, 0))
+        bc = _group_bc("UV")
+        description.SetParameter(grp_uv, bc, c4d.ID_LISTHEAD)
+
+        bc = _float_bc("Ширина UV", DEF_UV_SX, 0.1, 10000.0)
+        description.SetParameter(c4d.DescID(c4d.DescLevel(FG_UV_SX, c4d.DTYPE_REAL, 0)), bc, grp_uv)
+
+        bc = _float_bc("Длина UV", DEF_UV_SY, 0.1, 10000.0)
+        description.SetParameter(c4d.DescID(c4d.DescLevel(FG_UV_SY, c4d.DTYPE_REAL, 0)), bc, grp_uv)
+
+        bc = _float_bc("Угол UV", DEF_UV_ROT,
+                       -180.0, 180.0, c4d.DESC_UNIT_DEGREE, math.radians(1.0))
+        description.SetParameter(c4d.DescID(c4d.DescLevel(FG_UV_ROT, c4d.DTYPE_REAL, 0)), bc, grp_uv)
+
+        bc = _bool_bc("Рандом угла UV", DEF_UV_RAND)
+        description.SetParameter(c4d.DescID(c4d.DescLevel(FG_UV_RAND, c4d.DTYPE_BOOL, 0)), bc, grp_uv)
+
+        bc = _float_bc("Диапазон рандома", DEF_UV_RANDR,
+                       0.0, 180.0, c4d.DESC_UNIT_DEGREE, math.radians(1.0))
+        description.SetParameter(c4d.DescID(c4d.DescLevel(FG_UV_RANDR, c4d.DTYPE_REAL, 0)), bc, grp_uv)
+
+        bc = _bool_bc("Рандом смещения UV", DEF_UV_RANDOFF)
+        description.SetParameter(c4d.DescID(c4d.DescLevel(FG_UV_RANDOFF, c4d.DTYPE_BOOL, 0)), bc, grp_uv)
+
+        bc = _float_bc("Смещение X", DEF_UV_RANDOFF_X,
+                       0.0, 10000.0, c4d.DESC_UNIT_METER, 1.0)
+        description.SetParameter(c4d.DescID(c4d.DescLevel(FG_UV_RANDOFF_X, c4d.DTYPE_REAL, 0)), bc, grp_uv)
+
+        bc = _float_bc("Смещение Y", DEF_UV_RANDOFF_Y,
+                       0.0, 10000.0, c4d.DESC_UNIT_METER, 1.0)
+        description.SetParameter(c4d.DescID(c4d.DescLevel(FG_UV_RANDOFF_Y, c4d.DTYPE_REAL, 0)), bc, grp_uv)
+
+        bc = _int_bc("Сид смещения", DEF_UV_RAND_SEED, 0, 99999)
+        description.SetParameter(c4d.DescID(c4d.DescLevel(FG_UV_RAND_SEED, c4d.DTYPE_LONG, 0)), bc, grp_uv)
+
         return True, flags | c4d.DESCFLAGS_DESC_LOADED
 
     def CheckDirty(self, op, doc):
@@ -1800,7 +1807,7 @@ if __name__ == "__main__":
         id          = ID_FLOORGEN,
         str         = NAME_FLOORGEN,
         g           = FloorGeneratorObject,
-        description = "",
+        description = "Obase",
         icon        = _make_icon(),
         info        = c4d.OBJECT_GENERATOR,
     )

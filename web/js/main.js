@@ -94,7 +94,7 @@ function initIndexPage() {
             description: 'Процедурный генератор напольных покрытий — ёлочка, паркет, шеврон, соты — с фаской, швами и рандомизированными UV.',
             icon: 'ico/FloorGenerator.png',
             tags: [`Моделирование`, `Процедурный`],
-            version: 'v2.7.1',
+            version: 'v2.8',
             mdFile: 'plugins/floor-generator.md'
         },
         {
