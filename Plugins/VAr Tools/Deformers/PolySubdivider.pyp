@@ -21,7 +21,7 @@ import tempfile
 # ── ID плагина ──
 PLUGIN_ID = 1068837
 MENU_NAME = "Poly Subdivider"
-MENU_NAME_V = "Poly Subdivider v1.0.1 (Experimental)"
+MENU_NAME_V = "Poly Subdivider v1.0.2 (Experimental)"
 
 # ============================================================
 #  ID параметров (должны быть > 999, не пересекаться с C4D)
@@ -493,6 +493,7 @@ class PolySubdividerObject(plugins.ObjectData):
         bc[c4d.DESC_MAX]     = 8
         bc[c4d.DESC_STEP]    = 1
         bc[c4d.DESC_DEFAULT] = 3
+        bc[c4d.DESC_CUSTOMGUI] = c4d.CUSTOMGUI_REALSLIDER
         description.SetParameter(
             c4d.DescID(c4d.DescLevel(PAR_ITERATIONS, c4d.DTYPE_LONG, 0)),
             bc, gid
@@ -506,6 +507,7 @@ class PolySubdividerObject(plugins.ObjectData):
         bc[c4d.DESC_STEP]    = 0.01
         bc[c4d.DESC_UNIT]    = c4d.DESC_UNIT_PERCENT
         bc[c4d.DESC_DEFAULT] = 0.18
+        bc[c4d.DESC_CUSTOMGUI] = c4d.CUSTOMGUI_REALSLIDER
         description.SetParameter(
             c4d.DescID(c4d.DescLevel(PAR_SLIDER_X, c4d.DTYPE_REAL, 0)),
             bc, gid
@@ -519,6 +521,7 @@ class PolySubdividerObject(plugins.ObjectData):
         bc[c4d.DESC_STEP]    = 0.01
         bc[c4d.DESC_UNIT]    = c4d.DESC_UNIT_PERCENT
         bc[c4d.DESC_DEFAULT] = 0.35
+        bc[c4d.DESC_CUSTOMGUI] = c4d.CUSTOMGUI_REALSLIDER
         description.SetParameter(
             c4d.DescID(c4d.DescLevel(PAR_SLIDER_Y, c4d.DTYPE_REAL, 0)),
             bc, gid
@@ -532,6 +535,7 @@ class PolySubdividerObject(plugins.ObjectData):
         bc[c4d.DESC_STEP]    = 0.01
         bc[c4d.DESC_UNIT]    = c4d.DESC_UNIT_PERCENT
         bc[c4d.DESC_DEFAULT] = 0.50
+        bc[c4d.DESC_CUSTOMGUI] = c4d.CUSTOMGUI_REALSLIDER
         description.SetParameter(
             c4d.DescID(c4d.DescLevel(PAR_SLIDER_Z, c4d.DTYPE_REAL, 0)),
             bc, gid
@@ -545,6 +549,7 @@ class PolySubdividerObject(plugins.ObjectData):
         bc[c4d.DESC_STEP]    = math.radians(1.0)
         bc[c4d.DESC_UNIT]    = c4d.DESC_UNIT_DEGREE
         bc[c4d.DESC_DEFAULT] = 0.0
+        bc[c4d.DESC_CUSTOMGUI] = c4d.CUSTOMGUI_REALSLIDER
         description.SetParameter(
             c4d.DescID(c4d.DescLevel(PAR_PATTERN_ROT, c4d.DTYPE_REAL, 0)),
             bc, gid
@@ -556,7 +561,10 @@ class PolySubdividerObject(plugins.ObjectData):
         bc[c4d.DESC_MIN]     = 0
         bc[c4d.DESC_MAX]     = 99999
         bc[c4d.DESC_STEP]    = 1
-        bc[c4d.DESC_DEFAULT] = 1235
+        bc[c4d.DESC_DEFAULT] = 0
+        bc[c4d.DESC_CUSTOMGUI] = c4d.CUSTOMGUI_REALSLIDER
+        bc[c4d.DESC_MINSLIDER] = 0
+        bc[c4d.DESC_MAXSLIDER] = 100
         description.SetParameter(
             c4d.DescID(c4d.DescLevel(PAR_RANDOM_SEED, c4d.DTYPE_LONG, 0)),
             bc, gid
@@ -580,6 +588,7 @@ class PolySubdividerObject(plugins.ObjectData):
         bc[c4d.DESC_MAX]     = 50.0
         bc[c4d.DESC_STEP]    = 0.1
         bc[c4d.DESC_DEFAULT] = 0.5
+        bc[c4d.DESC_CUSTOMGUI] = c4d.CUSTOMGUI_REALSLIDER
         description.SetParameter(
             c4d.DescID(c4d.DescLevel(PAR_NOISE_AMT, c4d.DTYPE_REAL, 0)),
             bc, nid
@@ -592,6 +601,7 @@ class PolySubdividerObject(plugins.ObjectData):
         bc[c4d.DESC_MAX]     = 20.0
         bc[c4d.DESC_STEP]    = 0.1
         bc[c4d.DESC_DEFAULT] = 3.0
+        bc[c4d.DESC_CUSTOMGUI] = c4d.CUSTOMGUI_REALSLIDER
         description.SetParameter(
             c4d.DescID(c4d.DescLevel(PAR_NOISE_FREQ, c4d.DTYPE_REAL, 0)),
             bc, nid
@@ -605,6 +615,7 @@ class PolySubdividerObject(plugins.ObjectData):
         bc[c4d.DESC_STEP]    = 0.01
         bc[c4d.DESC_UNIT]    = c4d.DESC_UNIT_PERCENT
         bc[c4d.DESC_DEFAULT] = 0.0
+        bc[c4d.DESC_CUSTOMGUI] = c4d.CUSTOMGUI_REALSLIDER
         description.SetParameter(
             c4d.DescID(c4d.DescLevel(PAR_NOISE_LOOP, c4d.DTYPE_REAL, 0)),
             bc, nid
