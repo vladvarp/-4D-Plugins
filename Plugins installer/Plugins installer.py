@@ -15,7 +15,7 @@ from urllib.parse import unquote, quote
 import ctypes
 
 PROGRAM_NAME = "4D Plugin Installer"
-PROGRAM_VER  = "v2.0"
+PROGRAM_VER  = "v2.1"
 
 # Скрываем консольное окно для всех дочерних процессов на Windows
 CREATE_NO_WINDOW = 0x08000000
@@ -45,6 +45,8 @@ GIT_RELEASES_PAGE = "https://github.com/git-for-windows/git/releases"
 LIST_JSON_CACHE = Path(tempfile.gettempdir()) / "c4d_installer_list_cache.json"
 # Файл состояния свёрнутых/развёрнутых групп авторов
 GROUPS_STATE_FILE = Path(tempfile.gettempdir()) / "c4d_installer_groups_state.json"
+# Кэш дат обновления и иконок плагинов (ключ — имя папки плагина)
+PLUGIN_META_CACHE = Path(os.getenv("APPDATA")) / "C4D_PluginInstaller" / "plugin_meta_cache.json"
 # URL логотипа в шапке
 HEADER_LOGO_URL = (
     "https://raw.githubusercontent.com/vladvarp/-4D-Plugins/refs/heads/main/Plugins%20installer/icon.png"
@@ -228,6 +230,17 @@ def parse_list_json(raw: str) -> tuple[list[dict], dict]:
             raw_base = parts[0].replace("github.com", "raw.githubusercontent.com")
             raw_ver_url = f"{raw_base}/{branch}/{quote(repo_path, safe='/')}/ver"
 
+            # Иконка плагина из JSON (необязательное поле)
+            ico_url = p.get("ico", "").strip()
+
+            # URL GitHub API для получения даты последнего коммита папки плагина
+            # Пример: https://api.github.com/repos/user/repo/commits?path=Plugins/Name&per_page=1
+            repo_owner_name = parts[0].replace("https://github.com/", "")  # user/repo
+            github_commits_url = (
+                f"https://api.github.com/repos/{repo_owner_name}/commits"
+                f"?path={quote(repo_path, safe='')}&per_page=1"
+            )
+
             plugins_out.append({
                 "name":             folder_name,       # имя папки в репо (технический ключ)
                 "json_display_name": json_display_name, # имя из JSON (запасное)
@@ -239,7 +252,10 @@ def parse_list_json(raw: str) -> tuple[list[dict], dict]:
                 "info_url":    info_url,
                 "author":      author_name,
                 "raw_ver_url": raw_ver_url,
+                "ico_url":     ico_url,             # URL иконки плагина (или пусто)
+                "github_commits_url": github_commits_url,  # для запроса даты обновления
                 # remote_ver и remote_display_name заполняются после загрузки файла ver
+                # last_updated заполняется после запроса к GitHub API
             })
 
         authors_out.append({
@@ -278,6 +294,28 @@ def save_groups_state(state: dict):
     try:
         with open(GROUPS_STATE_FILE, "w", encoding="utf-8") as f:
             json.dump(state, f, ensure_ascii=False)
+    except Exception:
+        pass
+
+def load_plugin_meta_cache() -> dict:
+    """
+    Загружает кэш метаданных плагинов (дата обновления, иконка в base64).
+    Ключ — имя папки плагина. Возвращает {} если кэш отсутствует или повреждён.
+    """
+    if PLUGIN_META_CACHE.exists():
+        try:
+            with open(PLUGIN_META_CACHE, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            pass
+    return {}
+
+def save_plugin_meta_cache(cache: dict):
+    """Сохраняет кэш метаданных плагинов (дата + иконка base64) на диск."""
+    try:
+        PLUGIN_META_CACHE.parent.mkdir(parents=True, exist_ok=True)
+        with open(PLUGIN_META_CACHE, "w", encoding="utf-8") as f:
+            json.dump(cache, f, ensure_ascii=False)
     except Exception:
         pass
 
@@ -423,6 +461,33 @@ def fetch_remote_ver(raw_ver_url: str) -> tuple[str, str]:
         return (ver if ver else "not_found"), dn  # пустой файл ver = версия не указана
     except Exception:
         return "error", ""
+
+def fetch_plugin_last_updated(commits_url: str) -> str:
+    """
+    Запрашивает GitHub API для получения даты последнего коммита,
+    затронувшего папку плагина.
+    Возвращает строку с датой в формате ДД.ММ.ГГГГ или "" при ошибке.
+    """
+    import urllib.error
+    try:
+        req = urllib.request.Request(
+            commits_url,
+            headers={
+                "User-Agent": "C4D-Installer/1.0",
+                "Accept": "application/vnd.github+json",
+            }
+        )
+        with urllib.request.urlopen(req, timeout=8) as r:
+            data = json.loads(r.read().decode("utf-8"))
+        if data and isinstance(data, list) and len(data) > 0:
+            # Дата коммита: data[0]["commit"]["committer"]["date"] = "2024-11-05T12:34:56Z"
+            date_str = data[0].get("commit", {}).get("committer", {}).get("date", "")
+            if date_str and len(date_str) >= 10:
+                y, m, d = date_str[:10].split("-")
+                return f"{d}.{m}.{y}"
+    except Exception:
+        pass
+    return ""
 
 # ── Worker ────────────────────────────────────────────────────────────────────
 
@@ -772,6 +837,30 @@ class MainWindow(QMainWindow):
         self.table.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self.table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         self.table.setShowGrid(False)
+
+        # ── Плавная прокрутка ─────────────────────────────────────────────────
+        # QTableWidget прокручивается ступенчато (по строкам); переключаем на
+        # попиксельную прокрутку и реализуем инерционную анимацию через таймер.
+        self.table.setVerticalScrollMode(QAbstractItemView.ScrollMode.ScrollPerPixel)
+        self._smooth_scroll_target = 0   # целевая позиция прокрутки в пикселях
+        self._smooth_scroll_timer = QTimer(self)
+        self._smooth_scroll_timer.setInterval(16)  # ~60 fps
+        self._smooth_scroll_timer.timeout.connect(self._smooth_scroll_step)
+
+        def _wheel_event(event):
+            delta = event.angleDelta().y()
+            # 120 единиц = один «щелчок» колеса; 80px за щелчок — комфортная скорость
+            step = int(-delta / 120 * 80)
+            sb = self.table.verticalScrollBar()
+            self._smooth_scroll_target = max(sb.minimum(),
+                                             min(sb.maximum(),
+                                                 self._smooth_scroll_target + step))
+            if not self._smooth_scroll_timer.isActive():
+                self._smooth_scroll_timer.start()
+            event.accept()
+
+        self.table.wheelEvent = _wheel_event
+
         v.addWidget(self.table)
         return w
 
@@ -798,6 +887,18 @@ class MainWindow(QMainWindow):
         return w
 
     # ── Логика ────────────────────────────────────────────────────────────────
+
+    def _smooth_scroll_step(self):
+        """Шаг анимации плавной прокрутки таблицы (вызывается таймером ~60 fps)."""
+        sb = self.table.verticalScrollBar()
+        current = sb.value()
+        diff = self._smooth_scroll_target - current
+        if abs(diff) <= 1:
+            sb.setValue(self._smooth_scroll_target)
+            self._smooth_scroll_timer.stop()
+        else:
+            # Экспоненциальное затухание: приближаемся на 20% оставшегося расстояния за кадр
+            sb.setValue(current + int(diff * 0.2) or (1 if diff > 0 else -1))
 
     def _on_search_changed(self, text: str):
         """Динамически фильтрует таблицу по тексту поиска (без учёта регистра)."""
@@ -867,12 +968,20 @@ class MainWindow(QMainWindow):
                     authors, app_meta = parse_list_json(raw)
                     # Инициализируем remote_ver: если версия указана в JSON — берём её,
                     # иначе None (будет загружена из файла ver репозитория)
+                    # Загружаем кэш дат и иконок — данные будут сразу видны до завершения сетевых запросов
+                    _meta_cache = load_plugin_meta_cache()
                     for author_entry in authors:
                         for p in author_entry["plugins"]:
+                            _cached = _meta_cache.get(p["name"], {})
                             # remote_ver: None = ещё не загружено из репо
                             p["remote_ver"] = None
                             # remote_display_name: None = ещё не загружено из репо
                             p["remote_display_name"] = None
+                            # last_updated: берём из кэша, None = не загружено и нет в кэше
+                            p["last_updated"] = _cached.get("last_updated") or None
+                            # ico_pixmap_data: декодируем из base64-кэша если есть
+                            _ico_b64 = _cached.get("ico_b64", "")
+                            p["ico_pixmap_data"] = base64.b64decode(_ico_b64) if _ico_b64 else None
                     self._pending = (authors, app_meta, is_offline, None)
                 except Exception as parse_err:
                     self._pending = ([], {}, is_offline, str(parse_err))
@@ -984,27 +1093,7 @@ class MainWindow(QMainWindow):
 
             # Имя + info/ссылка
             if p and (p.get("info") or p.get("info_url")):
-                name_widget = QWidget()
-                name_widget.setStyleSheet("background:transparent;")
-                nw_lay = QVBoxLayout(name_widget)
-                nw_lay.setContentsMargins(10, 4, 6, 4)
-                nw_lay.setSpacing(2)
-                lbl_name = QLabel(display_name)
-                lbl_name.setStyleSheet(f"color:{TEXT}; font-size:12px; background:transparent;")
-                nw_lay.addWidget(lbl_name)
-                if p.get("info"):
-                    lbl_info = QLabel(p["info"])
-                    lbl_info.setStyleSheet(f"color:{DIM}; font-size:10px; background:transparent;")
-                    lbl_info.setWordWrap(True)
-                    nw_lay.addWidget(lbl_info)
-                if p.get("info_url"):
-                    lbl_link = QLabel(
-                        f'<a href="{p["info_url"]}" style="color:#5b9bd5; font-size:10px;">Подробнее...</a>'
-                    )
-                    lbl_link.setOpenExternalLinks(True)
-                    lbl_link.setStyleSheet("background:transparent;")
-                    nw_lay.addWidget(lbl_link)
-                self.table.setCellWidget(row, 0, name_widget)
+                self.table.setCellWidget(row, 0, self._build_name_widget(p, display_name))
                 # Сбрасываем фиксированную высоту — строка растянется по контенту
                 self.table.setRowHeight(row, 0)
                 self.table.resizeRowToContents(row)
@@ -1228,7 +1317,10 @@ class MainWindow(QMainWindow):
             self.progress_lbl.setText("Все плагины актуальны")
 
         # Восстанавливаем позицию прокрутки после перестройки таблицы
-        QTimer.singleShot(0, lambda pos=scroll_pos: self.table.verticalScrollBar().setValue(pos))
+        def _restore_scroll(pos=scroll_pos):
+            self.table.verticalScrollBar().setValue(pos)
+            self._smooth_scroll_target = pos
+        QTimer.singleShot(0, _restore_scroll)
 
     def _toggle_author(self, author_name: str):
         """Переключает состояние expanded для группы автора и перерисовывает таблицу."""
@@ -1275,7 +1367,21 @@ class MainWindow(QMainWindow):
         for p in plugins_to_fetch:
             def _fetch(plugin=p):
                 ver, dn = fetch_remote_ver(plugin.get("raw_ver_url", ""))
-                self._ver_fetch_results.append((plugin, ver, dn))
+                # Запрашиваем дату последнего коммита папки плагина
+                last_updated = fetch_plugin_last_updated(plugin.get("github_commits_url", ""))
+                # Загружаем иконку если задана
+                ico_pixmap_data = None
+                ico_url = plugin.get("ico_url", "")
+                if ico_url:
+                    try:
+                        req = urllib.request.Request(
+                            ico_url, headers={"User-Agent": "C4D-Installer/1.0"}
+                        )
+                        with urllib.request.urlopen(req, timeout=8) as r:
+                            ico_pixmap_data = r.read()
+                    except Exception:
+                        ico_pixmap_data = None
+                self._ver_fetch_results.append((plugin, ver, dn, last_updated, ico_pixmap_data))
             threading.Thread(target=_fetch, daemon=True).start()
 
         self._poll_ver_fetch()
@@ -1286,7 +1392,11 @@ class MainWindow(QMainWindow):
             return
 
         while self._ver_fetch_results:
-            plugin_ref, ver, repo_dn = self._ver_fetch_results.pop(0)
+            plugin_ref, ver, repo_dn, last_updated, ico_pixmap_data = self._ver_fetch_results.pop(0)
+            # Сохраняем дату обновления папки
+            plugin_ref["last_updated"] = last_updated
+            # Сохраняем данные иконки (сырые байты PNG/JPG)
+            plugin_ref["ico_pixmap_data"] = ico_pixmap_data if ico_pixmap_data else None
             # Приоритет версии: 1) строка 1 файла ver из репо, 2) JSON "json_version"
             if ver and ver not in ("not_found", "error"):
                 plugin_ref["remote_ver"] = ver
@@ -1344,6 +1454,21 @@ class MainWindow(QMainWindow):
             LIST_JSON_CACHE.write_text(
                 json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8"
             )
+
+            # Сохраняем кэш дат и иконок плагинов
+            meta_cache = {}
+            for author_entry in self.remote_authors:
+                for p in author_entry["plugins"]:
+                    entry = {}
+                    if p.get("last_updated"):
+                        entry["last_updated"] = p["last_updated"]
+                    ico_data = p.get("ico_pixmap_data")
+                    if ico_data:
+                        entry["ico_b64"] = base64.b64encode(ico_data).decode("ascii")
+                    if entry:
+                        meta_cache[p["name"]] = entry
+            if meta_cache:
+                save_plugin_meta_cache(meta_cache)
         except Exception:
             pass  # кэш не критичен, ошибку игнорируем
 
@@ -1362,6 +1487,77 @@ class MainWindow(QMainWindow):
             p["name"]
         )
 
+    def _build_name_widget(self, p: dict, display_name: str) -> QWidget:
+        """
+        Собирает виджет для колонки «Плагин»:
+          — иконка 32×32 (из ico_pixmap_data) или эмодзи 🧩
+          — отображаемое имя плагина
+          — описание (info)
+          — дата обновления + ссылка «Подробнее...»
+        Вызывается как при первом рендере, так и при обновлении после асинхронной загрузки.
+        """
+        name_widget = QWidget()
+        name_widget.setStyleSheet("background:transparent;")
+        nw_lay = QVBoxLayout(name_widget)
+        nw_lay.setContentsMargins(10, 4, 6, 4)
+        nw_lay.setSpacing(2)
+
+        # Строка: иконка (или эмодзи) + имя
+        name_row = QHBoxLayout()
+        name_row.setSpacing(6)
+        name_row.setContentsMargins(0, 0, 0, 0)
+
+        ico_pixmap_data = p.get("ico_pixmap_data")
+        if ico_pixmap_data:
+            # Иконка загружена — показываем QPixmap 32×32
+            pix = QPixmap()
+            pix.loadFromData(ico_pixmap_data)
+            pix = pix.scaled(
+                32, 32,
+                Qt.AspectRatioMode.KeepAspectRatio,
+                Qt.TransformationMode.SmoothTransformation
+            )
+            ico_lbl = QLabel()
+            ico_lbl.setPixmap(pix)
+            ico_lbl.setFixedSize(32, 32)
+            ico_lbl.setStyleSheet("background:transparent;")
+        else:
+            # Иконка не задана (или ещё не загружена) — эмодзи-заглушка
+            ico_lbl = QLabel("🧩")
+            # Не ставим setFixedSize до показа: это обрезает эмодзи.
+            # Задаём только минимальную ширину, высота подстраивается сама.
+            ico_lbl.setStyleSheet("font-size:18px; background:transparent;")
+            ico_lbl.setMinimumWidth(28)
+        name_row.addWidget(ico_lbl)
+
+        lbl_name = QLabel(display_name)
+        lbl_name.setStyleSheet(f"color:{TEXT}; font-size:12px; background:transparent;")
+        name_row.addWidget(lbl_name)
+        name_row.addStretch()
+        nw_lay.addLayout(name_row)
+
+        if p.get("info"):
+            lbl_info = QLabel(p["info"])
+            lbl_info.setStyleSheet(f"color:{DIM}; font-size:10px; background:transparent;")
+            lbl_info.setWordWrap(True)
+            nw_lay.addWidget(lbl_info)
+
+        if p.get("info_url"):
+            # Дата последнего обновления папки плагина на GitHub (может быть "" пока не загружена)
+            last_updated = p.get("last_updated", "")
+            date_prefix = (
+                f'<span style="color:#f38830; font-size:9px;">обновлён {last_updated}&nbsp;&nbsp;</span>'
+                if last_updated else ""
+            )
+            lbl_link = QLabel(
+                f'{date_prefix}<a href="{p["info_url"]}" style="color:#5b9bd5; font-size:10px;">Подробнее...</a>'
+            )
+            lbl_link.setOpenExternalLinks(True)
+            lbl_link.setStyleSheet("background:transparent;")
+            nw_lay.addWidget(lbl_link)
+
+        return name_widget
+
     def _update_row_remote_ver(self, p: dict):
         """
         Обновляет ячейки «Актуальная», «Статус» и кнопку действия
@@ -1378,15 +1574,14 @@ class MainWindow(QMainWindow):
         local_ver, _ = read_plugin_ver(install_dir, p["name"]) if install_dir else ("", "")
         dn = self._get_plugin_display_name(p)
 
-        # Обновляем имя в ячейке — сразу без сворачивания/разворачивания
-        item_name = self.table.item(row, 0)
-        widget_name = self.table.cellWidget(row, 0)
-        if item_name:
-            item_name.setText(dn)
-        elif widget_name:
-            labels = widget_name.findChildren(QLabel)
-            if labels:
-                labels[0].setText(dn)
+        # Пересобираем виджет колонки 0 целиком — теперь в нём актуальные иконка и дата
+        if p.get("info") or p.get("info_url"):
+            self.table.setCellWidget(row, 0, self._build_name_widget(p, dn))
+            self.table.resizeRowToContents(row)
+        else:
+            item_name = self.table.item(row, 0)
+            if item_name:
+                item_name.setText(dn)
 
         # Установлен ли плагин — по наличию папки, а не по ver
         is_installed = bool(install_dir) and is_plugin_installed(install_dir, p["name"])

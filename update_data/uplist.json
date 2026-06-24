@@ -2,7 +2,7 @@
   "app": {
     "about_label": "C4D Plugins",
     "about_url": "https://vladvarp.github.io/-4D-Plugins/web/index.html",
-    "actual_version": "v2.0"
+    "actual_version": "v2.1"
   },
   "authors": [
     {
@@ -22,42 +22,48 @@
           "url": "https://github.com/vladvarp/-4D-Plugins/tree/main/Plugins/Camera Resolution",
           "info": "Управление разрешением рендера для каждой камеры в сцене.",
           "info_url": "https://vladvarp.github.io/-4D-Plugins/web/plugin.html?md=plugins%2Fcamera-resolution-manager.md",
-          "version": ""
+          "version": "",
+          "ico": "https://vladvarp.github.io/-4D-Plugins/web/ico/CameraResolution.png"
         },
         {
           "name": "Object Renamer PRO",
           "url": "https://github.com/vladvarp/-4D-Plugins/tree/main/Plugins/Object Renamer PRO",
           "info": "Плавающая немодальная панель для пакетного переименования, выделения и сортировки объектов сцены.",
           "info_url": "https://vladvarp.github.io/-4D-Plugins/web/plugin.html?md=plugins%2Fobject-renamer-pro.md",
-          "version": ""
+          "version": "",
+          "ico": "https://vladvarp.github.io/-4D-Plugins/web/ico/ObjectRenamerPRO.png"
         },
         {
           "name": "Snapshot",
           "url": "https://github.com/vladvarp/-4D-Plugins/tree/main/Plugins/Snapshot",
           "info": "Мгновенно превращает анимацию единый полигональный снепшот.",
           "info_url": "https://vladvarp.github.io/-4D-Plugins/web/plugin.html?md=plugins%2Fsnapshot.md",
-          "version": ""
+          "version": "",
+          "ico": "https://vladvarp.github.io/-4D-Plugins/web/ico/Snapshot.png"
         },
         {
           "name": "Selection Sets",
           "url": "https://github.com/vladvarp/-4D-Plugins/tree/main/Plugins/Selection Sets",
           "info": "Сохранение и восстановление наборов выделения объектов.",
           "info_url": "https://vladvarp.github.io/-4D-Plugins/web/plugin.html?md=plugins%2FSelectionSet.md",
-          "version": ""
+          "version": "",
+          "ico": "https://vladvarp.github.io/-4D-Plugins/web/ico/SelectionSet/icon_plugin.png"
         },
         {
           "name": "Floor Generator",
           "url": "https://github.com/vladvarp/-4D-Plugins/tree/main/Plugins/Floor Generator",
           "info": "Процедурный генератор напольных покрытий — ёлочка, паркет, шеврон, соты — с фаской, швами и рандомизированными UV.",
           "info_url": "https://vladvarp.github.io/-4D-Plugins/web/plugin.html?md=plugins%2Ffloor-generator.md",
-          "version": ""
+          "version": "",
+          "ico": "https://vladvarp.github.io/-4D-Plugins/web/ico/FloorGenerator.png"
         },
         {
           "name": "Cloud Wizard",
           "url": "https://github.com/vladvarp/-4D-Plugins/tree/main/Plugins/Cloud Wizard",
           "info": "Процедурный генератор облаков — кучевые, перистые, грозовые, слоистые и высококучевые.",
           "info_url": "https://vladvarp.github.io/-4D-Plugins/web/plugin.html?md=plugins%2Fcloud-wizard.md",
-          "version": ""
+          "version": "",
+          "ico": "https://vladvarp.github.io/-4D-Plugins/web/ico/CloudWizard.png"
         }        
       ]
     }
