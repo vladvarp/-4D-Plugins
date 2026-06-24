@@ -29,6 +29,11 @@ Diamond — Cinema 4D ObjectData Plugin
   23 — Celtic    (Кельтский — тройной узел)
   24 — Crown     (Корона — зубчатая)
   25 — Dragon    (Дракон — органическая)
+  26 — Snowflake (Снежинка — 6-лучевая)
+  27 — Spiral    (Спираль — золотое сечение)
+  28 — RoseWindow(Роза — готическая)
+  29 — Lotus     (Лотос — священный)
+  30 — Flame     (Пламя — огненная)
 
 
 """
@@ -45,7 +50,7 @@ if not hasattr(c4d, "DESC_UNIT_NONE"):
 # ─── Plugin ID & Name ────────────────────────────────────────────────────────
 
 ID_DIAMOND   = 1069031
-NAME_DIAMOND = "Diamond v2.15"
+NAME_DIAMOND = "Diamond v2.20"
 
 # ─── UserData SubID ───────────────────────────────────────────────────────────
 # SubID=1 зарезервирован под группу. Поля начинаются с 2.
@@ -100,6 +105,11 @@ CUT_BUTTERFLY  = 21
 CUT_CELTIC     = 22
 CUT_CROWN      = 23
 CUT_DRAGON     = 24
+CUT_SNOWFLAKE  = 25
+CUT_SPIRAL     = 26
+CUT_ROSEWINDOW = 27
+CUT_LOTUS      = 28
+CUT_FLAME      = 29
 
 # ─── Математические утилиты ───────────────────────────────────────────────────
 
@@ -2746,6 +2756,354 @@ def build_dragon(size, height, crown_h, girdle_h, segs, table_size, culet, steps
 
     return pts, polys
 
+def build_snowflake(size, height, crown_h, girdle_h, segs, table_size, culet, steps):
+    r = size
+    r_table = r * max(0.1, min(0.85, table_size))
+    r_culet = r * max(0.0, min(0.15, culet))
+    total_h  = max(1.0, height)
+    girdle   = max(0.5, girdle_h)
+    crown    = max(1.0, total_h * max(0.05, min(0.5, crown_h)))
+    pavilion = max(1.0, total_h - crown - girdle)
+    steps    = max(1, min(5, steps))
+    y_culet  = -(pavilion + girdle / 2.0)
+    y_gird_b = -girdle / 2.0
+    y_gird_t = +girdle / 2.0
+    y_table  = y_gird_t + crown
+    pts   = []
+    polys = []
+    def _add(v):
+        idx = len(pts)
+        pts.append(v)
+        return idx
+    nv = max(24, segs)
+    def _snow_ring(radius, y):
+        idxs = []
+        for i in range(nv):
+            a = i / nv * 2.0 * math.pi
+            rd = radius * (1.0 + 0.50 * math.cos(6.0 * a) + 0.25 * math.cos(12.0 * a) + 0.12 * math.cos(18.0 * a))
+            idxs.append(_add(c4d.Vector(rd * math.cos(a), y, rd * math.sin(a))))
+        return idxs
+    gird_b = _snow_ring(r, y_gird_b)
+    gird_t = _snow_ring(r, y_gird_t)
+    table  = _snow_ring(r_table, y_table)
+    if r_culet < 0.5:
+        culet_idx  = _add(c4d.Vector(0.0, y_culet, 0.0))
+        culet_ring = None
+    else:
+        culet_ring = _snow_ring(r_culet, y_culet)
+        culet_idx  = _add(c4d.Vector(0.0, y_culet, 0.0))
+    pav_rings = []
+    for s in range(steps):
+        t = (s + 1) / (steps + 1)
+        sr = _lerp(r, r_culet if r_culet >= 0.5 else 0.001, t)
+        sy = _lerp(y_gird_b, y_culet, t)
+        pav_rings.append(_snow_ring(sr, sy))
+    prev = gird_b
+    for pr in pav_rings:
+        polys += _band(prev, pr)
+        prev = pr
+    if culet_ring is None:
+        polys += _fan(culet_idx, prev, 0)
+    else:
+        polys += _band(prev, culet_ring)
+        c4c = _add(c4d.Vector(0.0, y_culet, 0.0))
+        polys += _fan(c4c, culet_ring, 0)
+    polys += _band(gird_t, gird_b)
+    crown_rings = []
+    for s in range(steps):
+        t = (s + 1) / (steps + 1)
+        cr = _lerp(r, r_table, t)
+        cy = _lerp(y_gird_t, y_table, t)
+        crown_rings.append(_snow_ring(cr, cy))
+    prev = gird_t
+    for cr in crown_rings:
+        polys += _band(cr, prev)
+        prev = cr
+    polys += _band(table, prev)
+    table_center = _add(c4d.Vector(0.0, y_table, 0.0))
+    for i in range(nv):
+        polys.append(_tri(table_center, table[(i + 1) % nv], table[i]))
+    return pts, polys
+
+def build_spiral(size, height, crown_h, girdle_h, segs, table_size, culet, steps):
+    r = size
+    phi = (1.0 + math.sqrt(5.0)) / 2.0
+    r_table = r * max(0.1, min(0.85, table_size))
+    r_culet = r * max(0.0, min(0.15, culet))
+    total_h  = max(1.0, height)
+    girdle   = max(0.5, girdle_h)
+    crown    = max(1.0, total_h * max(0.05, min(0.5, crown_h)))
+    pavilion = max(1.0, total_h - crown - girdle)
+    steps    = max(1, min(5, steps))
+    y_culet  = -(pavilion + girdle / 2.0)
+    y_gird_b = -girdle / 2.0
+    y_gird_t = +girdle / 2.0
+    y_table  = y_gird_t + crown
+    pts   = []
+    polys = []
+    def _add(v):
+        idx = len(pts)
+        pts.append(v)
+        return idx
+    nv = max(24, segs)
+    def _spiral_ring(radius, y):
+        idxs = []
+        for i in range(nv):
+            t = i / nv
+            a = t * 2.0 * math.pi
+            rd = radius * (0.15 + 0.85 * t)
+            idxs.append(_add(c4d.Vector(rd * math.cos(a), y, rd * math.sin(a))))
+        return idxs
+    gird_b = _spiral_ring(r, y_gird_b)
+    gird_t = _spiral_ring(r, y_gird_t)
+    table  = _spiral_ring(r_table, y_table)
+    if r_culet < 0.5:
+        culet_idx  = _add(c4d.Vector(0.0, y_culet, 0.0))
+        culet_ring = None
+    else:
+        culet_ring = _spiral_ring(r_culet, y_culet)
+        culet_idx  = _add(c4d.Vector(0.0, y_culet, 0.0))
+    pav_rings = []
+    for s in range(steps):
+        t = (s + 1) / (steps + 1)
+        sr = _lerp(r, r_culet if r_culet >= 0.5 else 0.001, t)
+        sy = _lerp(y_gird_b, y_culet, t)
+        pav_rings.append(_spiral_ring(sr, sy))
+    prev = gird_b
+    for pr in pav_rings:
+        polys += _band(prev, pr)
+        prev = pr
+    if culet_ring is None:
+        polys += _fan(culet_idx, prev, 0)
+    else:
+        polys += _band(prev, culet_ring)
+        c4c = _add(c4d.Vector(0.0, y_culet, 0.0))
+        polys += _fan(c4c, culet_ring, 0)
+    polys += _band(gird_t, gird_b)
+    crown_rings = []
+    for s in range(steps):
+        t = (s + 1) / (steps + 1)
+        cr = _lerp(r, r_table, t)
+        cy = _lerp(y_gird_t, y_table, t)
+        crown_rings.append(_spiral_ring(cr, cy))
+    prev = gird_t
+    for cr in crown_rings:
+        polys += _band(cr, prev)
+        prev = cr
+    polys += _band(table, prev)
+    table_center = _add(c4d.Vector(0.0, y_table, 0.0))
+    for i in range(nv):
+        polys.append(_tri(table_center, table[(i + 1) % nv], table[i]))
+    return pts, polys
+
+def build_rosette(size, height, crown_h, girdle_h, segs, table_size, culet, steps):
+    r = size
+    r_table = r * max(0.1, min(0.85, table_size))
+    r_culet = r * max(0.0, min(0.15, culet))
+    total_h  = max(1.0, height)
+    girdle   = max(0.5, girdle_h)
+    crown    = max(1.0, total_h * max(0.05, min(0.5, crown_h)))
+    pavilion = max(1.0, total_h - crown - girdle)
+    steps    = max(1, min(5, steps))
+    y_culet  = -(pavilion + girdle / 2.0)
+    y_gird_b = -girdle / 2.0
+    y_gird_t = +girdle / 2.0
+    y_table  = y_gird_t + crown
+    pts   = []
+    polys = []
+    def _add(v):
+        idx = len(pts)
+        pts.append(v)
+        return idx
+    nv = max(24, segs)
+    def _rosette_ring(radius, y):
+        idxs = []
+        for i in range(nv):
+            a = i / nv * 2.0 * math.pi
+            rd = radius * (1.0 + 0.40 * math.cos(12.0 * a) + 0.20 * math.cos(24.0 * a) + 0.10 * math.sin(6.0 * a))
+            idxs.append(_add(c4d.Vector(rd * math.cos(a), y, rd * math.sin(a))))
+        return idxs
+    gird_b = _rosette_ring(r, y_gird_b)
+    gird_t = _rosette_ring(r, y_gird_t)
+    table  = _rosette_ring(r_table, y_table)
+    if r_culet < 0.5:
+        culet_idx  = _add(c4d.Vector(0.0, y_culet, 0.0))
+        culet_ring = None
+    else:
+        culet_ring = _rosette_ring(r_culet, y_culet)
+        culet_idx  = _add(c4d.Vector(0.0, y_culet, 0.0))
+    pav_rings = []
+    for s in range(steps):
+        t = (s + 1) / (steps + 1)
+        sr = _lerp(r, r_culet if r_culet >= 0.5 else 0.001, t)
+        sy = _lerp(y_gird_b, y_culet, t)
+        pav_rings.append(_rosette_ring(sr, sy))
+    prev = gird_b
+    for pr in pav_rings:
+        polys += _band(prev, pr)
+        prev = pr
+    if culet_ring is None:
+        polys += _fan(culet_idx, prev, 0)
+    else:
+        polys += _band(prev, culet_ring)
+        c4c = _add(c4d.Vector(0.0, y_culet, 0.0))
+        polys += _fan(c4c, culet_ring, 0)
+    polys += _band(gird_t, gird_b)
+    crown_rings = []
+    for s in range(steps):
+        t = (s + 1) / (steps + 1)
+        cr = _lerp(r, r_table, t)
+        cy = _lerp(y_gird_t, y_table, t)
+        crown_rings.append(_rosette_ring(cr, cy))
+    prev = gird_t
+    for cr in crown_rings:
+        polys += _band(cr, prev)
+        prev = cr
+    polys += _band(table, prev)
+    table_center = _add(c4d.Vector(0.0, y_table, 0.0))
+    for i in range(nv):
+        polys.append(_tri(table_center, table[(i + 1) % nv], table[i]))
+    return pts, polys
+
+def build_lotus(size, height, crown_h, girdle_h, segs, table_size, culet, steps):
+    r = size
+    r_table = r * max(0.1, min(0.85, table_size))
+    r_culet = r * max(0.0, min(0.15, culet))
+    total_h  = max(1.0, height)
+    girdle   = max(0.5, girdle_h)
+    crown    = max(1.0, total_h * max(0.05, min(0.5, crown_h)))
+    pavilion = max(1.0, total_h - crown - girdle)
+    steps    = max(1, min(5, steps))
+    y_culet  = -(pavilion + girdle / 2.0)
+    y_gird_b = -girdle / 2.0
+    y_gird_t = +girdle / 2.0
+    y_table  = y_gird_t + crown
+    pts   = []
+    polys = []
+    def _add(v):
+        idx = len(pts)
+        pts.append(v)
+        return idx
+    nv = max(24, segs)
+    def _lotus_ring(radius, y):
+        idxs = []
+        for i in range(nv):
+            a = i / nv * 2.0 * math.pi
+            rd = radius * (1.0 + 0.45 * math.cos(8.0 * a) + 0.20 * math.cos(16.0 * a) + 0.08 * math.sin(24.0 * a))
+            idxs.append(_add(c4d.Vector(rd * math.cos(a), y, rd * math.sin(a))))
+        return idxs
+    gird_b = _lotus_ring(r, y_gird_b)
+    gird_t = _lotus_ring(r, y_gird_t)
+    table  = _lotus_ring(r_table, y_table)
+    if r_culet < 0.5:
+        culet_idx  = _add(c4d.Vector(0.0, y_culet, 0.0))
+        culet_ring = None
+    else:
+        culet_ring = _lotus_ring(r_culet, y_culet)
+        culet_idx  = _add(c4d.Vector(0.0, y_culet, 0.0))
+    pav_rings = []
+    for s in range(steps):
+        t = (s + 1) / (steps + 1)
+        sr = _lerp(r, r_culet if r_culet >= 0.5 else 0.001, t)
+        sy = _lerp(y_gird_b, y_culet, t)
+        pav_rings.append(_lotus_ring(sr, sy))
+    prev = gird_b
+    for pr in pav_rings:
+        polys += _band(prev, pr)
+        prev = pr
+    if culet_ring is None:
+        polys += _fan(culet_idx, prev, 0)
+    else:
+        polys += _band(prev, culet_ring)
+        c4c = _add(c4d.Vector(0.0, y_culet, 0.0))
+        polys += _fan(c4c, culet_ring, 0)
+    polys += _band(gird_t, gird_b)
+    crown_rings = []
+    for s in range(steps):
+        t = (s + 1) / (steps + 1)
+        cr = _lerp(r, r_table, t)
+        cy = _lerp(y_gird_t, y_table, t)
+        crown_rings.append(_lotus_ring(cr, cy))
+    prev = gird_t
+    for cr in crown_rings:
+        polys += _band(cr, prev)
+        prev = cr
+    polys += _band(table, prev)
+    table_center = _add(c4d.Vector(0.0, y_table, 0.0))
+    for i in range(nv):
+        polys.append(_tri(table_center, table[(i + 1) % nv], table[i]))
+    return pts, polys
+
+def build_flame(size, height, crown_h, girdle_h, segs, table_size, culet, steps):
+    r = size
+    r_table = r * max(0.1, min(0.85, table_size))
+    r_culet = r * max(0.0, min(0.15, culet))
+    total_h  = max(1.0, height)
+    girdle   = max(0.5, girdle_h)
+    crown    = max(1.0, total_h * max(0.05, min(0.5, crown_h)))
+    pavilion = max(1.0, total_h - crown - girdle)
+    steps    = max(1, min(5, steps))
+    y_culet  = -(pavilion + girdle / 2.0)
+    y_gird_b = -girdle / 2.0
+    y_gird_t = +girdle / 2.0
+    y_table  = y_gird_t + crown
+    pts   = []
+    polys = []
+    def _add(v):
+        idx = len(pts)
+        pts.append(v)
+        return idx
+    nv = max(24, segs)
+    def _flame_ring(radius, y):
+        idxs = []
+        for i in range(nv):
+            a = i / nv * 2.0 * math.pi
+            rd = radius * (1.0 + 0.40 * math.sin(3.0 * a + 0.5) + 0.25 * math.sin(6.0 * a - 0.8) + 0.15 * math.cos(9.0 * a + 1.2))
+            idxs.append(_add(c4d.Vector(rd * math.cos(a), y, rd * math.sin(a))))
+        return idxs
+    gird_b = _flame_ring(r, y_gird_b)
+    gird_t = _flame_ring(r, y_gird_t)
+    table  = _flame_ring(r_table, y_table)
+    if r_culet < 0.5:
+        culet_idx  = _add(c4d.Vector(0.0, y_culet, 0.0))
+        culet_ring = None
+    else:
+        culet_ring = _flame_ring(r_culet, y_culet)
+        culet_idx  = _add(c4d.Vector(0.0, y_culet, 0.0))
+    pav_rings = []
+    for s in range(steps):
+        t = (s + 1) / (steps + 1)
+        sr = _lerp(r, r_culet if r_culet >= 0.5 else 0.001, t)
+        sy = _lerp(y_gird_b, y_culet, t)
+        pav_rings.append(_flame_ring(sr, sy))
+    prev = gird_b
+    for pr in pav_rings:
+        polys += _band(prev, pr)
+        prev = pr
+    if culet_ring is None:
+        polys += _fan(culet_idx, prev, 0)
+    else:
+        polys += _band(prev, culet_ring)
+        c4c = _add(c4d.Vector(0.0, y_culet, 0.0))
+        polys += _fan(c4c, culet_ring, 0)
+    polys += _band(gird_t, gird_b)
+    crown_rings = []
+    for s in range(steps):
+        t = (s + 1) / (steps + 1)
+        cr = _lerp(r, r_table, t)
+        cy = _lerp(y_gird_t, y_table, t)
+        crown_rings.append(_flame_ring(cr, cy))
+    prev = gird_t
+    for cr in crown_rings:
+        polys += _band(cr, prev)
+        prev = cr
+    polys += _band(table, prev)
+    table_center = _add(c4d.Vector(0.0, y_table, 0.0))
+    for i in range(nv):
+        polys.append(_tri(table_center, table[(i + 1) % nv], table[i]))
+    return pts, polys
+
+
 # ─── Диспетчер огранок ───────────────────────────────────────────────────────
 
 def build_diamond_mesh(cut, size, height, crown_h, girdle_h,
@@ -2805,6 +3163,16 @@ def build_diamond_mesh(cut, size, height, crown_h, girdle_h,
         return build_crown(size, height, crown_h, girdle_h, segs, table_size, culet, steps)
     elif cut == CUT_DRAGON:
         return build_dragon(size, height, crown_h, girdle_h, segs, table_size, culet, steps)
+    elif cut == CUT_SNOWFLAKE:
+        return build_snowflake(size, height, crown_h, girdle_h, segs, table_size, culet, steps)
+    elif cut == CUT_SPIRAL:
+        return build_spiral(size, height, crown_h, girdle_h, segs, table_size, culet, steps)
+    elif cut == CUT_ROSEWINDOW:
+        return build_rosette(size, height, crown_h, girdle_h, segs, table_size, culet, steps)
+    elif cut == CUT_LOTUS:
+        return build_lotus(size, height, crown_h, girdle_h, segs, table_size, culet, steps)
+    elif cut == CUT_FLAME:
+        return build_flame(size, height, crown_h, girdle_h, segs, table_size, culet, steps)
 
     else:
         return build_brilliant(size, height, crown_h, girdle_h,
@@ -2915,6 +3283,11 @@ class DiamondObject(_MeshPrimitiveBase):
         cyc[22] = "Кельтский (Celtic)"
         cyc[23] = "Корона (Crown)"
         cyc[24] = "Дракон (Dragon)"
+        cyc[25] = "Снежинка (Snowflake)"
+        cyc[26] = "Спираль (Spiral)"
+        cyc[27] = "Роза (Rose Window)"
+        cyc[28] = "Лотос (Lotus)"
+        cyc[29] = "Пламя (Flame)"
         bc[c4d.DESC_CYCLE] = cyc
         bc[c4d.DESC_ANIMATE] = c4d.DESC_ANIMATE_ON
         description.SetParameter(
