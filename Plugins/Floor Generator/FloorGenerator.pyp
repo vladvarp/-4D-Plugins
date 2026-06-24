@@ -37,7 +37,7 @@ import tempfile
 # ══════════════════════════════════════════════════════════════════════════════
 
 ID_FLOORGEN   = 1068969
-NAME_FLOORGEN = "Floor Generator v2.8"
+NAME_FLOORGEN = "Floor Generator v3.0"
 
 # ══════════════════════════════════════════════════════════════════════════════
 #  Паттерны
@@ -121,68 +121,6 @@ DEF_UV_RAND_SEED = 0
 
 DEF_PARQ_RAND_W = 0.0
 
-
-# ══════════════════════════════════════════════════════════════════════════════
-#  Вспомогательные функции Description
-# ══════════════════════════════════════════════════════════════════════════════
-
-def _group_bc(name):
-    bc = c4d.GetCustomDatatypeDefault(c4d.DTYPE_GROUP)
-    bc[c4d.DESC_NAME]       = name
-    bc[c4d.DESC_SHORT_NAME] = name
-    bc[c4d.DESC_TITLEBAR]   = 1
-    bc[c4d.DESC_DEFAULT]    = 1
-    return bc
-
-
-def _float_bc(name, default, minval, maxval, unit=c4d.DESC_UNIT_METER, step=1.0):
-    bc = c4d.GetCustomDatatypeDefault(c4d.DTYPE_REAL)
-    bc[c4d.DESC_NAME]       = name
-    bc[c4d.DESC_SHORT_NAME] = name
-    bc[c4d.DESC_DEFAULT]    = default
-    bc[c4d.DESC_MIN]        = minval
-    bc[c4d.DESC_MAX]        = maxval
-    bc[c4d.DESC_UNIT]       = unit
-    bc[c4d.DESC_STEP]       = step
-    bc[c4d.DESC_ANIMATE]    = c4d.DESC_ANIMATE_ON
-    return bc
-
-
-def _int_bc(name, default, minval, maxval):
-    bc = c4d.GetCustomDatatypeDefault(c4d.DTYPE_LONG)
-    bc[c4d.DESC_NAME]       = name
-    bc[c4d.DESC_SHORT_NAME] = name
-    bc[c4d.DESC_DEFAULT]    = default
-    bc[c4d.DESC_MIN]        = minval
-    bc[c4d.DESC_MAX]        = maxval
-    bc[c4d.DESC_STEP]       = 1
-    bc[c4d.DESC_ANIMATE]    = c4d.DESC_ANIMATE_ON
-    return bc
-
-
-def _bool_bc(name, default):
-    bc = c4d.GetCustomDatatypeDefault(c4d.DTYPE_BOOL)
-    bc[c4d.DESC_NAME]       = name
-    bc[c4d.DESC_SHORT_NAME] = name
-    bc[c4d.DESC_DEFAULT]    = default
-    bc[c4d.DESC_ANIMATE]    = c4d.DESC_ANIMATE_ON
-    return bc
-
-
-def _cycle_bc(name, default, items):
-    bc = c4d.GetCustomDatatypeDefault(c4d.DTYPE_LONG)
-    bc[c4d.DESC_NAME]       = name
-    bc[c4d.DESC_SHORT_NAME] = name
-    bc[c4d.DESC_DEFAULT]    = default
-    bc[c4d.DESC_CUSTOMGUI]  = c4d.CUSTOMGUI_CYCLE
-    cyc = c4d.BaseContainer()
-    for i, label in enumerate(items):
-        cyc[i] = label
-    bc[c4d.DESC_CYCLE]   = cyc
-    bc[c4d.DESC_ANIMATE] = c4d.DESC_ANIMATE_ON
-    return bc
-
-
 # ══════════════════════════════════════════════════════════════════════════════
 #  Математика / утилиты
 # ══════════════════════════════════════════════════════════════════════════════
@@ -206,34 +144,10 @@ def _v3_cross(a, b):
         a.x * b.y - a.y * b.x
     )
 
-
 def _rotate_pt_2d(px, py, cx, cy, angle):
     dx, dy = px - cx, py - cy
     cos_a, sin_a = math.cos(angle), math.sin(angle)
     return dx * cos_a - dy * sin_a + cx, dx * sin_a + dy * cos_a + cy
-
-
-def _polygon_center_2d(poly):
-    n = len(poly)
-    sx = sum(p[0] for p in poly) / n
-    sy = sum(p[1] for p in poly) / n
-    return sx, sy
-
-
-def _point_in_polygon(px, py, polygon):
-    """Ray casting — point-in-polygon test."""
-    n = len(polygon)
-    inside = False
-    j = n - 1
-    for i in range(n):
-        xi, yi = polygon[i]
-        xj, yj = polygon[j]
-        if ((yi > py) != (yj > py)) and \
-           (px < (xj - xi) * (py - yi) / (yj - yi) + xi):
-            inside = not inside
-        j = i
-    return inside
-
 
 def _is_convex(poly):
     """Check if a 2D polygon is convex."""
@@ -255,7 +169,6 @@ def _is_convex(poly):
             return False
     return True
 
-
 def _point_in_triangle(p, a, b, c):
     """Check if point p is inside triangle (a, b, c)."""
     d1 = (p[0] - b[0]) * (a[1] - b[1]) - (a[0] - b[0]) * (p[1] - b[1])
@@ -264,7 +177,6 @@ def _point_in_triangle(p, a, b, c):
     has_neg = (d1 < -1e-12) or (d2 < -1e-12) or (d3 < -1e-12)
     has_pos = (d1 > 1e-12) or (d2 > 1e-12) or (d3 > 1e-12)
     return not (has_neg and has_pos)
-
 
 def _triangulate_polygon(poly):
     """Ear clipping triangulation of a simple 2D polygon.
@@ -320,7 +232,6 @@ def _triangulate_polygon(poly):
             break
 
     return triangles
-
 
 def _triangulate_indices(pts_2d):
     """Ear clipping для плоского контура, возвращает треугольники как
@@ -380,7 +291,6 @@ def _triangulate_indices(pts_2d):
 
     return triangles
 
-
 def _build_frame(normal):
     """Orthonormal basis from normal: returns (u, v, n)."""
     n = _v3_normalize(normal)
@@ -392,16 +302,13 @@ def _build_frame(normal):
     v = _v3_normalize(_v3_cross(n, u))
     return u, v, n
 
-
 def _to_3d(u, v, origin, u_axis, v_axis, normal, h=0.0):
     return origin + u_axis * u + v_axis * v + normal * h
-
 
 def _bbox_2d(pts):
     us = [p[0] for p in pts]
     vs = [p[1] for p in pts]
     return min(us), max(us), min(vs), max(vs)
-
 
 def _clip_sh(subject, clip):
     """Sutherland-Hodgman clipping (single convex clip polygon).
@@ -452,11 +359,9 @@ def _clip_sh(subject, clip):
 
     return output if len(output) >= 3 else []
 
-
 def _pt_key(p):
     """Округление точки для устойчивого сравнения координат с учётом погрешности float."""
     return (round(p[0], 6), round(p[1], 6))
-
 
 def _merge_polygon_fragments(fragments):
     """Склеивает фрагменты, полученные обрезкой по треугольникам триангуляции,
@@ -585,7 +490,6 @@ def _merge_polygon_fragments(fragments):
 
     return [_remove_collinear_points(p) for p in merged]
 
-
 def _remove_collinear_points(poly):
     """Удаляет лишние вершины, лежащие на прямой между соседями.
     После склейки фрагментов триангуляции на местах бывших швов
@@ -618,7 +522,6 @@ def _remove_collinear_points(poly):
 
     return result if len(result) >= 3 else poly
 
-
 def _clip_polygon_subject(subject, clip):
     """Clip subject polygon against clip polygon (both lists of (x,y)).
     Returns a list of intersection polygons (may be 0, 1, or more).
@@ -640,7 +543,6 @@ def _clip_polygon_subject(subject, clip):
         if clipped and len(clipped) >= 3:
             results.append(clipped)
     return _merge_polygon_fragments(results)
-
 
 def _subtract_convex_hole_single(poly, hole_ccw):
     """Вычитает один ВЫПУКЛЫЙ полигон-дырку (CCW) из одного полигона `poly`.
@@ -716,7 +618,6 @@ def _subtract_convex_hole_single(poly, hole_ccw):
     # склеивает фрагменты триангуляции невыпуклого внешнего контура.
     return _merge_polygon_fragments(outside_pieces)
 
-
 def _subtract_hole_from_polygons(polygons, hole):
     """Вычитает одну дырку (CW-контур, например окно) из списка полигонов
     (плиток). Для каждой плитки из списка оставляет только ту её часть,
@@ -757,7 +658,6 @@ def _subtract_hole_from_polygons(polygons, hole):
         current = next_current
 
     return current
-
 
 def _inset_polygon(poly, amount):
     """Inset convex polygon by `amount` (positive = shrink).
@@ -810,7 +710,6 @@ def _inset_polygon(poly, amount):
         return None
 
     return result
-
 
 # ══════════════════════════════════════════════════════════════════════════════
 #  Получение границы плоского меша
@@ -881,7 +780,6 @@ def _get_boundary_info(mesh):
 
     return normal, origin, boundary_2d, u_axis, v_axis, holes_2d
 
-
 def _poly_area_2d(poly):
     """Signed area (Shoelace). Positive = CCW."""
     n = len(poly)
@@ -891,29 +789,6 @@ def _poly_area_2d(poly):
         x1, y1 = poly[(i + 1) % n]
         area += x0 * y1 - x1 * y0
     return area * 0.5
-
-
-def _find_boundary_loop(mesh):
-    """Найти граничные рёбра меша и соединить в замкнутый контур.
-    Возвращает только первую (наружную) петлю — оставлен для совместимости,
-    основная логика перенесена в _find_all_boundary_loops."""
-    loops = _find_all_boundary_loops(mesh)
-    if not loops:
-        return None
-    # Возвращаем петлю с наибольшей площадью (внешний контур)
-    return max(loops, key=lambda lp: abs(_poly_area_2d_indices(mesh, lp)))
-
-
-def _poly_area_2d_indices(mesh, loop):
-    """Знаковая площадь петли по индексам вершин меша (для определения внешнего контура)."""
-    n = len(loop)
-    area = 0.0
-    for i in range(n):
-        a = mesh.GetPoint(loop[i])
-        b = mesh.GetPoint(loop[(i + 1) % n])
-        area += a.x * b.z - b.x * a.z  # используем XZ как плоскость для оценки
-    return area * 0.5
-
 
 def _find_all_boundary_loops(mesh):
     """Найти все граничные петли меша (внешний контур + контуры отверстий).
@@ -1669,96 +1544,372 @@ class FloorGeneratorObject(c4d.plugins.ObjectData):
         if not description.LoadDescription("Obase"):
             return False, flags
 
-        grp_pat = c4d.DescID(c4d.DescLevel(FG_GRP_PAT, c4d.DTYPE_GROUP, 0))
-        bc = _group_bc("Паттерн (P) (P1) (P2)")
-        description.SetParameter(grp_pat, bc, c4d.ID_LISTHEAD)
+        # ── Паттерн (P) (P1) (P2) ──
+        bc = c4d.GetCustomDatatypeDefault(c4d.DTYPE_GROUP)
+        bc[c4d.DESC_NAME]    = "Паттерн (P) (P1) (P2)"
+        bc[c4d.DESC_COLUMNS] = 1
+        bc[c4d.DESC_DEFAULT] = 1
+        description.SetParameter(
+            c4d.DescID(c4d.DescLevel(FG_GRP_PAT, c4d.DTYPE_GROUP, 0)),
+            bc, c4d.ID_LISTHEAD
+        )
+        gid_pat = c4d.DescID(c4d.DescLevel(FG_GRP_PAT, c4d.DTYPE_GROUP, 0))
 
-        bc = _cycle_bc("Тип", DEF_PATTERN, PAT_NAMES)
-        description.SetParameter(c4d.DescID(c4d.DescLevel(FG_PATTERN, c4d.DTYPE_LONG, 0)), bc, grp_pat)
+        bc = c4d.GetCustomDataTypeDefault(c4d.DTYPE_LONG)
+        bc[c4d.DESC_NAME]      = "Тип"
+        bc[c4d.DESC_DEFAULT]   = DEF_PATTERN
+        bc[c4d.DESC_ANIMATE]   = c4d.DESC_ANIMATE_ON
+        bc[c4d.DESC_CUSTOMGUI] = c4d.CUSTOMGUI_CYCLE
+        cyc = c4d.BaseContainer()
+        for i, label in enumerate(PAT_NAMES):
+            cyc[i] = label
+        bc[c4d.DESC_CYCLE] = cyc
+        description.SetParameter(
+            c4d.DescID(c4d.DescLevel(FG_PATTERN, c4d.DTYPE_LONG, 0)),
+            bc, gid_pat
+        )
 
-        bc = _float_bc("Ширина плитки", DEF_TILE_W, 1.0, 10000.0)
-        description.SetParameter(c4d.DescID(c4d.DescLevel(FG_TILE_W, c4d.DTYPE_REAL, 0)), bc, grp_pat)
+        bc = c4d.GetCustomDataTypeDefault(c4d.DTYPE_REAL)
+        bc[c4d.DESC_NAME]      = "Длина плитки"
+        bc[c4d.DESC_DEFAULT]   = DEF_TILE_W
+        bc[c4d.DESC_MIN]       = 1.0
+        bc[c4d.DESC_MAX]       = 10000.0
+        bc[c4d.DESC_UNIT]      = c4d.DESC_UNIT_METER
+        bc[c4d.DESC_STEP]      = 1.0
+        bc[c4d.DESC_ANIMATE]   = c4d.DESC_ANIMATE_ON
+        bc[c4d.DESC_CUSTOMGUI] = c4d.CUSTOMGUI_REALSLIDER
+        bc[c4d.DESC_MINSLIDER] = 10.0
+        bc[c4d.DESC_MAXSLIDER] = 200.0
+        description.SetParameter(
+            c4d.DescID(c4d.DescLevel(FG_TILE_W, c4d.DTYPE_REAL, 0)),
+            bc, gid_pat
+        )
 
-        bc = _float_bc("Длина плитки", DEF_TILE_H, 1.0, 10000.0)
-        description.SetParameter(c4d.DescID(c4d.DescLevel(FG_TILE_H, c4d.DTYPE_REAL, 0)), bc, grp_pat)
+        bc = c4d.GetCustomDataTypeDefault(c4d.DTYPE_REAL)
+        bc[c4d.DESC_NAME]      = "Ширина плитки"
+        bc[c4d.DESC_DEFAULT]   = DEF_TILE_H
+        bc[c4d.DESC_MIN]       = 1.0
+        bc[c4d.DESC_MAX]       = 10000.0
+        bc[c4d.DESC_UNIT]      = c4d.DESC_UNIT_METER
+        bc[c4d.DESC_STEP]      = 1.0
+        bc[c4d.DESC_ANIMATE]   = c4d.DESC_ANIMATE_ON
+        bc[c4d.DESC_CUSTOMGUI] = c4d.CUSTOMGUI_REALSLIDER
+        bc[c4d.DESC_MINSLIDER] = 10.0
+        bc[c4d.DESC_MAXSLIDER] = 100.0
+        description.SetParameter(
+            c4d.DescID(c4d.DescLevel(FG_TILE_H, c4d.DTYPE_REAL, 0)),
+            bc, gid_pat
+        )
 
-        bc = _float_bc("Смещение X", DEF_PAT_X,
-                       -10000.0, 10000.0, c4d.DESC_UNIT_METER, 1.0)
-        description.SetParameter(c4d.DescID(c4d.DescLevel(FG_PAT_X, c4d.DTYPE_REAL, 0)), bc, grp_pat)
+        bc = c4d.GetCustomDataTypeDefault(c4d.DTYPE_REAL)
+        bc[c4d.DESC_NAME]    = "Смещение X"
+        bc[c4d.DESC_DEFAULT] = DEF_PAT_X
+        bc[c4d.DESC_MIN]     = -10000.0
+        bc[c4d.DESC_MAX]     = 10000.0
+        bc[c4d.DESC_UNIT]    = c4d.DESC_UNIT_METER
+        bc[c4d.DESC_STEP]    = 1.0
+        bc[c4d.DESC_ANIMATE] = c4d.DESC_ANIMATE_ON
+        bc[c4d.DESC_CUSTOMGUI] = c4d.CUSTOMGUI_REALSLIDER
+        bc[c4d.DESC_MINSLIDER] = -50.0
+        bc[c4d.DESC_MAXSLIDER] = 50.0
+        description.SetParameter(
+            c4d.DescID(c4d.DescLevel(FG_PAT_X, c4d.DTYPE_REAL, 0)),
+            bc, gid_pat
+        )
 
-        bc = _float_bc("Смещение Y", DEF_PAT_Y,
-                       -10000.0, 10000.0, c4d.DESC_UNIT_METER, 1.0)
-        description.SetParameter(c4d.DescID(c4d.DescLevel(FG_PAT_Y, c4d.DTYPE_REAL, 0)), bc, grp_pat)
+        bc = c4d.GetCustomDataTypeDefault(c4d.DTYPE_REAL)
+        bc[c4d.DESC_NAME]    = "Смещение Y"
+        bc[c4d.DESC_DEFAULT] = DEF_PAT_Y
+        bc[c4d.DESC_MIN]     = -10000.0
+        bc[c4d.DESC_MAX]     = 10000.0
+        bc[c4d.DESC_UNIT]    = c4d.DESC_UNIT_METER
+        bc[c4d.DESC_STEP]    = 1.0
+        bc[c4d.DESC_ANIMATE] = c4d.DESC_ANIMATE_ON
+        bc[c4d.DESC_CUSTOMGUI] = c4d.CUSTOMGUI_REALSLIDER
+        bc[c4d.DESC_MINSLIDER] = -50.0
+        bc[c4d.DESC_MAXSLIDER] = 50.0
+        description.SetParameter(
+            c4d.DescID(c4d.DescLevel(FG_PAT_Y, c4d.DTYPE_REAL, 0)),
+            bc, gid_pat
+        )
 
-        bc = _float_bc("Угол поворота", DEF_ANGLE,
-                       -180.0, 180.0, c4d.DESC_UNIT_DEGREE, math.radians(1.0))
-        description.SetParameter(c4d.DescID(c4d.DescLevel(FG_ANGLE, c4d.DTYPE_REAL, 0)), bc, grp_pat)
+        bc = c4d.GetCustomDataTypeDefault(c4d.DTYPE_REAL)
+        bc[c4d.DESC_NAME]      = "Угол поворота"
+        bc[c4d.DESC_DEFAULT]   = DEF_ANGLE
+        bc[c4d.DESC_MIN]       = math.radians(-180.0)
+        bc[c4d.DESC_MAX]       = math.radians(180.0)
+        bc[c4d.DESC_UNIT]      = c4d.DESC_UNIT_DEGREE
+        bc[c4d.DESC_STEP]      = math.radians(1.0)
+        bc[c4d.DESC_ANIMATE]   = c4d.DESC_ANIMATE_ON
+        bc[c4d.DESC_CUSTOMGUI] = c4d.CUSTOMGUI_REALSLIDER
+        bc[c4d.DESC_MINSLIDER] = math.radians(-180.0)
+        bc[c4d.DESC_MAXSLIDER] = math.radians(180.0)
+        description.SetParameter(
+            c4d.DescID(c4d.DescLevel(FG_ANGLE, c4d.DTYPE_REAL, 0)),
+            bc, gid_pat
+        )
 
-        bc = _float_bc("Смещение рядов", DEF_OFFSET,
-                       0.0, 1.0, c4d.DESC_UNIT_PERCENT, 0.01)
-        description.SetParameter(c4d.DescID(c4d.DescLevel(FG_OFFSET, c4d.DTYPE_REAL, 0)), bc, grp_pat)
+        bc = c4d.GetCustomDataTypeDefault(c4d.DTYPE_REAL)
+        bc[c4d.DESC_NAME]      = "Смещение рядов"
+        bc[c4d.DESC_DEFAULT]   = DEF_OFFSET
+        bc[c4d.DESC_MIN]       = 0.0
+        bc[c4d.DESC_MAX]       = 1.0
+        bc[c4d.DESC_UNIT]      = c4d.DESC_UNIT_PERCENT
+        bc[c4d.DESC_STEP]      = 0.01
+        bc[c4d.DESC_ANIMATE]   = c4d.DESC_ANIMATE_ON
+        bc[c4d.DESC_CUSTOMGUI] = c4d.CUSTOMGUI_REALSLIDER
+        description.SetParameter(
+            c4d.DescID(c4d.DescLevel(FG_OFFSET, c4d.DTYPE_REAL, 0)),
+            bc, gid_pat
+        )
 
-        bc = _int_bc("Зерно", DEF_SEED, 0, 99999)
-        description.SetParameter(c4d.DescID(c4d.DescLevel(FG_SEED, c4d.DTYPE_LONG, 0)), bc, grp_pat)
+        bc = c4d.GetCustomDataTypeDefault(c4d.DTYPE_LONG)
+        bc[c4d.DESC_NAME]      = "Зерно"
+        bc[c4d.DESC_DEFAULT]   = DEF_SEED
+        bc[c4d.DESC_MIN]       = 0
+        bc[c4d.DESC_MAX]       = 99999
+        bc[c4d.DESC_STEP]      = 1
+        bc[c4d.DESC_ANIMATE]   = c4d.DESC_ANIMATE_ON
+        bc[c4d.DESC_CUSTOMGUI] = c4d.CUSTOMGUI_REALSLIDER
+        bc[c4d.DESC_MINSLIDER] = 0
+        bc[c4d.DESC_MAXSLIDER] = 30
+        description.SetParameter(
+            c4d.DescID(c4d.DescLevel(FG_SEED, c4d.DTYPE_LONG, 0)),
+            bc, gid_pat
+        )
 
-        bc = _float_bc("Разброс ширины", DEF_PARQ_RAND_W,
-                       0.0, 100.0, c4d.DESC_UNIT_REAL, 1.0)
-        description.SetParameter(c4d.DescID(c4d.DescLevel(FG_PARQ_RAND_W, c4d.DTYPE_REAL, 0)), bc, grp_pat)
+        bc = c4d.GetCustomDataTypeDefault(c4d.DTYPE_REAL)
+        bc[c4d.DESC_NAME]    = "Разброс ширины"
+        bc[c4d.DESC_DEFAULT] = DEF_PARQ_RAND_W
+        bc[c4d.DESC_MIN]     = 0.0
+        bc[c4d.DESC_MAX]     = 100.0
+        bc[c4d.DESC_UNIT]    = c4d.DESC_UNIT_REAL
+        bc[c4d.DESC_STEP]    = 1.0
+        bc[c4d.DESC_ANIMATE] = c4d.DESC_ANIMATE_ON
+        bc[c4d.DESC_CUSTOMGUI] = c4d.CUSTOMGUI_REALSLIDER
+        description.SetParameter(
+            c4d.DescID(c4d.DescLevel(FG_PARQ_RAND_W, c4d.DTYPE_REAL, 0)),
+            bc, gid_pat
+        )
 
-        grp_thk = c4d.DescID(c4d.DescLevel(FG_GRP_THK, c4d.DTYPE_GROUP, 0))
-        bc = _group_bc("Толщина и фаска (S)")
-        description.SetParameter(grp_thk, bc, c4d.ID_LISTHEAD)
+        # ── Толщина и фаска (S) ──
+        bc = c4d.GetCustomDatatypeDefault(c4d.DTYPE_GROUP)
+        bc[c4d.DESC_NAME]    = "Толщина и фаска (S)"
+        bc[c4d.DESC_COLUMNS] = 1
+        bc[c4d.DESC_DEFAULT] = 1
+        description.SetParameter(
+            c4d.DescID(c4d.DescLevel(FG_GRP_THK, c4d.DTYPE_GROUP, 0)),
+            bc, c4d.ID_LISTHEAD
+        )
+        gid_thk = c4d.DescID(c4d.DescLevel(FG_GRP_THK, c4d.DTYPE_GROUP, 0))
 
-        bc = _float_bc("Толщина", DEF_THICKNESS, 0.001, 1000.0)
-        description.SetParameter(c4d.DescID(c4d.DescLevel(FG_THICKNESS, c4d.DTYPE_REAL, 0)), bc, grp_thk)
+        bc = c4d.GetCustomDataTypeDefault(c4d.DTYPE_REAL)
+        bc[c4d.DESC_NAME]      = "Толщина"
+        bc[c4d.DESC_DEFAULT]   = DEF_THICKNESS
+        bc[c4d.DESC_MIN]       = 0.001
+        bc[c4d.DESC_MAX]       = 1000.0
+        bc[c4d.DESC_UNIT]      = c4d.DESC_UNIT_METER
+        bc[c4d.DESC_STEP]      = 0.01
+        bc[c4d.DESC_ANIMATE]   = c4d.DESC_ANIMATE_ON
+        bc[c4d.DESC_CUSTOMGUI] = c4d.CUSTOMGUI_REALSLIDER
+        bc[c4d.DESC_MINSLIDER] = 0.001
+        bc[c4d.DESC_MAXSLIDER] = 30.0
+        description.SetParameter(
+            c4d.DescID(c4d.DescLevel(FG_THICKNESS, c4d.DTYPE_REAL, 0)),
+            bc, gid_thk
+        )
 
-        bc = _float_bc("Фаска", DEF_BEVEL, 0.0, 100.0)
-        description.SetParameter(c4d.DescID(c4d.DescLevel(FG_BEVEL, c4d.DTYPE_REAL, 0)), bc, grp_thk)
+        bc = c4d.GetCustomDataTypeDefault(c4d.DTYPE_REAL)
+        bc[c4d.DESC_NAME]      = "Фаска"
+        bc[c4d.DESC_DEFAULT]   = DEF_BEVEL
+        bc[c4d.DESC_MIN]       = 0.0
+        bc[c4d.DESC_MAX]       = 100.0
+        bc[c4d.DESC_UNIT]      = c4d.DESC_UNIT_METER
+        bc[c4d.DESC_STEP]      = 0.001
+        bc[c4d.DESC_ANIMATE]   = c4d.DESC_ANIMATE_ON
+        bc[c4d.DESC_CUSTOMGUI] = c4d.CUSTOMGUI_REALSLIDER
+        bc[c4d.DESC_MINSLIDER] = 0.0
+        bc[c4d.DESC_MAXSLIDER] = 3.0
+        description.SetParameter(
+            c4d.DescID(c4d.DescLevel(FG_BEVEL, c4d.DTYPE_REAL, 0)),
+            bc, gid_thk
+        )
 
-        grp_seam = c4d.DescID(c4d.DescLevel(FG_GRP_SEAM, c4d.DTYPE_GROUP, 0))
-        bc = _group_bc("Швы")
-        description.SetParameter(grp_seam, bc, c4d.ID_LISTHEAD)
+        # ── Швы ──
+        bc = c4d.GetCustomDatatypeDefault(c4d.DTYPE_GROUP)
+        bc[c4d.DESC_NAME]    = "Швы"
+        bc[c4d.DESC_COLUMNS] = 1
+        bc[c4d.DESC_DEFAULT] = 1
+        description.SetParameter(
+            c4d.DescID(c4d.DescLevel(FG_GRP_SEAM, c4d.DTYPE_GROUP, 0)),
+            bc, c4d.ID_LISTHEAD
+        )
+        gid_seam = c4d.DescID(c4d.DescLevel(FG_GRP_SEAM, c4d.DTYPE_GROUP, 0))
 
-        bc = _bool_bc("Швы включены", DEF_SEAM_ON)
-        description.SetParameter(c4d.DescID(c4d.DescLevel(FG_SEAM_ON, c4d.DTYPE_BOOL, 0)), bc, grp_seam)
+        bc = c4d.GetCustomDataTypeDefault(c4d.DTYPE_BOOL)
+        bc[c4d.DESC_NAME]    = "Швы включены"
+        bc[c4d.DESC_DEFAULT] = DEF_SEAM_ON
+        bc[c4d.DESC_ANIMATE] = c4d.DESC_ANIMATE_ON
+        description.SetParameter(
+            c4d.DescID(c4d.DescLevel(FG_SEAM_ON, c4d.DTYPE_BOOL, 0)),
+            bc, gid_seam
+        )
 
-        bc = _float_bc("Ширина шва", DEF_SEAM_W, 0.0, 50.0)
-        description.SetParameter(c4d.DescID(c4d.DescLevel(FG_SEAM_W, c4d.DTYPE_REAL, 0)), bc, grp_seam)
+        bc = c4d.GetCustomDataTypeDefault(c4d.DTYPE_REAL)
+        bc[c4d.DESC_NAME]      = "Ширина шва"
+        bc[c4d.DESC_DEFAULT]   = DEF_SEAM_W
+        bc[c4d.DESC_MIN]       = 0.0
+        bc[c4d.DESC_MAX]       = 50.0
+        bc[c4d.DESC_UNIT]      = c4d.DESC_UNIT_METER
+        bc[c4d.DESC_STEP]      = 0.1
+        bc[c4d.DESC_ANIMATE]   = c4d.DESC_ANIMATE_ON
+        bc[c4d.DESC_CUSTOMGUI] = c4d.CUSTOMGUI_REALSLIDER
+        bc[c4d.DESC_MINSLIDER] = 0.0
+        bc[c4d.DESC_MAXSLIDER] = 20.0
+        description.SetParameter(
+            c4d.DescID(c4d.DescLevel(FG_SEAM_W, c4d.DTYPE_REAL, 0)),
+            bc, gid_seam
+        )
 
-        grp_uv = c4d.DescID(c4d.DescLevel(FG_GRP_UV, c4d.DTYPE_GROUP, 0))
-        bc = _group_bc("UV")
-        description.SetParameter(grp_uv, bc, c4d.ID_LISTHEAD)
+        # ── UV ──
+        bc = c4d.GetCustomDatatypeDefault(c4d.DTYPE_GROUP)
+        bc[c4d.DESC_NAME]    = "UV"
+        bc[c4d.DESC_COLUMNS] = 1
+        bc[c4d.DESC_DEFAULT] = 1
+        description.SetParameter(
+            c4d.DescID(c4d.DescLevel(FG_GRP_UV, c4d.DTYPE_GROUP, 0)),
+            bc, c4d.ID_LISTHEAD
+        )
+        gid_uv = c4d.DescID(c4d.DescLevel(FG_GRP_UV, c4d.DTYPE_GROUP, 0))
 
-        bc = _float_bc("Ширина UV", DEF_UV_SX, 0.1, 10000.0)
-        description.SetParameter(c4d.DescID(c4d.DescLevel(FG_UV_SX, c4d.DTYPE_REAL, 0)), bc, grp_uv)
+        bc = c4d.GetCustomDataTypeDefault(c4d.DTYPE_REAL)
+        bc[c4d.DESC_NAME]      = "Ширина UV"
+        bc[c4d.DESC_DEFAULT]   = DEF_UV_SX
+        bc[c4d.DESC_MIN]       = 0.1
+        bc[c4d.DESC_MAX]       = 10000.0
+        bc[c4d.DESC_UNIT]      = c4d.DESC_UNIT_METER
+        bc[c4d.DESC_STEP]      = 0.1
+        bc[c4d.DESC_ANIMATE]   = c4d.DESC_ANIMATE_ON
+        bc[c4d.DESC_CUSTOMGUI] = c4d.CUSTOMGUI_REALSLIDER
+        bc[c4d.DESC_MINSLIDER] = 0.1
+        bc[c4d.DESC_MAXSLIDER] = 300.0
+        description.SetParameter(
+            c4d.DescID(c4d.DescLevel(FG_UV_SX, c4d.DTYPE_REAL, 0)),
+            bc, gid_uv
+        )
 
-        bc = _float_bc("Длина UV", DEF_UV_SY, 0.1, 10000.0)
-        description.SetParameter(c4d.DescID(c4d.DescLevel(FG_UV_SY, c4d.DTYPE_REAL, 0)), bc, grp_uv)
+        bc = c4d.GetCustomDataTypeDefault(c4d.DTYPE_REAL)
+        bc[c4d.DESC_NAME]      = "Длина UV"
+        bc[c4d.DESC_DEFAULT]   = DEF_UV_SY
+        bc[c4d.DESC_MIN]       = 0.1
+        bc[c4d.DESC_MAX]       = 10000.0
+        bc[c4d.DESC_UNIT]      = c4d.DESC_UNIT_METER
+        bc[c4d.DESC_STEP]      = 0.1
+        bc[c4d.DESC_ANIMATE]   = c4d.DESC_ANIMATE_ON
+        bc[c4d.DESC_CUSTOMGUI] = c4d.CUSTOMGUI_REALSLIDER
+        bc[c4d.DESC_MINSLIDER] = 0.1
+        bc[c4d.DESC_MAXSLIDER] = 300.0
+        description.SetParameter(
+            c4d.DescID(c4d.DescLevel(FG_UV_SY, c4d.DTYPE_REAL, 0)),
+            bc, gid_uv
+        )
 
-        bc = _float_bc("Угол UV", DEF_UV_ROT,
-                       -180.0, 180.0, c4d.DESC_UNIT_DEGREE, math.radians(1.0))
-        description.SetParameter(c4d.DescID(c4d.DescLevel(FG_UV_ROT, c4d.DTYPE_REAL, 0)), bc, grp_uv)
+        bc = c4d.GetCustomDataTypeDefault(c4d.DTYPE_REAL)
+        bc[c4d.DESC_NAME]      = "Угол UV"
+        bc[c4d.DESC_DEFAULT]   = DEF_UV_ROT
+        bc[c4d.DESC_MIN]       = math.radians(-180.0)
+        bc[c4d.DESC_MAX]       = math.radians(180.0)
+        bc[c4d.DESC_UNIT]      = c4d.DESC_UNIT_DEGREE
+        bc[c4d.DESC_STEP]      = math.radians(0.1)
+        bc[c4d.DESC_ANIMATE]   = c4d.DESC_ANIMATE_ON
+        bc[c4d.DESC_CUSTOMGUI] = c4d.CUSTOMGUI_REALSLIDER
+        bc[c4d.DESC_MINSLIDER] = math.radians(-180.0)
+        bc[c4d.DESC_MAXSLIDER] = math.radians(180.0)
+        description.SetParameter(
+            c4d.DescID(c4d.DescLevel(FG_UV_ROT, c4d.DTYPE_REAL, 0)),
+            bc, gid_uv
+        )
 
-        bc = _bool_bc("Рандом угла UV", DEF_UV_RAND)
-        description.SetParameter(c4d.DescID(c4d.DescLevel(FG_UV_RAND, c4d.DTYPE_BOOL, 0)), bc, grp_uv)
+        bc = c4d.GetCustomDataTypeDefault(c4d.DTYPE_BOOL)
+        bc[c4d.DESC_NAME]    = "Рандом угла UV"
+        bc[c4d.DESC_DEFAULT] = DEF_UV_RAND
+        bc[c4d.DESC_ANIMATE] = c4d.DESC_ANIMATE_ON
+        description.SetParameter(
+            c4d.DescID(c4d.DescLevel(FG_UV_RAND, c4d.DTYPE_BOOL, 0)),
+            bc, gid_uv
+        )
 
-        bc = _float_bc("Диапазон рандома", DEF_UV_RANDR,
-                       0.0, 180.0, c4d.DESC_UNIT_DEGREE, math.radians(1.0))
-        description.SetParameter(c4d.DescID(c4d.DescLevel(FG_UV_RANDR, c4d.DTYPE_REAL, 0)), bc, grp_uv)
+        bc = c4d.GetCustomDataTypeDefault(c4d.DTYPE_REAL)
+        bc[c4d.DESC_NAME]      = "Диапазон рандома"
+        bc[c4d.DESC_DEFAULT]   = DEF_UV_RANDR
+        bc[c4d.DESC_MIN]       = math.radians(0.0)
+        bc[c4d.DESC_MAX]       = math.radians(180.0)
+        bc[c4d.DESC_UNIT]      = c4d.DESC_UNIT_DEGREE
+        bc[c4d.DESC_STEP]      = math.radians(0.1)
+        bc[c4d.DESC_ANIMATE]   = c4d.DESC_ANIMATE_ON
+        bc[c4d.DESC_CUSTOMGUI] = c4d.CUSTOMGUI_REALSLIDER
+        bc[c4d.DESC_MINSLIDER] = math.radians(0.0)
+        bc[c4d.DESC_MAXSLIDER] = math.radians(180.0)
+        description.SetParameter(
+            c4d.DescID(c4d.DescLevel(FG_UV_RANDR, c4d.DTYPE_REAL, 0)),
+            bc, gid_uv
+        )
 
-        bc = _bool_bc("Рандом смещения UV", DEF_UV_RANDOFF)
-        description.SetParameter(c4d.DescID(c4d.DescLevel(FG_UV_RANDOFF, c4d.DTYPE_BOOL, 0)), bc, grp_uv)
+        bc = c4d.GetCustomDataTypeDefault(c4d.DTYPE_BOOL)
+        bc[c4d.DESC_NAME]    = "Рандом смещения UV"
+        bc[c4d.DESC_DEFAULT] = DEF_UV_RANDOFF
+        bc[c4d.DESC_ANIMATE] = c4d.DESC_ANIMATE_ON
+        description.SetParameter(
+            c4d.DescID(c4d.DescLevel(FG_UV_RANDOFF, c4d.DTYPE_BOOL, 0)),
+            bc, gid_uv
+        )
 
-        bc = _float_bc("Смещение X", DEF_UV_RANDOFF_X,
-                       0.0, 10000.0, c4d.DESC_UNIT_METER, 1.0)
-        description.SetParameter(c4d.DescID(c4d.DescLevel(FG_UV_RANDOFF_X, c4d.DTYPE_REAL, 0)), bc, grp_uv)
+        bc = c4d.GetCustomDataTypeDefault(c4d.DTYPE_REAL)
+        bc[c4d.DESC_NAME]    = "Смещение X"
+        bc[c4d.DESC_DEFAULT] = DEF_UV_RANDOFF_X
+        bc[c4d.DESC_MIN]     = 0.0
+        bc[c4d.DESC_MAX]     = 10000.0
+        bc[c4d.DESC_UNIT]    = c4d.DESC_UNIT_METER
+        bc[c4d.DESC_STEP]    = 1.0
+        bc[c4d.DESC_ANIMATE] = c4d.DESC_ANIMATE_ON
+        bc[c4d.DESC_CUSTOMGUI] = c4d.CUSTOMGUI_REALSLIDER
+        bc[c4d.DESC_MINSLIDER] = 0.0
+        bc[c4d.DESC_MAXSLIDER] = 300.0
+        description.SetParameter(
+            c4d.DescID(c4d.DescLevel(FG_UV_RANDOFF_X, c4d.DTYPE_REAL, 0)),
+            bc, gid_uv
+        )
 
-        bc = _float_bc("Смещение Y", DEF_UV_RANDOFF_Y,
-                       0.0, 10000.0, c4d.DESC_UNIT_METER, 1.0)
-        description.SetParameter(c4d.DescID(c4d.DescLevel(FG_UV_RANDOFF_Y, c4d.DTYPE_REAL, 0)), bc, grp_uv)
+        bc = c4d.GetCustomDataTypeDefault(c4d.DTYPE_REAL)
+        bc[c4d.DESC_NAME]    = "Смещение Y"
+        bc[c4d.DESC_DEFAULT] = DEF_UV_RANDOFF_Y
+        bc[c4d.DESC_MIN]     = 0.0
+        bc[c4d.DESC_MAX]     = 10000.0
+        bc[c4d.DESC_UNIT]    = c4d.DESC_UNIT_METER
+        bc[c4d.DESC_STEP]    = 1.0
+        bc[c4d.DESC_ANIMATE] = c4d.DESC_ANIMATE_ON
+        bc[c4d.DESC_CUSTOMGUI] = c4d.CUSTOMGUI_REALSLIDER
+        bc[c4d.DESC_MINSLIDER] = 0.0
+        bc[c4d.DESC_MAXSLIDER] = 300.0
+        description.SetParameter(
+            c4d.DescID(c4d.DescLevel(FG_UV_RANDOFF_Y, c4d.DTYPE_REAL, 0)),
+            bc, gid_uv
+        )
 
-        bc = _int_bc("Сид смещения", DEF_UV_RAND_SEED, 0, 99999)
-        description.SetParameter(c4d.DescID(c4d.DescLevel(FG_UV_RAND_SEED, c4d.DTYPE_LONG, 0)), bc, grp_uv)
+        bc = c4d.GetCustomDataTypeDefault(c4d.DTYPE_LONG)
+        bc[c4d.DESC_NAME]      = "Сид смещения"
+        bc[c4d.DESC_DEFAULT]   = DEF_UV_RAND_SEED
+        bc[c4d.DESC_MIN]       = 0
+        bc[c4d.DESC_MAX]       = 99999
+        bc[c4d.DESC_STEP]      = 1
+        bc[c4d.DESC_ANIMATE]   = c4d.DESC_ANIMATE_ON
+        bc[c4d.DESC_CUSTOMGUI] = c4d.CUSTOMGUI_REALSLIDER
+        bc[c4d.DESC_MINSLIDER] = 0
+        bc[c4d.DESC_MAXSLIDER] = 100
+        description.SetParameter(
+            c4d.DescID(c4d.DescLevel(FG_UV_RAND_SEED, c4d.DTYPE_LONG, 0)),
+            bc, gid_uv
+        )
 
         return True, flags | c4d.DESCFLAGS_DESC_LOADED
 
