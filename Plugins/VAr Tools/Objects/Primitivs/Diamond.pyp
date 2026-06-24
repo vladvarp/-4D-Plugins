@@ -16,6 +16,11 @@ Diamond — Cinema 4D ObjectData Plugin
   9 — Heart     (Сердце)
   10 — Rose      (Роза — старинная огранка)
   11 — Trillion  (Триллион — треугольный)
+  12 — Lozenge   (Ромб — вытянутый ромб)
+  13 — Kite      (Кайт — щитовидная)
+  14 — Briolette (Бриолетт — двойная капля)
+  15 — Coffin    (Гроб — удлинённый шестиугольник)
+  16 — Star      (Звезда — лучевая)
 
 
 """
@@ -32,7 +37,7 @@ if not hasattr(c4d, "DESC_UNIT_NONE"):
 # ─── Plugin ID & Name ────────────────────────────────────────────────────────
 
 ID_DIAMOND   = 1069031
-NAME_DIAMOND = "Diamond v2.2"
+NAME_DIAMOND = "Diamond v2.7.1"
 
 # ─── UserData SubID ───────────────────────────────────────────────────────────
 # SubID=1 зарезервирован под группу. Поля начинаются с 2.
@@ -74,6 +79,11 @@ CUT_ASSCHER    = 8
 CUT_HEART      = 9
 CUT_ROSE       = 10
 CUT_TRILLION   = 11
+CUT_LOZENGE    = 12
+CUT_KITE       = 13
+CUT_BRIOLETTE  = 14
+CUT_COFFIN     = 15
+CUT_STAR       = 16
 
 # ─── Математические утилиты ───────────────────────────────────────────────────
 
@@ -1412,6 +1422,535 @@ def build_trillion(size, height, crown_h, girdle_h, segs, table_size, culet):
 
     return pts, polys
 
+def build_lozenge(size, height, crown_h, girdle_h, segs, table_size, culet, steps):
+    """
+    Огранка Ромб (Lozenge) — вытянутый ромб со ступенчатыми гранями.
+
+    Форма в плане: ромб (4 угла), вытянутый вдоль Z в 1.5 раза.
+    Павильон и корона — ступенчатые (как Emerald/Asscher), управляемые steps.
+    """
+
+    rx       = size
+    rz       = size * 1.5
+    r_table_x = rx * max(0.1, min(0.9, table_size))
+    r_table_z = rz * max(0.1, min(0.9, table_size))
+    r_culet_x = rx * max(0.0, min(0.15, culet))
+    r_culet_z = rz * max(0.0, min(0.15, culet))
+
+    total_h  = max(1.0, height)
+    girdle   = max(0.5, girdle_h)
+    crown    = max(1.0, total_h * max(0.05, min(0.5, crown_h)))
+    pavilion = max(1.0, total_h - crown - girdle)
+    steps    = max(1, min(5, steps))
+
+    y_culet  = -(pavilion + girdle / 2.0)
+    y_gird_b = -girdle / 2.0
+    y_gird_t = +girdle / 2.0
+    y_table  = y_gird_t + crown
+
+    pts   = []
+    polys = []
+
+    def _add(v):
+        idx = len(pts)
+        pts.append(v)
+        return idx
+
+    def _loz_ring(rx, rz, y, n):
+        """Ромб: 4 угла, segs/4 точек на сторону, обход ПРОТИВ часовой (вид сверху)."""
+        n = max(4, n)
+        if n % 4 != 0:
+            n = ((n + 3) // 4) * 4
+        corners = [(rx, 0.0), (0.0, rz), (-rx, 0.0), (0.0, -rz)]
+        per_side = n // 4
+        idxs = []
+        for side in range(4):
+            x0, z0 = corners[side]
+            x1, z1 = corners[(side + 1) % 4]
+            for j in range(per_side):
+                t = float(j) / per_side
+                px = x0 + (x1 - x0) * t
+                pz = z0 + (z1 - z0) * t
+                idxs.append(_add(c4d.Vector(px, y, pz)))
+        return idxs
+
+    gird_b = _loz_ring(rx, rz, y_gird_b, segs)
+    gird_t = _loz_ring(rx, rz, y_gird_t, segs)
+    table  = _loz_ring(r_table_x, r_table_z, y_table, segs)
+
+    if r_culet_x < 0.5:
+        culet_idx  = _add(c4d.Vector(0.0, y_culet, 0.0))
+        culet_ring = None
+    else:
+        culet_ring = _loz_ring(r_culet_x, r_culet_z, y_culet, segs)
+        culet_idx  = _add(c4d.Vector(0.0, y_culet, 0.0))
+
+    n = len(gird_b)
+
+    pav_rings = []
+    for s in range(steps):
+        t = (s + 1) / (steps + 1)
+        srx = _lerp(rx, r_culet_x if r_culet_x >= 0.5 else 0.001, t)
+        srz = _lerp(rz, r_culet_z if r_culet_z >= 0.5 else 0.001, t)
+        sy  = _lerp(y_gird_b, y_culet, t)
+        pav_rings.append(_loz_ring(srx, srz, sy, segs))
+
+    prev = gird_b
+    for pr in pav_rings:
+        polys += _band(prev, pr)
+        prev = pr
+
+    if culet_ring is None:
+        polys += _fan(culet_idx, prev, 0)
+    else:
+        polys += _band(prev, culet_ring)
+        c4c = _add(c4d.Vector(0.0, y_culet, 0.0))
+        polys += _fan(c4c, culet_ring, 0)
+
+    polys += _band(gird_t, gird_b)
+
+    crown_rings = []
+    for s in range(steps):
+        t = (s + 1) / (steps + 1)
+        crx = _lerp(rx, r_table_x, t)
+        crz = _lerp(rz, r_table_z, t)
+        cy  = _lerp(y_gird_t, y_table, t)
+        crown_rings.append(_loz_ring(crx, crz, cy, segs))
+
+    prev = gird_t
+    for cr in crown_rings:
+        polys += _band(cr, prev)
+        prev = cr
+    polys += _band(table, prev)
+
+    table_center = _add(c4d.Vector(0.0, y_table, 0.0))
+    for i in range(n):
+        polys.append(_tri(table_center, table[(i + 1) % n], table[i]))
+
+    return pts, polys
+
+def build_kite(size, height, crown_h, girdle_h, segs, table_size, culet, steps):
+    """
+    Огранка Кайт (Kite) — щитовидная форма.
+
+    План: верхняя часть шире, нижняя — уже и длиннее.
+    4 основных угла + segs/4 точек на сторону.
+    Ступенчатые павильон и корона.
+    """
+
+    r_w      = size            # полуширина
+    l_top    = size * 1.0      # длина верхней части
+    l_bot    = size * 1.8      # длина нижней части
+
+    r_tw = r_w * max(0.1, min(0.9, table_size))
+    lt   = l_top * max(0.1, min(0.9, table_size))
+    lb   = l_bot * max(0.1, min(0.9, table_size))
+    r_culet = size * max(0.0, min(0.15, culet))
+
+    total_h  = max(1.0, height)
+    girdle   = max(0.5, girdle_h)
+    crown    = max(1.0, total_h * max(0.05, min(0.5, crown_h)))
+    pavilion = max(1.0, total_h - crown - girdle)
+    steps    = max(1, min(5, steps))
+
+    y_culet  = -(pavilion + girdle / 2.0)
+    y_gird_b = -girdle / 2.0
+    y_gird_t = +girdle / 2.0
+    y_table  = y_gird_t + crown
+
+    pts   = []
+    polys = []
+
+    def _add(v):
+        idx = len(pts)
+        pts.append(v)
+        return idx
+
+    def _kite_ring(rw, lt_len, lb_len, y, n):
+        """Кайт: 4 угла (верх, право, низ, лево), обход ПРОТИВ часовой."""
+        n = max(4, n)
+        if n % 4 != 0:
+            n = ((n + 3) // 4) * 4
+        corners = [
+            ( rw,  0.0),
+            ( 0.0, lt_len),
+            (-rw,  0.0),
+            ( 0.0, -lb_len),
+        ]
+        per_side = n // 4
+        idxs = []
+        for side in range(4):
+            x0, z0 = corners[side]
+            x1, z1 = corners[(side + 1) % 4]
+            for j in range(per_side):
+                t = float(j) / per_side
+                px = x0 + (x1 - x0) * t
+                pz = z0 + (z1 - z0) * t
+                idxs.append(_add(c4d.Vector(px, y, pz)))
+        return idxs
+
+    gird_b = _kite_ring(r_w, l_top, l_bot, y_gird_b, segs)
+    gird_t = _kite_ring(r_w, l_top, l_bot, y_gird_t, segs)
+    table  = _kite_ring(r_tw, lt, lb, y_table, segs)
+
+    if r_culet < 0.5:
+        culet_idx  = _add(c4d.Vector(0.0, y_culet, 0.0))
+        culet_ring = None
+    else:
+        cw = r_w * (r_culet / size) * 0.7
+        culet_ring = _kite_ring(cw, r_culet * 0.7, r_culet * 1.2, y_culet, segs)
+        culet_idx  = _add(c4d.Vector(0.0, y_culet, 0.0))
+
+    n = len(gird_b)
+
+    pav_rings = []
+    for s in range(steps):
+        t = (s + 1) / (steps + 1)
+        sw  = _lerp(r_w,  r_w * 0.01, t)
+        slt = _lerp(l_top, 0.01, t)
+        slb = _lerp(l_bot, 0.01, t)
+        sy  = _lerp(y_gird_b, y_culet, t)
+        pav_rings.append(_kite_ring(sw, slt, slb, sy, segs))
+
+    prev = gird_b
+    for pr in pav_rings:
+        polys += _band(prev, pr)
+        prev = pr
+
+    if culet_ring is None:
+        polys += _fan(culet_idx, prev, 0)
+    else:
+        polys += _band(prev, culet_ring)
+        c4c = _add(c4d.Vector(0.0, y_culet, 0.0))
+        polys += _fan(c4c, culet_ring, 0)
+
+    polys += _band(gird_t, gird_b)
+
+    crown_rings = []
+    for s in range(steps):
+        t = (s + 1) / (steps + 1)
+        cw = _lerp(r_w,  r_tw, t)
+        clt = _lerp(l_top, lt, t)
+        clb = _lerp(l_bot, lb, t)
+        cy  = _lerp(y_gird_t, y_table, t)
+        crown_rings.append(_kite_ring(cw, clt, clb, cy, segs))
+
+    prev = gird_t
+    for cr in crown_rings:
+        polys += _band(cr, prev)
+        prev = cr
+    polys += _band(table, prev)
+
+    table_center = _add(c4d.Vector(0.0, y_table, 0.0))
+    for i in range(n):
+        polys.append(_tri(table_center, table[(i + 1) % n], table[i]))
+
+    return pts, polys
+
+def build_briolette(size, height, crown_h, girdle_h, segs, table_size, culet, steps):
+    """
+    Огранка Бриолетт (Briolette) — двойная капля.
+
+    Вытянутый эллипс 1:2, ступенчатые павильон и корона.
+    """
+
+    rx = size
+    rz = size * 2.0
+
+    r_table_x = rx * max(0.1, min(0.8, table_size))
+    r_table_z = rz * max(0.1, min(0.8, table_size))
+    r_culet   = size * max(0.0, min(0.15, culet))
+
+    total_h  = max(1.0, height)
+    girdle   = max(0.5, girdle_h)
+    crown    = max(1.0, total_h * max(0.05, min(0.5, crown_h)))
+    pavilion = max(1.0, total_h - crown - girdle)
+    steps    = max(1, min(5, steps))
+
+    y_culet  = -(pavilion + girdle / 2.0)
+    y_gird_b = -girdle / 2.0
+    y_gird_t = +girdle / 2.0
+    y_table  = y_gird_t + crown
+
+    pts   = []
+    polys = []
+
+    def _add(v):
+        idx = len(pts)
+        pts.append(v)
+        return idx
+
+    segs2 = max(8, segs)
+    if segs2 % 2 != 0:
+        segs2 += 1
+
+    def _brio_ring(rbx, rbz, y):
+        idxs = []
+        for i in range(segs2):
+            a = i / segs2 * 2.0 * math.pi
+            idxs.append(_add(c4d.Vector(rbx * math.cos(a), y,
+                                         rbz * math.sin(a))))
+        return idxs
+
+    gird_b = _brio_ring(rx, rz, y_gird_b)
+    gird_t = _brio_ring(rx, rz, y_gird_t)
+    table  = _brio_ring(r_table_x, r_table_z, y_table)
+
+    if r_culet < 0.5:
+        culet_idx  = _add(c4d.Vector(0.0, y_culet, 0.0))
+        culet_ring = None
+    else:
+        culet_ring = _brio_ring(r_culet, r_culet * 1.5, y_culet)
+        culet_idx  = _add(c4d.Vector(0.0, y_culet, 0.0))
+
+    n = len(gird_b)
+
+    pav_rings = []
+    for s in range(steps):
+        t = (s + 1) / (steps + 1)
+        srx = _lerp(rx, r_culet if r_culet >= 0.5 else 0.001, t)
+        srz = _lerp(rz, r_culet * 1.5 if r_culet >= 0.5 else 0.001, t)
+        sy  = _lerp(y_gird_b, y_culet, t)
+        pav_rings.append(_brio_ring(srx, srz, sy))
+
+    prev = gird_b
+    for pr in pav_rings:
+        polys += _band(prev, pr)
+        prev = pr
+
+    if culet_ring is None:
+        polys += _fan(culet_idx, prev, 0)
+    else:
+        polys += _band(prev, culet_ring)
+        c4c = _add(c4d.Vector(0.0, y_culet, 0.0))
+        polys += _fan(c4c, culet_ring, 0)
+
+    polys += _band(gird_t, gird_b)
+
+    crown_rings = []
+    for s in range(steps):
+        t = (s + 1) / (steps + 1)
+        crx = _lerp(rx, r_table_x, t)
+        crz = _lerp(rz, r_table_z, t)
+        cy  = _lerp(y_gird_t, y_table, t)
+        crown_rings.append(_brio_ring(crx, crz, cy))
+
+    prev = gird_t
+    for cr in crown_rings:
+        polys += _band(cr, prev)
+        prev = cr
+    polys += _band(table, prev)
+
+    table_center = _add(c4d.Vector(0.0, y_table, 0.0))
+    for i in range(n):
+        polys.append(_tri(table_center, table[(i + 1) % n], table[i]))
+
+    return pts, polys
+
+def build_coffin(size, height, crown_h, girdle_h, segs, table_size, culet, steps):
+    """
+    Огранка Гроб (Coffin) — удлинённый 8-угольник.
+
+    Прямоугольник 1:2 со срезанными углами, ступенчатые павильон и корона.
+    """
+
+    rx       = size * 0.85
+    rz       = size * 1.7
+    cut_cf   = 0.25
+
+    r_tx = rx * max(0.2, min(0.9, table_size))
+    r_tz = rz * max(0.2, min(0.9, table_size))
+    r_culet = size * max(0.0, min(0.15, culet))
+
+    total_h  = max(1.0, height)
+    girdle   = max(0.5, girdle_h)
+    crown    = max(1.0, total_h * max(0.05, min(0.5, crown_h)))
+    pavilion = max(1.0, total_h - crown - girdle)
+    steps    = max(1, min(5, steps))
+
+    y_culet  = -(pavilion + girdle / 2.0)
+    y_gird_b = -girdle / 2.0
+    y_gird_t = +girdle / 2.0
+    y_table  = y_gird_t + crown
+
+    pts   = []
+    polys = []
+
+    def _add(v):
+        idx = len(pts)
+        pts.append(v)
+        return idx
+
+    def _coffin_ring(cx, cz, y):
+        """8-угольник: прямоугольник со срезанными углами."""
+        cf = cut_cf
+        raw = [
+            c4d.Vector( cx,              y,  cz - cf * cz),
+            c4d.Vector( cx - cf * cx,    y,  cz           ),
+            c4d.Vector(-(cx - cf * cx),  y,  cz           ),
+            c4d.Vector(-cx,              y,  cz - cf * cz),
+            c4d.Vector(-cx,              y, -(cz - cf * cz)),
+            c4d.Vector(-(cx - cf * cx),  y, -cz           ),
+            c4d.Vector( cx - cf * cx,    y, -cz           ),
+            c4d.Vector( cx,              y, -(cz - cf * cz)),
+        ]
+        return [_add(p) for p in raw]
+
+    gird_b = _coffin_ring(rx, rz, y_gird_b)
+    gird_t = _coffin_ring(rx, rz, y_gird_t)
+    table  = _coffin_ring(r_tx, r_tz, y_table)
+
+    if r_culet < 0.5:
+        culet_idx  = _add(c4d.Vector(0.0, y_culet, 0.0))
+        culet_ring = None
+    else:
+        culet_ring = _coffin_ring(r_culet * 0.85, r_culet * 1.7, y_culet)
+        culet_idx  = _add(c4d.Vector(0.0, y_culet, 0.0))
+
+    pav_rings = []
+    for s in range(steps):
+        t = (s + 1) / (steps + 1)
+        srx = _lerp(rx, r_culet * 0.85 if r_culet >= 0.5 else 0.001, t)
+        srz = _lerp(rz, r_culet * 1.7 if r_culet >= 0.5 else 0.001, t)
+        sy  = _lerp(y_gird_b, y_culet, t)
+        pav_rings.append(_coffin_ring(srx, srz, sy))
+
+    prev = gird_b
+    for pr in pav_rings:
+        polys += _band(prev, pr)
+        prev = pr
+
+    if culet_ring is None:
+        polys += _fan(culet_idx, prev, 0)
+    else:
+        polys += _band(prev, culet_ring)
+        c4c = _add(c4d.Vector(0.0, y_culet, 0.0))
+        polys += _fan(c4c, culet_ring, 0)
+
+    polys += _band(gird_t, gird_b)
+
+    crown_rings = []
+    for s in range(steps):
+        t = (s + 1) / (steps + 1)
+        crx = _lerp(rx, r_tx, t)
+        crz = _lerp(rz, r_tz, t)
+        cy  = _lerp(y_gird_t, y_table, t)
+        crown_rings.append(_coffin_ring(crx, crz, cy))
+
+    prev = gird_t
+    for cr in crown_rings:
+        polys += _band(cr, prev)
+        prev = cr
+    polys += _band(table, prev)
+
+    table_center = _add(c4d.Vector(0.0, y_table, 0.0))
+    for i in range(8):
+        polys.append(_tri(table_center, table[(i + 1) % 8], table[i]))
+
+    return pts, polys
+
+def build_star(size, height, crown_h, girdle_h, segs, table_size, culet, steps):
+    """
+    Огранка Звезда (Star) — лучевая огранка.
+
+    N-конечная звезда (N = max(3, segs // 4)).
+    Чередование внешних и внутренних вершин, ступенчатые павильон и корона.
+    """
+
+    r        = size
+    n_points = max(3, segs // 4)
+    n_verts  = n_points * 2
+
+    r_inner  = r * 0.45
+    r_table_o = r * max(0.1, min(0.9, table_size))
+    r_table_i = r_inner * max(0.1, min(0.9, table_size))
+    r_culet  = r * max(0.0, min(0.15, culet))
+
+    total_h  = max(1.0, height)
+    girdle   = max(0.5, girdle_h)
+    crown    = max(1.0, total_h * max(0.05, min(0.5, crown_h)))
+    pavilion = max(1.0, total_h - crown - girdle)
+    steps    = max(1, min(5, steps))
+
+    y_culet  = -(pavilion + girdle / 2.0)
+    y_gird_b = -girdle / 2.0
+    y_gird_t = +girdle / 2.0
+    y_table  = y_gird_t + crown
+
+    pts   = []
+    polys = []
+
+    def _add(v):
+        idx = len(pts)
+        pts.append(v)
+        return idx
+
+    def _star_ring(r_out, r_in, y):
+        idxs = []
+        for i in range(n_verts):
+            a = i / n_verts * 2.0 * math.pi
+            if i % 2 == 0:
+                px = r_out * math.cos(a)
+                pz = r_out * math.sin(a)
+            else:
+                px = r_in * math.cos(a)
+                pz = r_in * math.sin(a)
+            idxs.append(_add(c4d.Vector(px, y, pz)))
+        return idxs
+
+    gird_b = _star_ring(r, r_inner, y_gird_b)
+    gird_t = _star_ring(r, r_inner, y_gird_t)
+    table  = _star_ring(r_table_o, r_table_i, y_table)
+
+    if r_culet < 0.5:
+        culet_idx  = _add(c4d.Vector(0.0, y_culet, 0.0))
+        culet_ring = None
+    else:
+        culet_ring = _star_ring(r_culet, r_culet * 0.45, y_culet)
+        culet_idx  = _add(c4d.Vector(0.0, y_culet, 0.0))
+
+    pav_rings = []
+    for s in range(steps):
+        t = (s + 1) / (steps + 1)
+        so = _lerp(r, r_culet if r_culet >= 0.5 else 0.001, t)
+        si = _lerp(r_inner, r_culet * 0.45 if r_culet >= 0.5 else 0.001, t)
+        sy = _lerp(y_gird_b, y_culet, t)
+        pav_rings.append(_star_ring(so, si, sy))
+
+    prev = gird_b
+    for pr in pav_rings:
+        polys += _band(prev, pr)
+        prev = pr
+
+    if culet_ring is None:
+        polys += _fan(culet_idx, prev, 0)
+    else:
+        polys += _band(prev, culet_ring)
+        c4c = _add(c4d.Vector(0.0, y_culet, 0.0))
+        polys += _fan(c4c, culet_ring, 0)
+
+    polys += _band(gird_t, gird_b)
+
+    crown_rings = []
+    for s in range(steps):
+        t = (s + 1) / (steps + 1)
+        co = _lerp(r, r_table_o, t)
+        ci = _lerp(r_inner, r_table_i, t)
+        cy = _lerp(y_gird_t, y_table, t)
+        crown_rings.append(_star_ring(co, ci, cy))
+
+    prev = gird_t
+    for cr in crown_rings:
+        polys += _band(cr, prev)
+        prev = cr
+    polys += _band(table, prev)
+
+    table_center = _add(c4d.Vector(0.0, y_table, 0.0))
+    for i in range(n_verts):
+        polys.append(_tri(table_center, table[(i + 1) % n_verts], table[i]))
+
+    return pts, polys
+
 # ─── Диспетчер огранок ───────────────────────────────────────────────────────
 
 def build_diamond_mesh(cut, size, height, crown_h, girdle_h,
@@ -1445,6 +1984,16 @@ def build_diamond_mesh(cut, size, height, crown_h, girdle_h,
         return build_rose(size, height, crown_h, girdle_h, segs, culet)
     elif cut == CUT_TRILLION:
         return build_trillion(size, height, crown_h, girdle_h, segs, table_size, culet)
+    elif cut == CUT_LOZENGE:
+        return build_lozenge(size, height, crown_h, girdle_h, segs, table_size, culet, steps)
+    elif cut == CUT_KITE:
+        return build_kite(size, height, crown_h, girdle_h, segs, table_size, culet, steps)
+    elif cut == CUT_BRIOLETTE:
+        return build_briolette(size, height, crown_h, girdle_h, segs, table_size, culet, steps)
+    elif cut == CUT_COFFIN:
+        return build_coffin(size, height, crown_h, girdle_h, segs, table_size, culet, steps)
+    elif cut == CUT_STAR:
+        return build_star(size, height, crown_h, girdle_h, segs, table_size, culet, steps)
 
     else:
         return build_brilliant(size, height, crown_h, girdle_h,
@@ -1542,6 +2091,11 @@ class DiamondObject(_MeshPrimitiveBase):
         cyc[9] = "Сердце"
         cyc[10] = "Роза (Старинная)"
         cyc[11] = "Триллион (Треугольный)"
+        cyc[12] = "Ромб (Lozenge)"
+        cyc[13] = "Кайт (Kite)"
+        cyc[14] = "Бриолетт (Briolette)"
+        cyc[15] = "Гроб (Coffin)"
+        cyc[16] = "Звезда (Star)"
         bc[c4d.DESC_CYCLE] = cyc
         bc[c4d.DESC_ANIMATE] = c4d.DESC_ANIMATE_ON
         description.SetParameter(

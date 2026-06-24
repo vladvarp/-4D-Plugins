@@ -1,7 +1,7 @@
 ---
 title: VAr Tools
 tagline: Набор утилит для Cinema 4D, созданных для ускорения повседневной работы. Все плагины находятся в меню VAr Tools.
-version: v3.9.1
+version: v3.14.2
 author: V.Ar Production
 updated: Июнь 2026
 icon: ico/Var_tools/varp_tools.png
@@ -496,6 +496,11 @@ title: Diamond
 [[p:'image\var_tools\Objects\Primitivs\Diamond\Princess.png']]
 [[p:'image\var_tools\Objects\Primitivs\Diamond\Rose.png']]
 [[p:'image\var_tools\Objects\Primitivs\Diamond\Trillion.png']]
+[[p:'image\var_tools\Objects\Primitivs\Diamond\13.png']]
+[[p:'image\var_tools\Objects\Primitivs\Diamond\14.png']]
+[[p:'image\var_tools\Objects\Primitivs\Diamond\15.png']]
+[[p:'image\var_tools\Objects\Primitivs\Diamond\16.png']]
+[[p:'image\var_tools\Objects\Primitivs\Diamond\17.png']]
 ===
 ---
 
@@ -503,7 +508,7 @@ title: Diamond
 ::::details-open
 ПАРАМЕТРЫ
 
-♦ Огранка              [["23"]] [[ddl:'Бриллиант (Круглая)','Бриллиант (Квадратная)','Принцесса (Квадратная)','Изумруд (Ступенчатая)','Маркиза (Навет)','Груша (Teardrop)','Овал','Кушон (Подушка)','Ашер (Квадрат-ступени)','Сердце','Роза (Старинная)','Триллион (Треугольный)'-s200]]
+♦ Огранка              [["23"]] [[ddl:'Бриллиант (Круглая)','Бриллиант (Квадратная)','Принцесса (Квадратная)','Изумруд (Ступенчатая)','Маркиза (Навет)','Груша (Teardrop)','Овал','Кушон (Подушка)','Ашер (Квадрат-ступени)','Сердце','Роза (Старинная)','Триллион (Треугольный)','Ромб (Lozenge)','Кайт (Kite)','Бриолетт (Briolette)','Гроб (Coffin)','Звезда (Star)'-s200]]
 ♦ Размер               [["25"]] [[tif:'100'-t'0'-p'cm'-s80-sc250-d20/200-st1]]
 ♦ Высота               [["25"]] [[tif:'65'-t'0'-p'cm'-s80-sc250-d20/200-st1]]
 ♦ Высота короны        [["11"]] [[tif:'35'-t'0'-p'%'-s85-sc250-d5/60-st1]]
