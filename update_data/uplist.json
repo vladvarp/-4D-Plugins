@@ -14,7 +14,8 @@
           "url": "https://github.com/vladvarp/-4D-Plugins/tree/main/Plugins/VAr Tools",
           "info": "Пакет плагинов VAr Tools.",
           "info_url": "https://vladvarp.github.io/-4D-Plugins/web/plugin.html?md=plugins%2FVAr_Tools.md",
-          "version": ""
+          "version": "",
+          "ico": "https://vladvarp.github.io/-4D-Plugins/web/ico/Var_tools/varp_tools.png"
         },
         {
           "name": "Resolution Manager",
