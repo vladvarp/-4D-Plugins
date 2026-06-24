@@ -15,7 +15,7 @@ from urllib.parse import unquote, quote
 import ctypes
 
 PROGRAM_NAME = "4D Plugin Installer"
-PROGRAM_VER  = "v2.1"
+PROGRAM_VER  = "v2.2"
 
 # Скрываем консольное окно для всех дочерних процессов на Windows
 CREATE_NO_WINDOW = 0x08000000
@@ -535,6 +535,34 @@ GREEN    = "#4caf6e"
 RED      = "#e05c5c"
 YELLOW   = "#e0a94e"
 
+# ── SVG-иконки для кнопок таблицы ────────────────────────────────────────────
+
+def _svg_icon(svg_body: str, color: str) -> QIcon:
+    """Создаёт QIcon из SVG-фрагмента с подстановкой цвета fill."""
+    svg = (
+        f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" '
+        f'width="18" height="18" fill="{color}">{svg_body}</svg>'
+    )
+    pix = QPixmap()
+    pix.loadFromData(svg.encode("utf-8"), "SVG")
+    return QIcon(pix)
+
+# Стрелка вниз — «Установить»
+_ICO_INSTALL = lambda c: _svg_icon(
+    '<path d="M12 16l-6-6h4V4h4v6h4l-6 6z"/><rect x="4" y="18" width="16" height="2" rx="1"/>',
+    c
+)
+# Круговая стрелка — «Обновить» / «Переустановить»
+_ICO_UPDATE = lambda c: _svg_icon(
+    '<path d="M17.65 6.35A7.96 7.96 0 0 0 12 4a8 8 0 1 0 8 8h-2a6 6 0 1 1-1.76-4.24l-2.99 3H20V4l-2.35 2.35z"/>',
+    c
+)
+# Корзина — «Удалить»
+_ICO_DELETE = lambda c: _svg_icon(
+    '<path d="M9 3h6l1 1h4v2H4V4h4l1-1zM5 7h14l-1 13H6L5 7zm4 2v9h2V9H9zm4 0v9h2V9h-2z"/>',
+    c
+)
+
 STYLE = f"""
 QMainWindow, QWidget#root {{ background: {DARK_BG}; }}
 QWidget {{ background: transparent; color: {TEXT}; }}
@@ -556,9 +584,10 @@ QPushButton#primary:disabled {{ background: #5a3020; color: #996050; }}
 QPushButton#danger {{
     background: transparent; color: {RED};
     border: 1px solid #4a2020; border-radius: 6px;
-    padding: 5px 12px; font-size: 11px;
+    padding: 0px; font-size: 11px;
 }}
-QPushButton#danger:hover {{ background: #2a1212; }}
+QPushButton#danger:hover {{ background: #2a1212; border-color: #7a2828; }}
+QPushButton#danger:pressed {{ background: #1a0808; border-color: #aa3030; }}
 QPushButton#danger:disabled {{ color: #554040; border-color: #2a1818; }}
 QPushButton#readme {{
     background: transparent; color: {DIM};
@@ -566,18 +595,21 @@ QPushButton#readme {{
     padding: 5px 14px; font-size: 11px;
 }}
 QPushButton#readme:hover {{ color: {TEXT}; border-color: #555; background: #252525; }}
+QPushButton#readme:pressed {{ background: #1a1a1a; }}
 QPushButton#install {{
     background: transparent; color: #5b9bd5;
     border: 1px solid #2a4a70; border-radius: 6px;
-    padding: 5px 12px; font-size: 11px;
+    padding: 0px; font-size: 11px;
 }}
-QPushButton#install:hover {{ background: #152030; }}
+QPushButton#install:hover {{ background: #152030; border-color: #3a6a9a; }}
+QPushButton#install:pressed {{ background: #0a1520; border-color: #5b9bd5; }}
 QPushButton#update {{
     background: transparent; color: {GREEN};
     border: 1px solid #1e4a2e; border-radius: 6px;
-    padding: 5px 12px; font-size: 11px;
+    padding: 0px; font-size: 11px;
 }}
-QPushButton#update:hover {{ background: #122018; }}
+QPushButton#update:hover {{ background: #122018; border-color: #2e7a48; }}
+QPushButton#update:pressed {{ background: #081008; border-color: {GREEN}; }}
 QLineEdit {{
     background: {PANEL_BG}; color: {TEXT};
     border: 1px solid {BORDER}; border-radius: 6px;
@@ -620,6 +652,11 @@ QScrollBar::handle:vertical {{
 QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{ height: 0; }}
 QFrame#divider {{ background: {BORDER}; max-height: 1px; }}
 QTableWidget::item[groupHeader="true"] {{ background: #202020; }}
+QToolTip {{
+    background: #444444; color: {TEXT};
+    border: 1px solid #444; border-radius: 5px;
+    padding: 4px 8px; font-size: 11px;
+}}
 """
 
 # ── Главное окно ──────────────────────────────────────────────────────────────
@@ -829,8 +866,8 @@ class MainWindow(QMainWindow):
         self.table.setColumnWidth(1, 90)  # Текущая
         self.table.setColumnWidth(2, 90)  # Актуальная
         self.table.setColumnWidth(3, 125)  # Статус
-        self.table.setColumnWidth(4, 145)  # Установить / Обновить / Переустановить
-        self.table.setColumnWidth(5, 115)  # Удалить
+        self.table.setColumnWidth(4, 60)  # Установить / Обновить / Переустановить
+        self.table.setColumnWidth(5, 70)  # Удалить
         self.table.verticalHeader().setVisible(False)
         self.table.verticalHeader().setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
         self.table.setSelectionMode(QAbstractItemView.SelectionMode.NoSelection)
@@ -887,6 +924,32 @@ class MainWindow(QMainWindow):
         return w
 
     # ── Логика ────────────────────────────────────────────────────────────────
+
+    def _make_icon_btn(self, kind: str) -> "QPushButton":
+        """
+        Создаёт квадратную кнопку-иконку для таблицы.
+        kind: "install" | "update" | "danger" | "reinstall"
+        """
+        btn = QPushButton()
+        btn.setFixedSize(34, 28)
+        if kind == "install":
+            btn.setObjectName("install")
+            btn.setIcon(_ICO_INSTALL("#5b9bd5"))
+            btn.setToolTip("Установить")
+        elif kind == "update":
+            btn.setObjectName("update")
+            btn.setIcon(_ICO_UPDATE("#4caf6e"))
+            btn.setToolTip("Обновить")
+        elif kind == "reinstall":
+            btn.setObjectName("update")
+            btn.setIcon(_ICO_UPDATE("#4caf6e"))
+            btn.setToolTip("Переустановить")
+        elif kind == "danger":
+            btn.setObjectName("danger")
+            btn.setIcon(_ICO_DELETE("#e05c5c"))
+            btn.setToolTip("Удалить")
+        btn.setIconSize(btn.size().__class__(18, 18))
+        return btn
 
     def _smooth_scroll_step(self):
         """Шаг анимации плавной прокрутки таблицы (вызывается таймером ~60 fps)."""
@@ -1176,10 +1239,7 @@ class MainWindow(QMainWindow):
             if p is not None and not self.offline_mode and remote_ver not in (None, "error"):
                 if remote_ver == "not_found":
                     # Файл ver в репо отсутствует: переустановить если папка есть, иначе установить
-                    action_label = "Переустановить" if is_installed else "Установить"
-                    act_btn = QPushButton(action_label)
-                    act_btn.setObjectName("update" if is_installed else "install")
-                    act_btn.setFixedHeight(28)
+                    act_btn = self._make_icon_btn("reinstall" if is_installed else "install")
                     captured_plugin = dict(p)
                     act_btn.clicked.connect(lambda _, pl=captured_plugin: self._install_single(pl))
                     aw = QWidget()
@@ -1189,10 +1249,7 @@ class MainWindow(QMainWindow):
                     al.addWidget(act_btn)
                     self.table.setCellWidget(row, 4, aw)
                 elif not local_ver or local_ver != remote_ver:
-                    action_label = "Обновить" if local_ver else "Установить"
-                    act_btn = QPushButton(action_label)
-                    act_btn.setObjectName("update" if local_ver else "install")
-                    act_btn.setFixedHeight(28)
+                    act_btn = self._make_icon_btn("update" if local_ver else "install")
                     captured_plugin = dict(p)
                     act_btn.clicked.connect(lambda _, pl=captured_plugin: self._install_single(pl))
                     aw = QWidget()
@@ -1204,9 +1261,7 @@ class MainWindow(QMainWindow):
 
             # Кнопка «Удалить» (только если папка плагина существует)
             if is_installed:
-                del_btn = QPushButton("Удалить")
-                del_btn.setObjectName("danger")
-                del_btn.setFixedHeight(28)
+                del_btn = self._make_icon_btn("danger")
                 captured_name = name
                 del_btn.clicked.connect(lambda _, n=captured_name: self._delete_plugin(n))
                 dw = QWidget()
@@ -1596,9 +1651,7 @@ class MainWindow(QMainWindow):
                 st = QTableWidgetItem("Установлен")
                 st.setForeground(QColor(DIM))
                 self.table.setItem(row, 3, st)
-                act_btn = QPushButton("Переустановить")
-                act_btn.setObjectName("update")
-                act_btn.setFixedHeight(28)
+                act_btn = self._make_icon_btn("reinstall")
                 captured_plugin = dict(p)
                 act_btn.clicked.connect(lambda _, pl=captured_plugin: self._install_single(pl))
                 aw = QWidget(); aw.setStyleSheet("background:transparent;")
@@ -1609,9 +1662,7 @@ class MainWindow(QMainWindow):
                 st = QTableWidgetItem("")
                 st.setForeground(QColor(ACCENT))
                 self.table.setItem(row, 3, st)
-                act_btn = QPushButton("Установить")
-                act_btn.setObjectName("install")
-                act_btn.setFixedHeight(28)
+                act_btn = self._make_icon_btn("install")
                 captured_plugin = dict(p)
                 act_btn.clicked.connect(lambda _, pl=captured_plugin: self._install_single(pl))
                 aw = QWidget(); aw.setStyleSheet("background:transparent;")
@@ -1636,9 +1687,7 @@ class MainWindow(QMainWindow):
                 st = QTableWidgetItem("")
                 st.setForeground(QColor(ACCENT))
                 self.table.setItem(row, 3, st)
-                act_btn = QPushButton("Установить")
-                act_btn.setObjectName("install")
-                act_btn.setFixedHeight(28)
+                act_btn = self._make_icon_btn("install")
                 captured_plugin = dict(p)
                 act_btn.clicked.connect(lambda _, pl=captured_plugin: self._install_single(pl))
                 aw = QWidget(); aw.setStyleSheet("background:transparent;")
@@ -1649,9 +1698,7 @@ class MainWindow(QMainWindow):
                 st = QTableWidgetItem("Есть обновление")
                 st.setForeground(QColor(YELLOW))
                 self.table.setItem(row, 3, st)
-                act_btn = QPushButton("Обновить")
-                act_btn.setObjectName("update")
-                act_btn.setFixedHeight(28)
+                act_btn = self._make_icon_btn("update")
                 captured_plugin = dict(p)
                 act_btn.clicked.connect(lambda _, pl=captured_plugin: self._install_single(pl))
                 aw = QWidget(); aw.setStyleSheet("background:transparent;")
@@ -1798,9 +1845,7 @@ class MainWindow(QMainWindow):
                     self.table.item(row, 3).setForeground(QColor(DIM))
                     captured_plugin_ref = dict(plugin_obj) if plugin_obj else None
                     if captured_plugin_ref:
-                        reinstall_btn = QPushButton("Переустановить")
-                        reinstall_btn.setObjectName("update")
-                        reinstall_btn.setFixedHeight(28)
+                        reinstall_btn = self._make_icon_btn("reinstall")
                         reinstall_btn.clicked.connect(lambda _, pl=captured_plugin_ref: self._install_single(pl))
                         aw = QWidget()
                         aw.setStyleSheet("background:transparent;")
@@ -1819,9 +1864,7 @@ class MainWindow(QMainWindow):
 
                 # Поставить кнопку «Удалить» (если её ещё нет)
                 captured_name = name
-                del_btn = QPushButton("Удалить")
-                del_btn.setObjectName("danger")
-                del_btn.setFixedHeight(28)
+                del_btn = self._make_icon_btn("danger")
                 del_btn.clicked.connect(lambda _, n=captured_name: self._delete_plugin(n))
                 dw = QWidget()
                 dw.setStyleSheet("background:transparent;")
