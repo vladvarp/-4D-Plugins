@@ -1576,7 +1576,7 @@ function applyCarousel3D(id, index, instant) {
         if (offset < -total / 2) offset += total;
         const absOffset = Math.abs(offset);
 
-        slide.style.transition = instant ? 'none' : `transform ${asp}ms ease, opacity ${asp}ms ease`;
+        slide.style.transition = instant ? 'none' : `transform ${asp}ms ease, opacity ${asp}ms ease, filter ${asp}ms ease`;
 
         if (offset === 0) {
             slide.style.transform = 'translateZ(0) rotateY(0deg) scale(1)';
@@ -1588,13 +1588,13 @@ function applyCarousel3D(id, index, instant) {
             slide.style.transform = `translateX(${sign * 62}%) translateZ(-180px) rotateY(${sign * -45}deg) scale(0.65)`;
             slide.style.opacity = '0.7';
             slide.style.zIndex = '4';
-            slide.style.filter = 'brightness(0.7)';
+            slide.style.filter = 'brightness(0.75)';
         } else if (absOffset === 2) {
             const sign = offset > 0 ? 1 : -1;
             slide.style.transform = `translateX(${sign * 90}%) translateZ(-350px) rotateY(${sign * -60}deg) scale(0.4)`;
             slide.style.opacity = '0.3';
             slide.style.zIndex = '3';
-            slide.style.filter = 'brightness(0.4)';
+            slide.style.filter = 'brightness(0.5)';
         } else {
             slide.style.transform = `translateZ(-500px) scale(0)`;
             slide.style.opacity = '0';
