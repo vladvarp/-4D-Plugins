@@ -490,18 +490,18 @@ def build_quads(verts_raw, triangles_raw, pts, tris, freq):
 
 def build_spiral(verts_raw, triangles_raw, pts, tris, freq):
     """
-    PAT_SPIRAL — спиральное / Phyllotaxis покрытие.
-    Используем золотой угол (137.5°) для расположения точек на сфере,
-    затем строим Делоне-треугольники через proximity на сфере.
-    Для C4D: аппроксимируем через концентрические кольца со смещением.
+    PAT_SPIRAL — спиральное покрытие.
+    Концентрические кольца с постепенным азимутальным смещением,
+    создающим визуальный спиральный узор на поверхности купола.
     """
     r = max((math.sqrt(p.x**2 + p.y**2 + p.z**2) for p in pts), default=100.0)
     ys = [p.y for p in pts] if pts else [0.0, r]
     y_min = min(ys)
 
-    golden_angle = math.pi * (3.0 - math.sqrt(5.0))  # ~137.5°
     n_rings = max(3, freq * 3)
     n_per_ring = max(6, freq * 6)
+    twist_total = math.pi * 0.5  # четверть оборота на весь купол
+    twist_per_ring = twist_total / n_rings
 
     new_pts = []
     polys_out = []
@@ -509,14 +509,14 @@ def build_spiral(verts_raw, triangles_raw, pts, tris, freq):
     theta_max = math.pi / 2.0
     theta_min = math.asin(max(-1.0, min(1.0, y_min / r)))
 
-    # Строим точки по phyllotaxis (золотой угол) + концентрические спирали
+    # Строим концентрические кольца со спиральным смещением
     rings = []
     for j in range(n_rings + 1):
         t = j / n_rings
         theta = theta_min + (theta_max - theta_min) * t
         # Смещение азимута пропорционально j
         ring = []
-        offset = j * golden_angle
+        offset = j * twist_per_ring
         for k in range(n_per_ring):
             phi = offset + k / n_per_ring * 2.0 * math.pi
             x = r * math.cos(theta) * math.cos(phi)
@@ -532,8 +532,7 @@ def build_spiral(verts_raw, triangles_raw, pts, tris, freq):
         hi = rings[j + 1]
         n = n_per_ring
         # Вычисляем угловое смещение между кольцами
-        offset_angle = golden_angle
-        dphi = offset_angle / (2.0 * math.pi / n)
+        dphi = twist_per_ring / (2.0 * math.pi / n)
         k_offset = int(round(dphi)) % n
 
         for k in range(n):
@@ -1207,7 +1206,7 @@ class GeodesicDomeObject(c4d.plugins.ObjectData):
 
         # ── Угол среза ────────────────────────────────────────────────────────
         bc = c4d.GetCustomDataTypeDefault(c4d.DTYPE_REAL)
-        bc[c4d.DESC_NAME]      = "Угол среза (°)"
+        bc[c4d.DESC_NAME]      = "Угол среза"
         bc[c4d.DESC_DEFAULT]   = 90.0
         bc[c4d.DESC_MIN]       = 1.0
         bc[c4d.DESC_MAX]       = 180.0
