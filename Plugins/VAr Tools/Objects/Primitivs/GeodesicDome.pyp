@@ -555,16 +555,14 @@ def build_spiral(verts_raw, triangles_raw, pts, tris, freq):
 def build_voronoi(verts_raw, triangles_raw, pts, tris):
     """
     PAT_VORONOI — органические ячейки.
-    Используем двойник Вороного как расширение сотового покрытия:
-    добавляем случайный шум к позиции центроидов, затем строим
-    те же ячейки-двойники, но с возмущёнными центрами.
+    Двойник триангуляции: каждая вершина → полигон из центроидов
+    окружающих треугольников. Добавляем лёгкий шум для органичности.
     """
     import random
-    rng = random.Random(42)   # детерминированный seed
+    rng = random.Random(42)
 
     polys_out = []
 
-    # Немного возмущаем центроиды треугольников
     tri_centers = []
     for (a, b, c) in tris:
         cx = (pts[a].x + pts[b].x + pts[c].x) / 3.0
@@ -574,15 +572,10 @@ def build_voronoi(verts_raw, triangles_raw, pts, tris):
         if r < 1e-10:
             tri_centers.append(c4d.Vector(cx, cy, cz))
             continue
-        # Возмущение: 5% по касательной
-        noise = 0.05
-        tx = rng.uniform(-noise, noise)
-        ty = rng.uniform(-noise, noise)
-        tz = rng.uniform(-noise, noise)
-        # Проецируем на сферу
-        nx = cx / r + tx
-        ny = cy / r + ty
-        nz = cz / r + tz
+        noise = 0.01
+        nx = cx / r + rng.uniform(-noise, noise)
+        ny = cy / r + rng.uniform(-noise, noise)
+        nz = cz / r + rng.uniform(-noise, noise)
         l2 = math.sqrt(nx * nx + ny * ny + nz * nz)
         tri_centers.append(c4d.Vector(nx * r / l2, ny * r / l2, nz * r / l2))
 
@@ -608,29 +601,17 @@ def build_voronoi(verts_raw, triangles_raw, pts, tris):
         def angle_for(ti):
             c_pt = tri_centers[ti]
             d = c4d.Vector(c_pt.x - vp.x, c_pt.y - vp.y, c_pt.z - vp.z)
-            u = _dot(d, tang)
-            v2 = _dot(d, btan)
-            return math.atan2(v2, u)
+            return math.atan2(_dot(d, btan), _dot(d, tang))
 
         sorted_tris = sorted(tri_list, key=angle_for)
         n = len(sorted_tris)
-
         if n == 3:
-            polys_out.append(_tri(*sorted_tris))
+            polys_out.append(_tri(sorted_tris[0], sorted_tris[1], sorted_tris[2]))
         elif n == 4:
-            polys_out.append(_quad(*sorted_tris))
-        elif n == 5:
-            a, b, c_, d, e = sorted_tris
-            polys_out.append(_tri(a, b, c_))
-            polys_out.append(_tri(a, c_, d))
-            polys_out.append(_tri(a, d, e))
-        elif n == 6:
-            a, b, c_, d, e, f = sorted_tris
-            polys_out.append(_quad(a, b, c_, d))
-            polys_out.append(_quad(a, d, e, f))
+            polys_out.append(_quad(sorted_tris[0], sorted_tris[1], sorted_tris[2], sorted_tris[3]))
         else:
-            for i in range(1, n - 1):
-                polys_out.append(_tri(sorted_tris[0], sorted_tris[i], sorted_tris[i + 1]))
+            for k in range(1, n - 1):
+                polys_out.append(_tri(sorted_tris[0], sorted_tris[k], sorted_tris[k + 1]))
 
     return new_pts, polys_out
 
