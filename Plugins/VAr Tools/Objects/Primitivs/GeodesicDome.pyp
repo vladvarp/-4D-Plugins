@@ -474,7 +474,7 @@ def build_quads(verts_raw, triangles_raw, pts, tris, freq):
             b = grid[j][(k + 1) % cols]
             c_ = grid[j + 1][(k + 1) % cols]
             d = grid[j + 1][k]
-            polys_out.append(_quad(a, b, c_, d))
+            polys_out.append(_quad(a, d, c_, b))
 
     # Верхняя крышка (пирамида к полюсу)
     pole_idx = len(new_pts)
@@ -483,7 +483,7 @@ def build_quads(verts_raw, triangles_raw, pts, tris, freq):
     for k in range(cols):
         a = top_ring[k]
         b = top_ring[(k + 1) % cols]
-        polys_out.append(_tri(pole_idx, b, a))
+        polys_out.append(_tri(pole_idx, a, b))
 
     return new_pts, polys_out
 
@@ -541,14 +541,14 @@ def build_spiral(verts_raw, triangles_raw, pts, tris, freq):
             b = lo[(k + 1) % n]
             c_ = hi[(k + 1 + k_offset) % n]
             d  = hi[(k + k_offset) % n]
-            polys_out.append(_quad(a, b, c_, d))
+            polys_out.append(_quad(a, d, c_, b))
 
     # Полюс
     pole = len(new_pts)
     new_pts.append(c4d.Vector(0.0, r, 0.0))
     top = rings[n_rings]
     for k in range(n_per_ring):
-        polys_out.append(_tri(pole, top[(k + 1) % n_per_ring], top[k]))
+        polys_out.append(_tri(pole, top[k], top[(k + 1) % n_per_ring]))
 
     return new_pts, polys_out
 
@@ -738,27 +738,24 @@ def build_bricks(verts_raw, triangles_raw, pts, tris, freq):
 
         for k in range(n):
             if j % 2 == 0:
-                # Чётные → нечётные: hi сдвинуто на 0.5
                 a = lo[k]
                 b = lo[(k + 1) % n]
-                # Ближайшие два в hi
                 c_ = hi[(k + 1) % n]
                 d  = hi[k]
-                polys_out.append(_quad(a, b, c_, d))
+                polys_out.append(_quad(a, d, c_, b))
             else:
-                # Нечётные → чётные
                 a = lo[k]
                 b = lo[(k + 1) % n]
                 c_ = hi[(k + 1) % n]
                 d  = hi[k]
-                polys_out.append(_quad(a, b, c_, d))
+                polys_out.append(_quad(a, d, c_, b))
 
     # Полюс
     pole = len(new_pts)
     new_pts.append(c4d.Vector(0.0, r, 0.0))
     top = grids[n_rows]
     for k in range(n_cols):
-        polys_out.append(_tri(pole, top[(k + 1) % n_cols], top[k]))
+        polys_out.append(_tri(pole, top[k], top[(k + 1) % n_cols]))
 
     return new_pts, polys_out
 
@@ -943,15 +940,13 @@ def build_weave(verts_raw, triangles_raw, pts, tris, freq):
         grid_b.append(col)
 
     # Строим ромбы из пересечений прядей
-    # Каждый квадрат: A[i][j] - B[i][j] - A[i+1][j+1] - B[i][j+1] ... 
-    # Упрощённо: квады между соседними шагами A-сетки
     for si in range(n_strands):
         for sj in range(n_steps):
             a = grid_a[si][sj]
             b = grid_a[(si + 1) % n_strands][sj]
             c_ = grid_a[(si + 1) % n_strands][sj + 1]
             d  = grid_a[si][sj + 1]
-            polys_out.append(_quad(a, b, c_, d))
+            polys_out.append(_quad(a, d, c_, b))
 
     # Добавляем квады из B-сетки (ромбы поперёк)
     for si in range(n_strands):
@@ -960,7 +955,7 @@ def build_weave(verts_raw, triangles_raw, pts, tris, freq):
             b = grid_b[(si + 1) % n_strands][sj]
             c_ = grid_b[(si + 1) % n_strands][sj + 1]
             d  = grid_b[si][sj + 1]
-            polys_out.append(_quad(a, b, c_, d))
+            polys_out.append(_quad(a, d, c_, b))
 
     # Полюс
     pole = len(new_pts)
@@ -968,11 +963,11 @@ def build_weave(verts_raw, triangles_raw, pts, tris, freq):
     for si in range(n_strands):
         a = grid_a[si][n_steps]
         b = grid_a[(si + 1) % n_strands][n_steps]
-        polys_out.append(_tri(pole, b, a))
+        polys_out.append(_tri(pole, a, b))
     for si in range(n_strands):
         a = grid_b[si][n_steps]
         b = grid_b[(si + 1) % n_strands][n_steps]
-        polys_out.append(_tri(pole, b, a))
+        polys_out.append(_tri(pole, a, b))
 
     return new_pts, polys_out
 
