@@ -318,8 +318,8 @@ def _add_flat_base(pts, y_level, radius):
     polys = []
     n = len(rim_idx)
     for i in range(n):
-        a = rim_idx[(i + 1) % n]
-        b = rim_idx[i]
+        a = rim_idx[i]
+        b = rim_idx[(i + 1) % n]
         polys.append(_tri(center_idx, a, b))
     return center_idx, polys
 
