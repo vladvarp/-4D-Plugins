@@ -32,7 +32,7 @@ import tempfile
 # ─── Константы ────────────────────────────────────────────────────────────────
 
 ID_GEODOME   = 1069092
-NAME_GEODOME = "Geodesic Dome 1.0"
+NAME_GEODOME = "Geodesic Dome 1.9"
 
 # ─── UserData / Description IDs ───────────────────────────────────────────────
 
@@ -80,14 +80,12 @@ PAT_NAMES = [
 ARCH_DOME     = 0   # Стандартный купол (полусфера или угол среза)
 ARCH_FULL     = 1   # Полная сфера
 ARCH_DRUM     = 2   # Купол на барабане (цилиндрическом основании)
-ARCH_TUNNEL   = 3   # Туннельный свод (половина цилиндра)
-ARCH_ELLIPTIC = 4   # Эллиптический купол (сплюснутая сфера)
+ARCH_ELLIPTIC = 3   # Эллиптический купол (сплюснутая сфера)
 
 ARCH_NAMES = [
     "Dome (Купол)",
     "Full Sphere (Полная сфера)",
     "Drum (На барабане)",
-    "Tunnel Vault (Туннель)",
     "Elliptic Dome (Эллипс)",
 ]
 
@@ -1077,10 +1075,6 @@ def build_geodome_mesh(pattern, freq, radius, cut_angle,
     elif arch_mode == ARCH_ELLIPTIC:
         pts_raw, tris_raw, y_base = _apply_dome_cut(
             verts_s, tris_s, cut_angle, ARCH_DOME, radius, drum_h, elliptic_scale)
-    elif arch_mode == ARCH_TUNNEL:
-        # Туннель: половина цилиндра — используем особую логику
-        pts_raw, tris_raw, y_base = _apply_dome_cut(
-            verts_s, tris_s, cut_angle, ARCH_DOME, radius, drum_h, 1.0)
     else:
         pts_raw, tris_raw, y_base = _apply_dome_cut(
             verts_s, tris_s, cut_angle, arch_mode, radius, drum_h, elliptic_scale)
@@ -1318,13 +1312,13 @@ class GeodesicDomeObject(c4d.plugins.ObjectData):
         bc = c4d.GetCustomDataTypeDefault(c4d.DTYPE_REAL)
         bc[c4d.DESC_NAME]      = "Высота барабана"
         bc[c4d.DESC_DEFAULT]   = 50.0
-        bc[c4d.DESC_MIN]       = 0.0
+        bc[c4d.DESC_MIN]       = 0.01
         bc[c4d.DESC_MAX]       = 100000.0
         bc[c4d.DESC_UNIT]      = c4d.DESC_UNIT_METER
-        bc[c4d.DESC_STEP]      = 5.0
+        bc[c4d.DESC_STEP]      = 1.0
         bc[c4d.DESC_ANIMATE]   = c4d.DESC_ANIMATE_ON
         bc[c4d.DESC_CUSTOMGUI] = c4d.CUSTOMGUI_REALSLIDER
-        bc[c4d.DESC_MINSLIDER] = 0.0
+        bc[c4d.DESC_MINSLIDER] = 0.01
         bc[c4d.DESC_MAXSLIDER] = 500.0
         description.SetParameter(
             c4d.DescID(c4d.DescLevel(GD_D_DRUM_H, c4d.DTYPE_REAL, 0)),
