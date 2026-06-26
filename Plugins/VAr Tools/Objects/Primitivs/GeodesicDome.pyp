@@ -1086,7 +1086,7 @@ class GeodesicDomeObject(c4d.plugins.ObjectData):
         op[GD_D_PATTERN]  = PAT_TRIANGLES
         op[GD_D_FREQ]     = 3
         op[GD_D_RADIUS]   = 200.0
-        op[GD_D_CUTANGLE] = 90.0
+        op[GD_D_CUTANGLE] = 0.5
         op[GD_D_ARCH]     = ARCH_DOME
         op[GD_D_DRUM_H]   = 50.0
         op[GD_D_INVERT]   = False
@@ -1126,7 +1126,7 @@ class GeodesicDomeObject(c4d.plugins.ObjectData):
         pattern  = int(op[GD_D_PATTERN]  or 0)
         freq     = int(op[GD_D_FREQ]     or 3)
         radius   = float(op[GD_D_RADIUS] or 200.0)
-        cut_ang  = float(op[GD_D_CUTANGLE] or 90.0)
+        cut_ang  = float(op[GD_D_CUTANGLE] or 0.5)
         arch     = int(op[GD_D_ARCH]     or 0)
         drum_h   = float(op[GD_D_DRUM_H] or 50.0)
         open_b   = bool(op[GD_D_OPENBASE])
@@ -1134,9 +1134,10 @@ class GeodesicDomeObject(c4d.plugins.ObjectData):
 
         # Эллиптический масштаб
         elliptic_scale = 0.6 if arch == ARCH_ELLIPTIC else 1.0
+        cut_ang_deg = cut_ang * 180.0
 
         pts, polys = build_geodome_mesh(
-            pattern, freq, radius, cut_ang,
+            pattern, freq, radius, cut_ang_deg,
             arch, drum_h, elliptic_scale,
             open_b, flat_b
         )
@@ -1208,15 +1209,15 @@ class GeodesicDomeObject(c4d.plugins.ObjectData):
         # ── Угол среза ────────────────────────────────────────────────────────
         bc = c4d.GetCustomDataTypeDefault(c4d.DTYPE_REAL)
         bc[c4d.DESC_NAME]      = "Угол среза"
-        bc[c4d.DESC_DEFAULT]   = 90.0
-        bc[c4d.DESC_MIN]       = 1.0
-        bc[c4d.DESC_MAX]       = 180.0
-        bc[c4d.DESC_UNIT]      = c4d.DESC_UNIT_DEGREE
-        bc[c4d.DESC_STEP]      = 1.0
+        bc[c4d.DESC_DEFAULT]   = 0.5
+        bc[c4d.DESC_MIN]       = 0.0
+        bc[c4d.DESC_MAX]       = 1.0
+        bc[c4d.DESC_UNIT]      = c4d.DESC_UNIT_PERCENT
+        bc[c4d.DESC_STEP]      = 0.01
         bc[c4d.DESC_ANIMATE]   = c4d.DESC_ANIMATE_ON
         bc[c4d.DESC_CUSTOMGUI] = c4d.CUSTOMGUI_REALSLIDER
-        bc[c4d.DESC_MINSLIDER] = 10.0
-        bc[c4d.DESC_MAXSLIDER] = 180.0
+        bc[c4d.DESC_MINSLIDER] = 0.0
+        bc[c4d.DESC_MAXSLIDER] = 1.0
         description.SetParameter(
             c4d.DescID(c4d.DescLevel(GD_D_CUTANGLE, c4d.DTYPE_REAL, 0)),
             bc, gid
