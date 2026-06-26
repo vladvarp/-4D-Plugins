@@ -892,87 +892,88 @@ def build_triacon(verts_raw, triangles_raw, pts, tris):
 
 def build_weave(verts_raw, triangles_raw, pts, tris, freq):
     """
-    PAT_WEAVE — плетение (перекрёстное разбиение).
-    Два набора спиральных линий (левые и правые) образуют
-    ромбические ячейки, напоминающие плетёную корзину.
-
-    Реализация: два набора longitude-рядов со смещением.
+    PAT_WEAVE — плетение.
+    Два набора спиралей (CW и CCW) пересекаются, образуя ромбы.
+    Горизонтальных колец нет — только перекрёстные ячейки.
     """
     r = max((math.sqrt(p.x**2 + p.y**2 + p.z**2) for p in pts), default=100.0)
     ys = [p.y for p in pts] if pts else [0.0, r]
     y_min = min(ys)
 
-    n_strands = max(4, freq * 4)  # число прядей в каждом направлении
-    n_steps   = max(6, freq * 6)  # шаги по высоте
+    n_strands = max(4, freq * 4)
+    n_steps = max(6, freq * 6)
 
     theta_max = math.pi / 2.0
     theta_min = math.asin(max(-1.0, min(1.0, y_min / r)))
 
+    twist_total = math.pi * 0.5
+    twist_per_step = twist_total / n_steps
+
     new_pts = []
     polys_out = []
 
-    # Строим два набора наклонных линий
-    # A-strands: наклон +45°, B-strands: наклон -45°
-    # Каждая прядь — спираль на сфере
-    twist = math.pi / n_strands  # угол закручивания
-
-    def strand_pt(strand_i, step_j, direction):
-        t = step_j / n_steps
-        theta = theta_min + (theta_max - theta_min) * t
-        # Базовый азимут прядi + скручивание
-        phi_base = strand_i / n_strands * 2.0 * math.pi
-        phi = phi_base + direction * twist * step_j
-        x = r * math.cos(theta) * math.cos(phi)
-        y = r * math.sin(theta)
-        z = r * math.cos(theta) * math.sin(phi)
-        return c4d.Vector(x, y, z)
-
-    # Строим сетку A (direction = +1)
+    # Генерируем точки A-спиралей (CW) и B-спиралей (CCW)
     grid_a = []
     for si in range(n_strands):
         col = []
         for sj in range(n_steps + 1):
+            t = sj / n_steps
+            theta = theta_min + (theta_max - theta_min) * t
+            phi = si / n_strands * 2.0 * math.pi + sj * twist_per_step
+            x = r * math.cos(theta) * math.cos(phi)
+            y = r * math.sin(theta)
+            z = r * math.cos(theta) * math.sin(phi)
             col.append(len(new_pts))
-            new_pts.append(strand_pt(si, sj, +1))
+            new_pts.append(c4d.Vector(x, y, z))
         grid_a.append(col)
 
-    # Строим сетку B (direction = -1), со смещением на полшага
     grid_b = []
     for si in range(n_strands):
         col = []
         for sj in range(n_steps + 1):
+            t = sj / n_steps
+            theta = theta_min + (theta_max - theta_min) * t
+            phi = (si + 0.5) / n_strands * 2.0 * math.pi - sj * twist_per_step
+            x = r * math.cos(theta) * math.cos(phi)
+            y = r * math.sin(theta)
+            z = r * math.cos(theta) * math.sin(phi)
             col.append(len(new_pts))
-            new_pts.append(strand_pt(si + 0.5, sj, -1))
+            new_pts.append(c4d.Vector(x, y, z))
         grid_b.append(col)
 
-    # Строим ромбы из пересечений прядей
-    for si in range(n_strands):
-        for sj in range(n_steps):
-            a = grid_a[si][sj]
-            b = grid_a[(si + 1) % n_strands][sj]
-            c_ = grid_a[(si + 1) % n_strands][sj + 1]
-            d  = grid_a[si][sj + 1]
+    # На каждом уровне sj собираем все 2*n_strands точек,
+    # сортируем по азимуту и строим квады между уровнями
+    for sj in range(n_steps + 1):
+        level = []
+        for si in range(n_strands):
+            p = new_pts[grid_a[si][sj]]
+            level.append((grid_a[si][sj], math.atan2(p.z, p.x)))
+            p = new_pts[grid_b[si][sj]]
+            level.append((grid_b[si][sj], math.atan2(p.z, p.x)))
+        level.sort(key=lambda x: x[1])
+        # Сохраняем индексы в порядке азимута
+        for idx in range(len(level)):
+            level[idx] = level[idx][0]
+        if sj == 0:
+            prev_level = level
+            continue
+        # Квады между prev_level и level
+        n = len(level)
+        for i in range(n):
+            a = prev_level[i]
+            b = prev_level[(i + 1) % n]
+            c_ = level[(i + 1) % n]
+            d = level[i]
             polys_out.append(_quad(a, d, c_, b))
-
-    # Добавляем квады из B-сетки (ромбы поперёк)
-    for si in range(n_strands):
-        for sj in range(n_steps):
-            a = grid_b[si][sj]
-            b = grid_b[(si + 1) % n_strands][sj]
-            c_ = grid_b[(si + 1) % n_strands][sj + 1]
-            d  = grid_b[si][sj + 1]
-            polys_out.append(_quad(a, d, c_, b))
+        prev_level = level
 
     # Полюс
     pole = len(new_pts)
     new_pts.append(c4d.Vector(0.0, r, 0.0))
-    for si in range(n_strands):
-        a = grid_a[si][n_steps]
-        b = grid_a[(si + 1) % n_strands][n_steps]
-        polys_out.append(_tri(pole, a, b))
-    for si in range(n_strands):
-        a = grid_b[si][n_steps]
-        b = grid_b[(si + 1) % n_strands][n_steps]
+    top = prev_level
+    for i in range(len(top)):
+        a = top[i]
+        b = top[(i + 1) % len(top)]
         polys_out.append(_tri(pole, a, b))
 
     return new_pts, polys_out
