@@ -49,7 +49,7 @@ function initIndexPage() {
             description: 'Набор утилит для Cinema 4D, созданных для ускорения повседневной работы.',
             icon: 'ico/Var_tools/varp_tools.png',
             tags: ['Моделирование', 'Процедурный', 'Анимация', 'Автоматизация'],
-            version: 'v3.27',
+            version: 'v3.27.31',
             mdFile: 'plugins/VAr_Tools.md'
         },
         {
@@ -58,7 +58,7 @@ function initIndexPage() {
             description: 'Управление разрешением рендера для каждой камеры в сцене — назначай, активируй и переключай форматы прямо из плавающей панели.',
             icon: 'ico/CameraResolution.png',
             tags: ['Рендер', 'Автоматизация', 'Камера'],
-            version: 'v1.7',
+            version: 'v1.7.1',
             mdFile: 'plugins/camera-resolution-manager.md'
         },
         {
@@ -67,7 +67,7 @@ function initIndexPage() {
             description: 'Инструмент для наведения порядка в сцене. Плагин решает одну из самых рутинных задач 3D-художника: быстрое и массовое переименование объектов с полным контролем над результатом.',
             icon: 'ico/ObjectRenamerPRO.png',
             tags: ['Автоматизация', 'Утилиты'],
-            version: 'v2.6',
+            version: 'v2.6.1',
             mdFile: 'plugins/object-renamer-pro.md'
         },
         {
@@ -76,7 +76,7 @@ function initIndexPage() {
             description: 'Мгновенно превращает анимацию объекта в набор статичных мешей — по одному на каждый кадр — и объединяет их в единый полигональный снепшот.',
             icon: 'ico/Snapshot.png',
             tags: ['Анимация', 'Автоматизация', 'Утилиты'],
-            version: 'v1.7',
+            version: 'v1.7.1',
             mdFile: 'plugins/snapshot.md'
         },
         {
@@ -85,7 +85,7 @@ function initIndexPage() {
             description: 'Сохранение и восстановление наборов выделения объектов. Каждый набор — это тег (Selection Set Tag) на нулевом объекте внутри контейнера "Selection Sets". Тег хранит имя набора и ссылки на объекты в пользовательских данных (UserData).',
             icon: 'ico/SelectionSet/icon_plugin.png',
             tags: [`Выделение`, `Утилиты`, `Организация`],
-            version: 'v1.4',
+            version: 'v1.4.1',
             mdFile: 'plugins/SelectionSet.md'
         },
         {
@@ -94,7 +94,7 @@ function initIndexPage() {
             description: 'Процедурный генератор напольных покрытий — ёлочка, паркет, шеврон, соты — с фаской, швами и рандомизированными UV.',
             icon: 'ico/FloorGenerator.png',
             tags: [`Моделирование`, `Процедурный`],
-            version: 'v3.0',
+            version: 'v3.0.1',
             mdFile: 'plugins/floor-generator.md'
         },
         {
@@ -103,7 +103,7 @@ function initIndexPage() {
             description: 'Процедурный генератор облаков — кучевые, перистые, грозовые, слоистые и высококучевые.',
             icon: 'ico/CloudWizard.png',
             tags: [`Генератор`, `Процедурный`, `Облака`],
-            version: 'v1.8',
+            version: 'v1.8.2',
             mdFile: 'plugins/cloud-wizard.md'
         }        
     ];

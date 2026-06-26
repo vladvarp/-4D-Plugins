@@ -1,7 +1,7 @@
 ---
 title: Selection Sets
 tagline: Сохраняй и восстанавливай наборы выделения объектов — создаёшь именованные группы одним кликом и переключаешься между ними мгновенно.
-version: v1.4
+version: v1.4.1
 author: V.Ar Production
 updated: Июнь 2026
 icon: ico/SelectionSet/icon_plugin.png

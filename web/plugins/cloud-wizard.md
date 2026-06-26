@@ -1,7 +1,7 @@
 ---
 title: Cloud Wizard
 tagline: Процедурный генератор облаков — кучевые, перистые, грозовые, слоистые и высококучевые.
-version: v1.8
+version: v1.8.2
 author: V.Ar Production
 updated: Июнь 2026
 icon: ico/CloudWizard.png
