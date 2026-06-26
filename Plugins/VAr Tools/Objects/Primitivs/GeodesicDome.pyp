@@ -672,10 +672,10 @@ def build_diamond(verts_raw, triangles_raw, pts, tris, freq):
     used_edges = set()
 
     for ti, (a, b, c) in enumerate(tris):
-        # Для каждого треугольника строим 3 ромба (по одному на каждое ребро)
         tc = tri_centers_idx[ti]
-        for (ea, eb) in [_midpoint_key(a, b), _midpoint_key(b, c), _midpoint_key(a, c)]:
-            edge = (ea, eb)
+        tc_pos = new_pts[tc]
+        for (ea_orig, eb_orig) in [(a, b), (b, c), (a, c)]:
+            edge = _midpoint_key(ea_orig, eb_orig)
             if edge in used_edges:
                 continue
             adj = [t for t in edge_to_tris[edge] if t != ti]
@@ -683,11 +683,18 @@ def build_diamond(verts_raw, triangles_raw, pts, tris, freq):
                 continue
             tj = adj[0]
             tc2 = tri_centers_idx[tj]
-            em = edge_mid_idx[edge]
-            # Ромб: центр ti → середина ребра → центр tj → середина ребра (обход)
-            # Используем 4 точки: tc, ea-mid, tc2, eb-mid
-            # Реально строим quad из двух центроидов и двух вершин ребра
-            polys_out.append(_quad(tc, ea, tc2, eb))
+            ea_pos = pts[ea_orig]
+            eb_pos = pts[eb_orig]
+            e1 = c4d.Vector(ea_pos.x - tc_pos.x, ea_pos.y - tc_pos.y, ea_pos.z - tc_pos.z)
+            e2 = c4d.Vector(eb_pos.x - tc_pos.x, eb_pos.y - tc_pos.y, eb_pos.z - tc_pos.z)
+            nrm = _cross(e1, e2)
+            mid = c4d.Vector((ea_pos.x + eb_pos.x) * 0.5,
+                             (ea_pos.y + eb_pos.y) * 0.5,
+                             (ea_pos.z + eb_pos.z) * 0.5)
+            if _dot(nrm, mid) > 0:
+                polys_out.append(_quad(tc, ea_orig, tc2, eb_orig))
+            else:
+                polys_out.append(_quad(tc, eb_orig, tc2, ea_orig))
             used_edges.add(edge)
 
     return new_pts, polys_out
