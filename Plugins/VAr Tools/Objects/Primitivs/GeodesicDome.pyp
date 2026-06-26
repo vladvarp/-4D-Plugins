@@ -219,10 +219,9 @@ def _apply_dome_cut(verts, triangles, cut_angle_deg, arch_mode,
     """
     Принимает (verts, triangles) единичной сферы и применяет:
       - Масштаб по радиусу (и эллипс по Y)
-      - Срез купола по высоте
-      - Drum: добавляет цилиндрическое основание
-    Возвращает (pts, tris, edge_verts_y_min) — точки, треугольники,
-    минимальный Y рундиста для заглушки.
+      - Срез купола по высоте: берём только треугольники,
+        где все три вершины выше y_cut.
+    Возвращает (pts, tris, y_base).
     """
     cut_angle = max(0.0, min(180.0, cut_angle_deg))
     # y_cut: при cut=90 → полусфера (y_cut=0), при cut=0 → полная сфера снизу
@@ -237,13 +236,12 @@ def _apply_dome_cut(verts, triangles, cut_angle_deg, arch_mode,
         vy = v.y * elliptic_scale
         return c4d.Vector(v.x * radius, vy * radius, v.z * radius)
 
-    # Фильтруем треугольники выше y_cut
     if arch_mode == ARCH_FULL:
         pts = [_scale(v) for v in verts]
         tris = triangles
         return pts, tris, -radius * elliptic_scale
 
-    # Собираем только те треугольники, где все три вершины выше y_cut
+    # Собираем только треугольники где все 3 вершины выше y_cut
     used = set()
     filtered = []
     for (a, b, c) in triangles:
@@ -251,7 +249,6 @@ def _apply_dome_cut(verts, triangles, cut_angle_deg, arch_mode,
             used.update([a, b, c])
             filtered.append((a, b, c))
 
-    # Переиндексируем
     old_to_new = {}
     pts = []
     for old_idx in sorted(used):
@@ -264,64 +261,158 @@ def _apply_dome_cut(verts, triangles, cut_angle_deg, arch_mode,
     return pts, tris, y_base
 
 
-def _add_drum(pts, tris, y_base, radius, drum_height):
+def _add_drum(pts, polys, y_base, radius, drum_height):
     """
-    Добавляет к куполу цилиндрическое основание (drum).
-    Находит вершины на уровне y_base, опускает их копии вниз
-    и строит боковую стенку цилиндра.
-    Возвращает (pts, tris, polys_drum) — pts расширен, polys_drum —
-    список CPolygon.
-    """
-    eps = radius * 0.01
-    rim_indices = [i for i, p in enumerate(pts) if abs(p.y - y_base) < eps]
-
-    if len(rim_indices) < 3:
-        return pts, tris, []
-
-    # Сортируем по азимуту
-    rim_indices.sort(key=lambda i: math.atan2(pts[i].z, pts[i].x))
-
-    # Добавляем нижнее кольцо
-    y_drum = y_base - abs(drum_height)
-    new_ring = []
-    for ri in rim_indices:
-        p = pts[ri]
-        new_ring.append(len(pts))
-        pts.append(c4d.Vector(p.x, y_drum, p.z))
-
-    # Строим квады боковой стенки
-    polys = []
-    n = len(rim_indices)
-    for i in range(n):
-        a = rim_indices[i]
-        b = rim_indices[(i + 1) % n]
-        c = new_ring[(i + 1) % n]
-        d = new_ring[i]
-        polys.append(_quad(a, b, c, d))
-
-    return pts, tris, polys, y_drum
-
-
-def _add_flat_base(pts, y_level, radius):
-    """
-    Возвращает центральную точку заглушки и rim_indices для веера.
+    Экструдирует граничное кольцо купола вниз, создавая цилиндрическую стенку.
+    Граничные вершины определяются через boundary edges (рёбра ровно одного полигона),
+    лежащие на уровне y_base — после _snap_bottom_to_plane они уже выровнены.
+    Для каждого граничного ребра строится квад-стенка вниз до y_drum.
+    Возвращает (pts, polys_drum, y_drum) — pts расширен новым нижним кольцом.
     """
     eps = radius * 0.02
-    rim = [(i, math.atan2(p.z, p.x)) for i, p in enumerate(pts)
-           if abs(p.y - y_level) < eps]
-    if not rim:
+
+    # Находим boundary edges на уровне y_base
+    edge_count = {}
+    for poly in polys:
+        vlist = [poly.a, poly.b, poly.c]
+        if poly.c != poly.d:
+            vlist.append(poly.d)
+        n = len(vlist)
+        for i in range(n):
+            e = (min(vlist[i], vlist[(i+1)%n]), max(vlist[i], vlist[(i+1)%n]))
+            edge_count[e] = edge_count.get(e, 0) + 1
+
+    # Граничные вершины на y_base
+    rim_set = set()
+    for (va, vb), cnt in edge_count.items():
+        if cnt == 1:
+            if abs(pts[va].y - y_base) < eps:
+                rim_set.add(va)
+            if abs(pts[vb].y - y_base) < eps:
+                rim_set.add(vb)
+
+    if len(rim_set) < 3:
+        return pts, [], y_base
+
+    # Сортируем по азимуту
+    rim_indices = sorted(rim_set, key=lambda i: math.atan2(pts[i].z, pts[i].x))
+
+    # Создаём нижнее кольцо — копии граничных вершин опущенные на drum_height
+    y_drum = y_base - abs(drum_height)
+    # old_rim_idx → new_bottom_idx
+    bottom = {}
+    for ri in rim_indices:
+        p = pts[ri]
+        bottom[ri] = len(pts)
+        pts.append(c4d.Vector(p.x, y_drum, p.z))
+
+    # Строим квады стенки по граничным рёбрам
+    drum_polys = []
+    n = len(rim_indices)
+    for i in range(n):
+        top_a = rim_indices[i]
+        top_b = rim_indices[(i + 1) % n]
+        bot_a = bottom[top_a]
+        bot_b = bottom[top_b]
+        # Квад: верх-лево, верх-право, низ-право, низ-лево
+        drum_polys.append(_quad(top_a, top_b, bot_b, bot_a))
+
+    return pts, drum_polys, y_drum
+
+
+def _add_flat_base(pts, y_level, radius, polys=None):
+    """
+    Возвращает центральную точку заглушки и список CPolygon для веера.
+    Если передан polys (список CPolygon текущего меша), граничные вершины
+    определяются через boundary edges (рёбра, входящие ровно в один полигон),
+    а не по eps-близости к y_level — это исключает ложные внутренние вершины.
+    Если polys не передан — fallback на поиск по eps.
+    """
+    eps = radius * 0.02
+
+    if polys is not None:
+        # Считаем сколько раз каждое ребро входит в полигоны
+        edge_count = {}
+        for poly in polys:
+            vlist = [poly.a, poly.b, poly.c]
+            if poly.c != poly.d:
+                vlist.append(poly.d)
+            n = len(vlist)
+            for i in range(n):
+                e = (min(vlist[i], vlist[(i+1)%n]), max(vlist[i], vlist[(i+1)%n]))
+                edge_count[e] = edge_count.get(e, 0) + 1
+        # Граничные вершины — те, что входят в boundary edges (count==1)
+        # и лежат на y_level
+        boundary_verts = set()
+        for (va, vb), cnt in edge_count.items():
+            if cnt == 1:
+                if abs(pts[va].y - y_level) < eps:
+                    boundary_verts.add(va)
+                if abs(pts[vb].y - y_level) < eps:
+                    boundary_verts.add(vb)
+        rim_set = boundary_verts
+    else:
+        rim_set = {i for i, p in enumerate(pts) if abs(p.y - y_level) < eps}
+
+    if not rim_set:
         return None, []
-    rim.sort(key=lambda x: x[1])
-    rim_idx = [r[0] for r in rim]
+
+    rim = sorted(rim_set, key=lambda i: math.atan2(pts[i].z, pts[i].x))
     center_idx = len(pts)
     pts.append(c4d.Vector(0.0, y_level, 0.0))
-    polys = []
-    n = len(rim_idx)
+    result_polys = []
+    n = len(rim)
     for i in range(n):
-        a = rim_idx[i]
-        b = rim_idx[(i + 1) % n]
-        polys.append(_tri(center_idx, a, b))
-    return center_idx, polys
+        a = rim[i]
+        b = rim[(i + 1) % n]
+        result_polys.append(_tri(center_idx, a, b))
+    return center_idx, result_polys
+
+
+def _snap_bottom_to_plane(pts, polys, y_base, radius):
+    """
+    Прижимает граничные вершины меша точно к плоскости y=y_base,
+    проецируя их XZ на идеальную окружность радиуса среза.
+    Граничные вершины — те, что входят в boundary edges (рёбра ровно одного полигона)
+    и находятся ниже y_base (или близко к нему).
+    Это делает нижний край меша идеально плоским и круглым для любого паттерна.
+    """
+    if not pts or not polys:
+        return
+
+    # Считаем кратность каждого ребра
+    edge_count = {}
+    for poly in polys:
+        vlist = [poly.a, poly.b, poly.c]
+        if poly.c != poly.d:
+            vlist.append(poly.d)
+        n = len(vlist)
+        for i in range(n):
+            e = (min(vlist[i], vlist[(i+1)%n]), max(vlist[i], vlist[(i+1)%n]))
+            edge_count[e] = edge_count.get(e, 0) + 1
+
+    # Граничные вершины — входят в ребро с кратностью 1
+    boundary = set()
+    for (va, vb), cnt in edge_count.items():
+        if cnt == 1:
+            boundary.add(va)
+            boundary.add(vb)
+
+    if not boundary:
+        return
+
+    # Для граничных вершин: прижимаем Y к y_base, XZ проецируем на окружность
+    # радиуса sqrt(radius^2 - y_base^2)
+    rim_r = math.sqrt(max(0.0, radius * radius - y_base * y_base))
+
+    for i in boundary:
+        p = pts[i]
+        xz = math.sqrt(p.x * p.x + p.z * p.z)
+        if xz > 1e-12 and rim_r > 1e-12:
+            scale = rim_r / xz
+            pts[i] = c4d.Vector(p.x * scale, y_base, p.z * scale)
+        else:
+            pts[i] = c4d.Vector(p.x, y_base, p.z)
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -1031,20 +1122,24 @@ def build_geodome_mesh(pattern, freq, radius, cut_angle,
     else:
         pts_out, polys_out = build_triangles(verts_s, tris_s, pts_raw, tris_raw)
 
-    # 5. Барабан (drum)
-    drum_polys = []
+    # 5. Выравниваем нижний край купола по плоскости y_base.
+    # Делаем это ДО drum, чтобы экструзия стартовала с ровного кольца.
+    # Срабатывает если: активна "Плоская заглушка" ИЛИ "Открытое основание" ИЛИ режим Drum.
+    needs_snap = (flat_base or open_base or arch_mode == ARCH_DRUM) and arch_mode != ARCH_FULL
+    if needs_snap:
+        _snap_bottom_to_plane(pts_out, polys_out, y_base, radius)
+
+    # 6. Барабан (drum) — экструдируем граничное кольцо вниз
     y_drum = y_base
     if arch_mode == ARCH_DRUM and drum_h > 0.0:
-        result = _add_drum(pts_out, tris_raw, y_base, radius, drum_h)
-        pts_out, _, drum_polys_raw, y_drum = result
-        drum_polys = drum_polys_raw
+        pts_out, drum_polys, y_drum = _add_drum(pts_out, polys_out, y_base, radius, drum_h)
+        polys_out.extend(drum_polys)
 
-    polys_out.extend(drum_polys)
-
-    # 6. Плоское основание (заглушка)
-    if flat_base and not open_base:
+    # 7. Плоское основание (заглушка)
+    # Срабатывает ТОЛЬКО если активна "Плоская заглушка" ИЛИ режим Drum — и НЕ открытое основание
+    if (flat_base or arch_mode == ARCH_DRUM) and not open_base:
         y_level = y_drum if arch_mode == ARCH_DRUM else y_base
-        _, base_polys = _add_flat_base(pts_out, y_level, radius)
+        _, base_polys = _add_flat_base(pts_out, y_level, radius, polys_out)
         polys_out.extend(base_polys)
 
     return pts_out, polys_out
