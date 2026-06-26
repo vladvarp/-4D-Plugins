@@ -1036,6 +1036,21 @@ def icon_clean_empty_polys():
     d.line([(xk+s(8), yk-s(8)), (xk-s(8), yk+s(8))], fill=ORANGE, width=s(3))
     save(img, "Var_tools/Tools/Clean/CleanEmptyPolys.png")
 
+def icon_clean_animation_keys():
+    img = make(); d = ImageDraw.Draw(img)
+    cx, cy = s(32), s(30)
+    # Timeline bar
+    d.rounded_rectangle([s(4), cy-s(6), s(56), cy+s(6)], radius=s(3), fill=GRAY_D, outline=CYAN, width=s(2))
+    # Keyframes (diamond shapes) on the timeline
+    for x in [s(14), s(26), s(38)]:
+        pts = [(x, cy-s(5)), (x+s(3), cy), (x, cy+s(5)), (x-s(3), cy)]
+        d.polygon(pts, fill=ORANGE, outline=ORANGE, width=s(1))
+    # Small X bottom-right
+    xk, yk = s(52), s(52)
+    d.line([(xk-s(8), yk-s(8)), (xk+s(8), yk+s(8))], fill=ORANGE, width=s(3))
+    d.line([(xk+s(8), yk-s(8)), (xk-s(8), yk+s(8))], fill=ORANGE, width=s(3))
+    save(img, "Var_tools/Tools/Clean/Clean_AnimationKeys.png")
+
 # ─── MAIN ──────────────────────────────────────────────────────
 
 def main():
@@ -1058,6 +1073,7 @@ def main():
         icon_clean_nulls, icon_clean_empty_nulls, icon_clean_objects,
         icon_clean_empty_objects, icon_clean_all_tags, icon_clean_select_tags,
         icon_clean_empty_mat_tags, icon_clean_select_mat_tags, icon_clean_empty_polys,
+        icon_clean_animation_keys,
     ]
     for fn in funcs:
         fn()

@@ -37,6 +37,7 @@ MENU_ITEMS = [
                 1068911,   # CleanSelectTags
                 1068912,   # CleanEmptyMatTags
                 1068913,   # CleanSelectMatTags
+                1069091,   # CleanAnimationKeys
             ]},
         ]},
 
