@@ -615,19 +615,19 @@ tagline: Объект-Ноль с расширенными UserData для фи�
 ## Пример иерархии
 ---
 ```-ico-s13
-[[ico:'ico/Var_tools/Objects/XPressos_objects/HierarchyFilter.png'-20]] Hierarchy Filter 
-    [[ico:'ico/c4d/PLUGIN_CMD_5140.png'-20]] Примитивы 
-        [[ico:'ico/c4d/PLUGIN_CMD_5159.png'-20]] Куб
-        [[ico:'ico/c4d/PLUGIN_CMD_5160.png'-20]] Сфера
-        [[ico:'ico/c4d/PLUGIN_CMD_5162.png'-20]] Конус
-    [[ico:'ico/c4d/PLUGIN_CMD_5140.png'-20]] Сплайны
-        [[ico:'ico/c4d/PLUGIN_CMD_5186.png'-20]] Прямоугольник
-        [[ico:'ico/c4d/PLUGIN_CMD_5178.png'-20]] Сплайн Текст
-    [[ico:'ico/c4d/PLUGIN_CMD_5140.png'-20]] Модификаторы
-        [[ico:'ico/c4d/PLUGIN_CMD_1018544.png'-20]] Клон
-            [[ico:'ico/c4d/OPOLYGON.png'-20]] Объект_1
-        [[ico:'ico/c4d/PLUGIN_CMD_1007455.png'-20]] Subdivision Surface
-            [[ico:'ico/c4d/OPOLYGON.png'-20]] Объект_2
+[[ico:'ico/Var_tools/Objects/XPressos_objects/HierarchyFilter.png'-20]] Hierarchy Filter               [[ico:'ico/c4d/LEAR.png'-15]][[ico:'ico/c4d/OBJ_VIWE.png'-20]][[ico:'ico/c4d/Act.png'-20]] 
+    [[ico:'ico/c4d/PLUGIN_CMD_5140.png'-20]] Примитивы                  [[ico:'ico/c4d/LEAR.png'-15]][[ico:'ico/c4d/OBJ_VIWE.png'-20]]
+        [[ico:'ico/c4d/PLUGIN_CMD_5159.png'-20]] Куб                    [[ico:'ico/c4d/LEAR.png'-15]][[ico:'ico/c4d/OBJ_VIWE.png'-20]][[ico:'ico/c4d/Act.png'-20]] [[ico:'ico/c4d/5612.png'-20]][[ico:'ico/c4d/m1.jpg'-20]]
+        [[ico:'ico/c4d/PLUGIN_CMD_5160.png'-20]] Сфера                  [[ico:'ico/c4d/LEAR.png'-15]][[ico:'ico/c4d/OBJ_VIWE.png'-20]][[ico:'ico/c4d/Act.png'-20]] [[ico:'ico/c4d/5612.png'-20]][[ico:'ico/c4d/m2.jpg'-20]]
+        [[ico:'ico/c4d/PLUGIN_CMD_5162.png'-20]] Конус                  [[ico:'ico/c4d/LEAR.png'-15]][[ico:'ico/c4d/OBJ_VIWE.png'-20]][[ico:'ico/c4d/Act.png'-20]] [[ico:'ico/c4d/5612.png'-20]][[ico:'ico/c4d/m3.jpg'-20]]
+    [[ico:'ico/c4d/PLUGIN_CMD_5140.png'-20]] Сплайны                    [[ico:'ico/c4d/LEAR.png'-15]][[ico:'ico/c4d/OBJ_VIWE.png'-20]]
+        [[ico:'ico/c4d/PLUGIN_CMD_5186.png'-20]] Прямоугольник          [[ico:'ico/c4d/LEAR.png'-15]][[ico:'ico/c4d/OBJ_VIWE.png'-20]][[ico:'ico/c4d/Act.png'-20]]
+        [[ico:'ico/c4d/PLUGIN_CMD_5178.png'-20]] Сплайн Текст           [[ico:'ico/c4d/LEAR.png'-15]][[ico:'ico/c4d/OBJ_VIWE.png'-20]][[ico:'ico/c4d/Act.png'-20]]
+    [[ico:'ico/c4d/PLUGIN_CMD_5140.png'-20]] Модификаторы               [[ico:'ico/c4d/LEAR.png'-15]][[ico:'ico/c4d/OBJ_VIWE.png'-20]]
+        [[ico:'ico/c4d/PLUGIN_CMD_1018544.png'-20]] Клон                   [[ico:'ico/c4d/LEAR.png'-15]][[ico:'ico/c4d/OBJ_VIWE.png'-20]][[ico:'ico/c4d/Act.png'-20]]
+            [[ico:'ico/c4d/OPOLYGON.png'-20]] Объект_1           [[ico:'ico/c4d/LEAR.png'-15]][[ico:'ico/c4d/OBJ_VIWE.png'-20]]    [[ico:'ico/c4d/5612.png'-20]][[ico:'ico/c4d/5671.png'-20]][[ico:'ico/c4d/m4.jpg'-20]][[ico:'ico/c4d/5673.png'-20]]
+        [[ico:'ico/c4d/PLUGIN_CMD_1007455.png'-20]] Subdivision Surface    [[ico:'ico/c4d/LEAR.png'-15]][[ico:'ico/c4d/OBJ_VIWE.png'-20]][[ico:'ico/c4d/Act.png'-20]]
+            [[ico:'ico/c4d/OPOLYGON.png'-20]] Объект_2           [[ico:'ico/c4d/LEAR.png'-15]][[ico:'ico/c4d/OBJ_VIWE.png'-20]]    [[ico:'ico/c4d/5612.png'-20]][[ico:'ico/c4d/5671.png'-20]][[ico:'ico/c4d/18183.png'-20]][[ico:'ico/c4d/m5.jpg'-20]][[ico:'ico/c4d/5673.png'-20]][[ico:'ico/c4d/m6.jpg'-20]][[ico:'ico/c4d/5673.png'-20]]
 ```
 
 ## Интерфейс
@@ -661,10 +661,10 @@ tagline: Добавляет на объект дропдаун выбора пр
 ## Пример иерархии
 ---
 ```-ico-s13
-[[ico:'ico/c4d/PLUGIN_CMD_5140.png'-20]] Примитивы    [[ico:'ico/Var_tools/Tegs/ChildSelectorTeg.png'-20]] 
-    [[ico:'ico/c4d/PLUGIN_CMD_5159.png'-20]] Куб
-    [[ico:'ico/c4d/PLUGIN_CMD_5160.png'-20]] Сфера
-    [[ico:'ico/c4d/PLUGIN_CMD_5162.png'-20]] Конус
+[[ico:'ico/c4d/PLUGIN_CMD_5140.png'-20]] Примитивы    [[ico:'ico/c4d/LEAR.png'-15]][[ico:'ico/c4d/OBJ_VIWE.png'-20]]    [[ico:'ico/Var_tools/Tegs/ChildSelectorTeg.png'-20]] 
+    [[ico:'ico/c4d/PLUGIN_CMD_5159.png'-20]] Куб      [[ico:'ico/c4d/LEAR.png'-15]][[ico:'ico/c4d/OBJ_VIWE.png'-20]][[ico:'ico/c4d/Act.png'-20]] [[ico:'ico/c4d/5612.png'-20]]
+    [[ico:'ico/c4d/PLUGIN_CMD_5160.png'-20]] Сфера    [[ico:'ico/c4d/LEAR.png'-15]][[ico:'ico/c4d/OBJ_VIWE.png'-20]][[ico:'ico/c4d/Act.png'-20]] [[ico:'ico/c4d/5612.png'-20]]
+    [[ico:'ico/c4d/PLUGIN_CMD_5162.png'-20]] Конус    [[ico:'ico/c4d/LEAR.png'-15]][[ico:'ico/c4d/OBJ_VIWE.png'-20]][[ico:'ico/c4d/Act.png'-20]] [[ico:'ico/c4d/5612.png'-20]]
 ```
 ## Интерфейс
 ---
@@ -680,12 +680,12 @@ tagline: Тег управляет видимостью объекта (вьюп
 ## Пример иерархии
 ---
 ```-ico-s13
-[[ico:'ico/c4d/PLUGIN_CMD_1027744.png'-20]] Камера.1         [[ico:'ico/c4d/LEAR.png'-20]][[ico:'ico/c4d/OBJ_VIWE.png'-20]][[ico:'ico/c4d/CAM_ACTIV_1.png'-20]]
-[[ico:'ico/c4d/PLUGIN_CMD_1027744.png'-20]] Камера.2         [[ico:'ico/c4d/LEAR.png'-20]][[ico:'ico/c4d/OBJ_VIWE.png'-20]][[ico:'ico/c4d/CAM_ACTIV_2.png'-20]]
-[[ico:'ico/c4d/PLUGIN_CMD_1027744.png'-20]] Камера.3         [[ico:'ico/c4d/LEAR.png'-20]][[ico:'ico/c4d/OBJ_VIWE.png'-20]][[ico:'ico/c4d/CAM_ACTIV_1.png'-20]]
-[[ico:'ico/c4d/PLUGIN_CMD_5159.png'-20]] Куб              [[ico:'ico/c4d/LEAR.png'-20]][[ico:'ico/c4d/OBJ_VIWE.png'-20]][[ico:'ico/c4d/Act.png'-20]]
-[[ico:'ico/c4d/PLUGIN_CMD_5160.png'-20]] Сфера            [[ico:'ico/c4d/LEAR.png'-20]][[ico:'ico/c4d/OBJ_VIWE_off.png'-20]][[ico:'ico/c4d/Act.png'-20]] [[ico:'ico/Var_tools/Tegs/CameraVisibilityTag.png'-20]]
-[[ico:'ico/c4d/PLUGIN_CMD_5162.png'-20]] Конус            [[ico:'ico/c4d/LEAR.png'-20]][[ico:'ico/c4d/OBJ_VIWE.png'-20]][[ico:'ico/c4d/Act.png'-20]]
+[[ico:'ico/c4d/PLUGIN_CMD_1027744.png'-20]] Камера.1       [[ico:'ico/c4d/LEAR.png'-15]][[ico:'ico/c4d/OBJ_VIWE.png'-20]][[ico:'ico/c4d/CAM_ACTIV_1.png'-20]]
+[[ico:'ico/c4d/PLUGIN_CMD_1027744.png'-20]] Камера.2       [[ico:'ico/c4d/LEAR.png'-15]][[ico:'ico/c4d/OBJ_VIWE.png'-20]][[ico:'ico/c4d/CAM_ACTIV_2.png'-20]]
+[[ico:'ico/c4d/PLUGIN_CMD_1027744.png'-20]] Камера.3       [[ico:'ico/c4d/LEAR.png'-15]][[ico:'ico/c4d/OBJ_VIWE.png'-20]][[ico:'ico/c4d/CAM_ACTIV_1.png'-20]]
+[[ico:'ico/c4d/PLUGIN_CMD_5159.png'-20]] Куб            [[ico:'ico/c4d/LEAR.png'-15]][[ico:'ico/c4d/OBJ_VIWE.png'-20]][[ico:'ico/c4d/Act.png'-20]] [[ico:'ico/c4d/5612.png'-20]]
+[[ico:'ico/c4d/PLUGIN_CMD_5160.png'-20]] Сфера          [[ico:'ico/c4d/LEAR.png'-15]][[ico:'ico/c4d/OBJ_VIWE_off.png'-20]][[ico:'ico/c4d/Act.png'-20]] [[ico:'ico/c4d/5612.png'-20]][[ico:'ico/Var_tools/Tegs/CameraVisibilityTag.png'-20]]
+[[ico:'ico/c4d/PLUGIN_CMD_5162.png'-20]] Конус          [[ico:'ico/c4d/LEAR.png'-15]][[ico:'ico/c4d/OBJ_VIWE.png'-20]][[ico:'ico/c4d/Act.png'-20]] [[ico:'ico/c4d/5612.png'-20]]
 ```
 
 ## Интерфейс
