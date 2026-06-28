@@ -1051,6 +1051,65 @@ def icon_clean_animation_keys():
     d.line([(xk+s(8), yk-s(8)), (xk-s(8), yk+s(8))], fill=ORANGE, width=s(3))
     save(img, "Var_tools/Tools/Clean/Clean_AnimationKeys.png")
 
+# ─── ACTION RECORDER ────────────────────────────────────────────
+
+def icon_action_recorder_log():
+    img = make(); d = ImageDraw.Draw(img)
+    cx, cy = s(32), s(32)
+    # Document / list with code lines
+    dw, dh = s(44), s(50)
+    bx, by = cx - dw//2, cy - dh//2
+    d.rounded_rectangle([bx, by, bx+dw, by+dh], radius=s(4), fill=None, outline=CYAN, width=s(3))
+    # Code lines
+    for i, w in enumerate([s(30), s(22), s(34), s(18), s(26)]):
+        y = by + s(6) + i * s(9)
+        d.rounded_rectangle([bx+s(6), y, bx+s(6)+w, y+s(4)], radius=s(1), fill=CYAN)
+    # Record dot (red)
+    d.ellipse([bx+dw-s(14), by-s(2), bx+dw+s(2), by+s(12)], fill=RED_L)
+    save(img, "ActionRecorder/Log.png")
+
+def icon_action_recorder_manager():
+    img = make(); d = ImageDraw.Draw(img)
+    cx, cy = s(32), s(32)
+    # Two-column layout: left list, right code block
+    # Left panel (list)
+    lx, ly = s(4), s(6)
+    lw, lh = s(26), s(52)
+    d.rounded_rectangle([lx, ly, lx+lw, ly+lh], radius=s(3), fill=None, outline=CYAN, width=s(2))
+    # List items
+    for i in range(4):
+        y = ly + s(6) + i * s(11)
+        d.rounded_rectangle([lx+s(4), y, lx+lw-s(4), y+s(7)], radius=s(2), fill=CYAN_D if i != 1 else ORANGE, outline=CYAN, width=s(1))
+    # Right panel (code)
+    rx, ry = s(34), s(6)
+    rw, rh = s(26), s(52)
+    d.rounded_rectangle([rx, ry, rx+rw, ry+rh], radius=s(3), fill=None, outline=CYAN_L, width=s(2))
+    # Code lines
+    for i, w in enumerate([s(18), s(14), s(20)]):
+        y = ry + s(10) + i * s(10)
+        d.rounded_rectangle([rx+s(4), y, rx+s(4)+w, y+s(3)], radius=s(1), fill=CYAN_L)
+    # Play triangle in center
+    pts = [(cx-s(4), cy-s(6)), (cx-s(4), cy+s(6)), (cx+s(6), cy)]
+    d.polygon(pts, fill=ORANGE)
+    save(img, "ActionRecorder/Manager.png")
+
+def icon_action_recorder_play():
+    img = make(); d = ImageDraw.Draw(img)
+    cx, cy = s(32), s(32)
+    # Big play button
+    r = s(26)
+    d.ellipse([cx-r, cy-r, cx+r, cy+r], fill=None, outline=CYAN, width=s(3))
+    # Play triangle
+    pts = [(cx-s(8), cy-s(14)), (cx-s(8), cy+s(14)), (cx+s(14), cy)]
+    d.polygon(pts, fill=ORANGE)
+    # Small circular arrow (replay) at bottom-right
+    ar_r = s(8)
+    ar_cx, ar_cy = cx + s(16), cy + s(16)
+    d.arc([ar_cx-ar_r, ar_cy-ar_r, ar_cx+ar_r, ar_cy+ar_r], 200, 340, fill=CYAN_L, width=s(2))
+    # Arrow tip
+    d.polygon([(ar_cx+s(6), ar_cy-s(4)), (ar_cx+s(6), ar_cy+s(4)), (ar_cx+s(10), ar_cy)], fill=CYAN_L)
+    save(img, "ActionRecorder/Play.png")
+
 # ─── MAIN ──────────────────────────────────────────────────────
 
 def main():
@@ -1074,6 +1133,7 @@ def main():
         icon_clean_empty_objects, icon_clean_all_tags, icon_clean_select_tags,
         icon_clean_empty_mat_tags, icon_clean_select_mat_tags, icon_clean_empty_polys,
         icon_clean_animation_keys,
+        icon_action_recorder_log, icon_action_recorder_manager, icon_action_recorder_play,
     ]
     for fn in funcs:
         fn()
