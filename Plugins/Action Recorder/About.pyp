@@ -12,12 +12,12 @@ import base64
 import tempfile
 
 PLUGIN_ID   = 1069098
-VERS = 'v1.0'
+VERS = 'v1.6'
 LABLE =  'Action Recorder'
 PLUGIN_NAME = "About"
 PLUGIN_HELP = "Информация о плагине ActionRecorder"
 
-AUTHOR_URL  = "https://vladvarp.github.io/-4D-Plugins/web/plugin.html?md=plugins%2FVAr_Tools.md"
+AUTHOR_URL  = "https://vladvarp.github.io/-4D-Plugins/web/"
 
 # --- ID элементов диалога -----------------------------------------------------
 ID_BTN_WEBSITE = 1001
@@ -26,15 +26,15 @@ ID_BTN_CLOSE   = 1002
 # --- Текст о плагинах ---------------------------------------------------------
 ABOUT_TEXT = """\
 ╔══════════════════════════════════════════════════════════════════════════════╗
-║          ACTION RECORDER  —  Cinema 4D  R20+                                 ║
-║          Аналог экшонов Photoshop для Cinema 4D                              ║
+║          ACTION RECORDER  —  Cinema 4D                                       ║
+║          Аналог операций Photoshop для Cinema 4D                             ║
 ║                                                                              ║
 ║  3 кнопки в меню плагинов:                                                   ║
 ║   1. «Лог событий»  — плавающее окно с записью всех команд в виде кода       ║
-║   2. «Менеджер экшонов» — создание, удаление, запуск, коллекции              ║
-║   3. «Воспроизвести последний» — быстрый запуск последнего экшона            ║
+║   2. «Менеджер операций» — создание, удаление, запуск, коллекции             ║
+║   3. «Воспроизвести последний» — быстрый запуск последней операции           ║
 ║                                                                              ║
-║  Экшоны хранятся в:                                                          ║
+║  Операции хранятся в:                                                        ║
 ║    ~/Documents/ActionRecorder/<Коллекция>/<action>.py                        ║
 ╚══════════════════════════════════════════════════════════════════════════════╝
 
@@ -61,8 +61,8 @@ class AboutDialog(gui.GeDialog):
         self.AddMultiLineEditText(
             1000,
             c4d.BFH_SCALEFIT | c4d.BFV_SCALEFIT,
-            initw=260,
-            inith=120,
+            initw=950,
+            inith=150,
             style=c4d.DR_MULTILINE_READONLY | c4d.DR_MULTILINE_MONOSPACED,
         )
         self.GroupEnd()
@@ -102,8 +102,6 @@ class AboutCommand(c4d.plugins.CommandData):
         dlg.Open(
             dlgtype=c4d.DLG_TYPE_MODAL_RESIZEABLE,
             pluginid=PLUGIN_ID,
-            defaultw=500,
-            defaulth=260,
         )
         return True
 
