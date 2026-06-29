@@ -159,18 +159,7 @@ def _run_action_code(code):
     }
     try:
         import textwrap
-        code = textwrap.dedent(code)
-        result_lines = []
-        prev_indent = 0
-        for line in code.splitlines():
-            stripped = line.lstrip()
-            curr_indent = len(line) - len(stripped)
-            if stripped and curr_indent > 0 and prev_indent == 0:
-                result_lines.append(stripped)
-            else:
-                result_lines.append(line)
-            prev_indent = curr_indent if stripped else prev_indent
-        safe_code = "\n".join(result_lines)
+        safe_code = textwrap.dedent(code)
         exec(compile(safe_code, "<action>", "exec"), ctx)  # noqa: S102
         c4d.EventAdd()
         return True, ""
