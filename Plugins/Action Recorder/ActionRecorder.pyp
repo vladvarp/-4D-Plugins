@@ -39,6 +39,8 @@ ID_MGR_SCROLL       = 11040
 ID_MGR_LIST_GROUP   = 11041
 ID_MGR_CODE_SCROLL  = 11050
 ID_MGR_CODE_TEXT    = 11051
+ID_MGR_SAVE_STATUS  = 11060
+ID_MGR_BTN_REVERT   = 11061
 
 ROW_STRIDE          = 5
 ACTION_ROW_BASE     = 12000
@@ -54,6 +56,30 @@ ROOT_DIR_NAME      = "ActionRecorder"
 
 _event_log = []          # список кортежей (время_строка, строка_кода)
 _is_recording = False    # режим записи
+_last_command_id = 0  # ID последней перехваченной команды C4D
+
+
+def _get_last_command_id(doc):
+    """
+    Возвращает ID последней выполненной команды C4D.
+    Использует doc.GetAction() — стандартный способ получить последнюю команду меню/горячей клавиши.
+    """
+    try:
+        return doc.GetAction()
+    except Exception:
+        return 0
+
+
+def _command_to_code(cmd_id, cmd_name):
+    """
+    Формирует строку Python-кода для команды по её ID и имени.
+    Формат идентичен встроенному Протоколу скриптов C4D.
+    """
+    if not cmd_id:
+        return ""
+    if cmd_name:
+        return "c4d.CallCommand({})  # {}".format(cmd_id, cmd_name)
+    return "c4d.CallCommand({})".format(cmd_id)
 
 
 def _get_root_dir():
@@ -197,6 +223,18 @@ def _scene_snapshot(doc):
                     while tag:
                         tags.append({"type": tag.GetType(), "name": tag.GetName()})
                         tag = tag.GetNext()
+                    # Захватываем параметры BaseContainer объекта (для меш-операций: фаска, экструзия и пр.)
+                    params = {}
+                    try:
+                        bc = obj.GetDataInstance()
+                        if bc:
+                            for key, val in bc:
+                                # Сохраняем только скалярные типы, пригодные для сравнения и воспроизведения
+                                if isinstance(val, (int, float, bool, str)):
+                                    params[key] = val
+                    except Exception:
+                        pass
+
                     snap["obj_{}".format(uid)] = {
                         "kind":   "object",
                         "uid":    uid,
@@ -207,6 +245,7 @@ def _scene_snapshot(doc):
                         "scale":  (scale.x, scale.y, scale.z),
                         "parent": parent_name,
                         "tags":   tags,
+                        "params": params,
                     }
                 except Exception:
                     pass
@@ -255,11 +294,42 @@ def _describe_change(old_snap, new_snap, doc):
 
         lines = []
 
+        # ── Детекция «Make Editable» (C) ───────────────────────────────────
+        # Паттерн: объект с тем же именем и позицией исчез из снимка (примитив)
+        # и появился новый с типом 1007532 (полигональный объект).
+        # UID строится как "{name}_{type}_{parent}", поэтому смена типа даёт
+        # разные ключи — объект попадает одновременно в added_keys и removed_keys.
+        make_editable_names = set()
+        removed_obj_by_name = {}   # name -> old snap entry
+        added_obj_by_name   = {}   # name -> new snap entry
+        for k in removed_keys:
+            d = old_snap[k]
+            if d["kind"] == "object":
+                removed_obj_by_name[d["name"]] = d
+        for k in added_keys:
+            d = new_snap[k]
+            if d["kind"] == "object":
+                added_obj_by_name[d["name"]] = d
+        for name in set(removed_obj_by_name.keys()) & set(added_obj_by_name.keys()):
+            old_d = removed_obj_by_name[name]
+            new_d = added_obj_by_name[name]
+            # Позиция совпадает и новый тип — полигональный объект (1007532)
+            if old_d["pos"] == new_d["pos"] and new_d["type"] == 1007532:
+                make_editable_names.add(name)
+                lines.append("# Make Editable: {}".format(name))
+                lines.append("_obj = doc.SearchObject({!r})".format(name))
+                lines.append("if _obj:")
+                lines.append("    _obj.SetBit(c4d.BIT_ACTIVE)")
+                lines.append("    c4d.CallCommand(12236)  # Make Editable (C)")
+                lines.append("    c4d.EventAdd()")
+
         # ── Добавлены объекты ──────────────────────────────────────────────
         for k in added_keys:
             d = new_snap[k]
             if d["kind"] != "object":
                 continue
+            if d["name"] in make_editable_names:
+                continue  # уже обработан как Make Editable
             obj_type = d["type"]
             obj_name = d["name"]
             px, py, pz = d["pos"]
@@ -280,6 +350,8 @@ def _describe_change(old_snap, new_snap, doc):
             d = old_snap[k]
             if d["kind"] != "object":
                 continue
+            if d["name"] in make_editable_names:
+                continue  # уже обработан как Make Editable
             obj_name = d["name"]
             lines.append("_obj = doc.SearchObject({!r})".format(obj_name))
             lines.append("if _obj: _obj.Remove()")
@@ -304,6 +376,15 @@ def _describe_change(old_snap, new_snap, doc):
                 changed.append("obj.SetAbsScale(c4d.Vector({:.4f}, {:.4f}, {:.4f}))".format(sx, sy, sz))
             if o["name"] != n["name"]:
                 changed.append("obj.SetName({!r})".format(n["name"]))
+            # Изменения параметров BaseContainer (фаска, экструзия и другие меш-параметры)
+            o_params = o.get("params", {})
+            n_params = n.get("params", {})
+            all_param_keys = set(o_params.keys()) | set(n_params.keys())
+            for pk in sorted(all_param_keys):
+                oval = o_params.get(pk)
+                nval = n_params.get(pk)
+                if oval != nval and nval is not None:
+                    changed.append("obj[{}] = {!r}  # param id={}".format(pk, nval, pk))
             if changed:
                 lines.append("obj = doc.SearchObject({!r})".format(obj_name))
                 lines.append("if obj:")
@@ -356,6 +437,50 @@ def _describe_change(old_snap, new_snap, doc):
         return ""
 
 
+def _detect_new_primitive_command(old_snap, new_snap):
+    """
+    Определяет, не было ли единственным изменением между снимками
+    появление ОДНОГО нового объекта-примитива с параметрами по умолчанию
+    (позиция, поворот и масштаб не заданы пользователем вручную).
+    Такое изменение типично для создания объекта через палитру/меню
+    (например, кнопка «Куб»), когда C4D реально выполняет
+    c4d.CallCommand(<тип_объекта>), но doc.GetAction() не успевает
+    зафиксировать эту команду до прихода EVMSG_CHANGE.
+    Возвращает готовую строку кода "c4d.CallCommand(...)" или "" если
+    эвристика не сработала (тогда вызывающий код использует снимок как обычно).
+    """
+    try:
+        old_keys = set(old_snap.keys()) if old_snap else set()
+        new_keys = set(new_snap.keys()) if new_snap else set()
+
+        added_keys   = new_keys - old_keys
+        removed_keys = old_keys - new_keys
+
+        # Эвристика применяется только если ничего не было удалено
+        # и добавлен ровно один объект (характерно для создания примитива).
+        added_objects = [new_snap[k] for k in added_keys if new_snap[k]["kind"] == "object"]
+        if removed_keys or len(added_objects) != 1:
+            return ""
+
+        d = added_objects[0]
+        # Объект-примитив создаётся в начале координат без поворота и масштаба
+        if d["pos"] != (0.0, 0.0, 0.0):
+            return ""
+        if d["rot"] != (0.0, 0.0, 0.0):
+            return ""
+        if d["scale"] != (1.0, 1.0, 1.0):
+            return ""
+
+        obj_type = d["type"]
+        try:
+            cmd_name = c4d.GetCommandName(obj_type)
+        except Exception:
+            cmd_name = ""
+        return _command_to_code(obj_type, cmd_name)
+    except Exception:
+        return ""
+
+
 class ActionMessageData(c4d.plugins.MessageData):
     """
     Перехватывает глобальные события C4D через EVMSG_CHANGE.
@@ -367,6 +492,7 @@ class ActionMessageData(c4d.plugins.MessageData):
         super(ActionMessageData, self).__init__()
         self._last_snapshot = {}   # снимок сцены после предыдущего события
         self._last_doc_name = ""   # имя документа для сброса снимка при смене проекта
+        self._last_action_id = 0   # последний ID команды, чтобы не дублировать запись
 
     def CoreMessage(self, kind, msg):
         global _event_log
@@ -392,12 +518,43 @@ class ActionMessageData(c4d.plugins.MessageData):
                 self._last_snapshot = _scene_snapshot(doc)
                 return True
 
+            # ── Динамическая фиксация смены инструмента/команды ────────────────
+            # Проверяем GetAction() здесь, ДО сравнения снимков сцены, чтобы смена
+            # инструмента (которая сама по себе не меняет сцену и не попадёт в
+            # сравнение снимков ниже) записывалась сразу отдельной строкой, а не
+            # задним числом склеивалась с следующим реальным изменением сцены.
+            if _is_recording and _manager_command and _manager_command._dialog \
+                    and _manager_command._dialog.IsOpen():
+                mgr = _manager_command._dialog
+                if mgr._selected_action_idx >= 0:
+                    cmd_id = _get_last_command_id(doc)
+                    if cmd_id and cmd_id != self._last_action_id:
+                        self._last_action_id = cmd_id
+                        col  = mgr._current_collection()
+                        name = mgr._actions[mgr._selected_action_idx]
+                        existing = _load_action(col, name)
+                        try:
+                            cmd_name = c4d.GetCommandName(cmd_id)
+                        except Exception:
+                            cmd_name = ""
+                        cmd_line = _command_to_code(cmd_id, cmd_name)
+                        combined = (existing.rstrip() + "\n" + cmd_line
+                                    if existing.strip() else cmd_line)
+                        _save_action(col, name, combined)
+                        mgr.SetString(ID_MGR_CODE_TEXT, combined)
+                        mgr._saved_code = combined
+                        mgr._update_save_status()
+                        # Прокручиваем поле кода в конец только если оно активно
+                        if mgr.IsActive(ID_MGR_CODE_TEXT):
+                            mgr.SetMultiLinePos(ID_MGR_CODE_TEXT, combined.count("\n") + 1, 0)
+
             # Делаем новый снимок и сравниваем
             new_snap = _scene_snapshot(doc)
             if new_snap == self._last_snapshot:
                 return True  # ничего не изменилось
 
             code_block = _describe_change(self._last_snapshot, new_snap, doc)
+            prev_snap_for_primitive = self._last_snapshot  # снимок до обновления — нужен для детекта примитива ниже
             self._last_snapshot = new_snap
 
             if not code_block:
@@ -410,7 +567,9 @@ class ActionMessageData(c4d.plugins.MessageData):
             if log_open:
                 _log_command._dialog._refresh_log()
 
-            # Во время записи — динамически дописываем код в файл и обновляем панель менеджера
+            # Во время записи в менеджере — дописываем сгенерированный по снимку код.
+            # Смена инструмента (CallCommand) уже была зафиксирована динамично выше,
+            # поэтому здесь обрабатываем только реальное изменение сцены.
             if _is_recording and _manager_command and _manager_command._dialog \
                     and _manager_command._dialog.IsOpen():
                 mgr = _manager_command._dialog
@@ -418,10 +577,35 @@ class ActionMessageData(c4d.plugins.MessageData):
                     col  = mgr._current_collection()
                     name = mgr._actions[mgr._selected_action_idx]
                     existing = _load_action(col, name)
+
+                    # Проверяем, не является ли изменение созданием нового примитива
+                    # палитрой/меню (Куб, Сфера и т.п.). В этом случае C4D реально
+                    # вызывает CallCommand(<тип_объекта>), но GetAction() не успевает
+                    # это зафиксировать, поэтому подставляем CallCommand вручную по
+                    # типу добавленного объекта вместо снимка.
+                    primitive_cmd_line = _detect_new_primitive_command(prev_snap_for_primitive, new_snap)
+                    if primitive_cmd_line:
+                        combined = (existing.rstrip() + "\n" + primitive_cmd_line
+                                    if existing.strip() else primitive_cmd_line)
+                        _save_action(col, name, combined)
+                        mgr.SetString(ID_MGR_CODE_TEXT, combined)
+                        mgr._saved_code = combined
+                        mgr._update_save_status()
+                        # Прокручиваем поле кода в конец только если оно активно
+                        if mgr.IsActive(ID_MGR_CODE_TEXT):
+                            mgr.SetMultiLinePos(ID_MGR_CODE_TEXT, combined.count("\n") + 1, 0)
+                        return True
+
+                    # Записываем фактическое изменение сцены (трансформация, параметры и пр.)
                     combined = (existing.rstrip() + "\n" + code_block
                                 if existing.strip() else code_block)
                     _save_action(col, name, combined)
                     mgr.SetString(ID_MGR_CODE_TEXT, combined)
+                    mgr._saved_code = combined
+                    mgr._update_save_status()
+                    # Прокручиваем поле кода в конец только если оно активно
+                    if mgr.IsActive(ID_MGR_CODE_TEXT):
+                        mgr.SetMultiLinePos(ID_MGR_CODE_TEXT, combined.count("\n") + 1, 0)
 
         except Exception:
             pass
@@ -505,7 +689,9 @@ class LogDialog(gui.GeDialog):
             ID_LOG_TEXT,
             c4d.BFH_SCALEFIT | c4d.BFV_SCALEFIT,
             initw=560, inith=280,
-            style=c4d.DR_MULTILINE_MONOSPACED | c4d.DR_MULTILINE_READONLY,
+            style=c4d.DR_MULTILINE_MONOSPACED | c4d.DR_MULTILINE_READONLY
+                  | c4d.DR_MULTILINE_PYTHON | c4d.DR_MULTILINE_SYNTAXCOLOR
+                  | c4d.DR_MULTILINE_STATUSBAR | c4d.DR_MULTILINE_HIGHLIGHTLINE,
         )
         self.GroupEnd()
         self.GroupEnd()
@@ -533,6 +719,11 @@ class LogDialog(gui.GeDialog):
         else:
             text = "# Лог пуст. Выполните любое действие в сцене."
         self.SetString(ID_LOG_TEXT, text)
+        # Прокручиваем текстовое поле в конец только если оно уже активно,
+        # чтобы не перехватывать фокус у viewport при фоновом обновлении
+        if self.IsActive(ID_LOG_TEXT):
+            line_count = text.count("\n") + 1
+            self.SetMultiLinePos(ID_LOG_TEXT, line_count, 0)
 
     def _refresh_record_btn(self):
         if _is_recording:
@@ -678,6 +869,7 @@ class ManagerDialog(gui.GeDialog):
         self._collections = []
         self._actions = []
         self._selected_action_idx = -1
+        self._saved_code = ""   # код на момент последнего сохранения / загрузки
 
     def CreateLayout(self):
         self.SetTitle("Action Recorder — Менеджер операций")
@@ -740,15 +932,18 @@ class ManagerDialog(gui.GeDialog):
             ID_MGR_CODE_TEXT,
             c4d.BFH_SCALEFIT | c4d.BFV_SCALEFIT,
             initw=320, inith=260,
-            style=c4d.DR_MULTILINE_MONOSPACED,
+            style=c4d.DR_MULTILINE_MONOSPACED
+                  | c4d.DR_MULTILINE_PYTHON | c4d.DR_MULTILINE_SYNTAXCOLOR
+                  | c4d.DR_MULTILINE_STATUSBAR | c4d.DR_MULTILINE_HIGHLIGHTLINE,
         )
         self.GroupEnd()
         self.GroupEnd()
 
-        # Кнопка сохранить код
-        self.GroupBegin(0, c4d.BFH_SCALEFIT, cols=2, rows=1)
+        # Кнопки под редактором кода
+        self.GroupBegin(0, c4d.BFH_SCALEFIT, cols=3, rows=1)
         self.GroupBorderSpace(0, 4, 0, 0)
-        self.AddStaticText(0, c4d.BFH_SCALEFIT, name="")
+        self.AddStaticText(ID_MGR_SAVE_STATUS, c4d.BFH_SCALEFIT, name="")
+        self.AddButton(ID_MGR_BTN_REVERT, c4d.BFH_RIGHT, name="↩ Восстановить")
         self.AddButton(ID_MGR_BTN_IMPORT, c4d.BFH_RIGHT, name="Сохранить код ➜]")
 
         self.GroupEnd()
@@ -767,7 +962,13 @@ class ManagerDialog(gui.GeDialog):
 
     def InitValues(self):
         self._reload_collections()
+        self.SetTimer(500)  # обновляем статус каждые 500 мс
         return True
+
+    def Timer(self, msg):
+        """Периодически проверяем, изменился ли код в редакторе."""
+        if self._selected_action_idx >= 0:
+            self._update_save_status()
 
     # ── Коллекции ──────────────────────────────────────────────────────────────
 
@@ -788,12 +989,26 @@ class ManagerDialog(gui.GeDialog):
 
     # ── Операции ─────────────────────────────────────────────────────────────────
 
+    def _update_save_status(self):
+        """Обновляет метку несохранённых изменений."""
+        if self._selected_action_idx < 0:
+            self.SetString(ID_MGR_SAVE_STATUS, "")
+            return
+        current = self.GetString(ID_MGR_CODE_TEXT).replace("\r\n", "\n").replace("\r", "\n")
+        saved   = self._saved_code.replace("\r\n", "\n").replace("\r", "\n")
+        if current == saved:
+            self.SetString(ID_MGR_SAVE_STATUS, "✓ Сохранено")
+        else:
+            self.SetString(ID_MGR_SAVE_STATUS, "⚠ Не сохранено")
+
     def _reload_actions(self):
         col = self._current_collection()
         self._actions = _list_actions(col)
         self._selected_action_idx = -1
+        self._saved_code = ""
         self._rebuild_action_list()
         self.SetString(ID_MGR_CODE_TEXT, "")
+        self.SetString(ID_MGR_SAVE_STATUS, "")
         self.SetString(ID_MGR_STATUS, "Коллекция: {}  |  Операций: {}".format(col, len(self._actions)))
 
     def _rebuild_action_list(self):
@@ -817,13 +1032,18 @@ class ManagerDialog(gui.GeDialog):
         self.LayoutChanged(ID_MGR_LIST_GROUP)
 
     def _select_action(self, idx):
+        global _is_recording
+        if _is_recording:
+            _is_recording = False
         self._selected_action_idx = idx
         col = self._current_collection()
         name = self._actions[idx]
         code = _load_action(col, name)
+        self._saved_code = code.replace("\r\n", "\n").replace("\r", "\n")
         self.SetString(ID_MGR_CODE_TEXT, code)
         self._rebuild_action_list()
         self.SetString(ID_MGR_STATUS, "Выбран: {}".format(name))
+        self._update_save_status()
 
     def _run_selected(self):
         if self._selected_action_idx < 0 or self._selected_action_idx >= len(self._actions):
@@ -852,6 +1072,8 @@ class ManagerDialog(gui.GeDialog):
             if doc:
                 _message_data_instance._last_snapshot = _scene_snapshot(doc)
                 _message_data_instance._last_doc_name = doc.GetDocumentName()
+                if _message_data_instance:  # сбрасываем ID последней команды при старте записи
+                    _message_data_instance._last_action_id = _get_last_command_id(doc)
             self.SetString(ID_MGR_STATUS, "● Запись в «{}»…".format(
                 self._actions[idx]))
         else:
@@ -970,7 +1192,23 @@ class ManagerDialog(gui.GeDialog):
             name = self._actions[self._selected_action_idx]
             _save_action(self._current_collection(), name, code)
             _save_last_info(self._current_collection(), name)
+            self._saved_code = code.replace("\r\n", "\n").replace("\r", "\n")
             self.SetString(ID_MGR_STATUS, "Сохранено: {}".format(name))
+            self._update_save_status()
+            return True
+
+        # Восстановить код из файла
+        if widget_id == ID_MGR_BTN_REVERT:
+            if self._selected_action_idx < 0:
+                gui.MessageDialog("Выберите операцию для восстановления.")
+                return True
+            name = self._actions[self._selected_action_idx]
+            col = self._current_collection()
+            code = _load_action(col, name)
+            self._saved_code = code.replace("\r\n", "\n").replace("\r", "\n")
+            self.SetString(ID_MGR_CODE_TEXT, code)
+            self.SetString(ID_MGR_STATUS, "Восстановлено из файла: {}".format(name))
+            self._update_save_status()
             return True
 
         # Кнопки рядом с каждой операцией

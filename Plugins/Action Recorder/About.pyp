@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 AboutVArTools - Cinema 4D Command Plugin
-Отображает окно «О плагине» с описанием набора VAr Tools
+Отображает окно «О плагине»
 и кнопкой-ссылкой на сайт автора.
 """
 import c4d # type: ignore
@@ -12,12 +12,12 @@ import base64
 import tempfile
 
 PLUGIN_ID   = 1069098
-VERS = 'v1.6'
+VERS = 'v1.14'
 LABLE =  'Action Recorder'
 PLUGIN_NAME = "About"
-PLUGIN_HELP = "Информация о плагине ActionRecorder"
+PLUGIN_HELP = "Информация о плагине Action Recorder"
 
-AUTHOR_URL  = "https://vladvarp.github.io/-4D-Plugins/web/"
+AUTHOR_URL  = "https://vladvarp.github.io/-4D-Plugins/web/plugins/action-recorder.md"
 
 # --- ID элементов диалога -----------------------------------------------------
 ID_BTN_WEBSITE = 1001

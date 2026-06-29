@@ -105,7 +105,16 @@ function initIndexPage() {
             tags: [`Генератор`, `Процедурный`, `Облака`],
             version: 'v1.8.2',
             mdFile: 'plugins/cloud-wizard.md'
-        }        
+        },
+        {
+            id: '8',
+            title: 'Action Recorder',
+            description: 'Записывает действия пользователя в виде Python-кода, автоматически генерируются скрипты, которые можно сохранить, редактировать и запускать одной кнопкой.',
+            icon: 'ico/ActionRecorder/Manager.png',
+            tags: [`Автоматизация`],
+            version: 'v1.14',
+            mdFile: 'plugins/action-recorder.md'
+        }  
     ];
 
     // Рендерим карточки плагинов
