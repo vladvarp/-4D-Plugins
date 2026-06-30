@@ -71,7 +71,14 @@
                                 <li><a href="#md-formatting">Текстовое форматирование</a></li>
                                 <li><a href="#md-lists">Списки</a></li>
                                 <li><a href="#md-quotes">Цитаты и линия</a></li>
-                                <li><a href="#md-code">Блоки кода</a></li>
+                                <li><a href="#md-code">Блоки кода</a>
+                                    <ul>
+                                        <li><a href="#md-code-ico">Иконки в блоке кода</a></li>
+                                        <li><a href="#md-code-size">Размер шрифта</a></li>
+                                        <li><a href="#md-code-limit">Фиксированная высота</a></li>
+                                        <li><a href="#md-code-num">Нумерация строк</a></li>
+                                    </ul>
+                                </li>
                                 <li><a href="#md-images">Изображения</a></li>
                             </ul>
                         </li>
@@ -434,6 +441,11 @@ def main():
                                     <td><code>-lЧИСЛО</code></td>
                                     <td>Фиксированная высота блока (в пикселях). Содержимое пролистывается</td>
                                 </tr>
+                                <tr>
+                                    <td><code>-num</code></td>
+                                    <td><code>```-num</code></td>
+                                    <td>Включает нумерацию строк слева и панель состояния снизу (количество строк и символов)</td>
+                                </tr>
                             </tbody>
                         </table>
 
@@ -482,6 +494,38 @@ def main():
 Строка 6
 Строка 7
 Строка 8
+```</code></pre>
+                        </div>
+
+                        <h4 id="md-code-num">Нумерация строк</h4>
+                        <p>
+                            Параметр <code>-num</code> добавляет панель с нумерацией строк слева
+                            (как в Notepad++ / VS Code) и нижнюю панель состояния с количеством строк и символов.
+                        </p>
+                        <div class="code-example">
+                            <div class="code-example-header">
+                                <span class="code-example-label">Пример с -num</span>
+                                <button class="copy-btn">Копировать</button>
+                            </div>
+                            <pre><code>```-num
+import c4d
+
+def main():
+    doc = c4d.documents.GetActiveDocument()
+    print(doc.GetName())
+```</code></pre>
+                        </div>
+
+                        <p>Параметры можно комбинировать: <code>-num</code> работает вместе с <code>-ico</code>, <code>-s</code> и <code>-l</code>.</p>
+                        <div class="code-example">
+                            <div class="code-example-header">
+                                <span class="code-example-label">Комбинация -num с другими параметрами</span>
+                                <button class="copy-btn">Копировать</button>
+                            </div>
+                            <pre><code>```-num-ico-s14-l300
+[[ico:'icon.png']] Код с иконками и нумерацией
+Строка вторая
+Строка третья
 ```</code></pre>
                         </div>
 

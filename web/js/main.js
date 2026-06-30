@@ -483,11 +483,12 @@ function renderMarkdown(markdown) {
         const idx = codeBlocks.length;
         let raw = code.trimEnd();
         const hasIco = header.includes('-ico');
+        const hasNum = header.includes('-num');
         const sizeMatch = header.match(/-s(\d+)/);
         const fontSize = sizeMatch ? sizeMatch[1] : '';
         const limitMatch = header.match(/-l(\d+)/);
         const lineHeight = limitMatch ? limitMatch[1] : '';
-        const lang = header.replace(/\s*-ico\s*/, '').replace(/\s*-s\d+\s*/, '').replace(/\s*-l\d+\s*/, '').trim();
+        const lang = header.replace(/\s*-ico\s*/, '').replace(/\s*-num\s*/, '').replace(/\s*-s\d+\s*/, '').replace(/\s*-l\d+\s*/, '').trim();
         if (hasIco) {
             raw = raw.replace(/\[\[ico:'([^']+)'(?:-(\d+))?\]\]/g, (_, src, h) => {
                 const icoIdx = icoSlots.length;
@@ -498,11 +499,20 @@ function renderMarkdown(markdown) {
                 return `%%ICO_${icoIdx}%%`;
             });
         }
-        raw = escapeHtml(raw);
-        icoSlots.forEach((ico, i) => { raw = raw.replace(`%%ICO_${i}%%`, ico); });
         let attrs = '';
         if (fontSize) attrs = ` style="font-size:${fontSize}px"`;
-        const codeBlock = `<pre><code class="language-${lang}"${attrs}>${raw}</code></pre>`;
+        let codeBlock;
+        if (hasNum) {
+            const lines = raw.split('\n');
+            const lineCount = lines.length;
+            const charCount = raw.length;
+            const numberedLines = lines.map((line, i) => `<tr><td class="code-num-gutter-cell">${i + 1}</td><td class="code-num-content-cell"><code class="language-${lang}"${attrs}>${escapeHtml(line)}</code></td></tr>`).join('');
+            codeBlock = `<div class="code-num" data-code="${escapeHtml(raw)}"><div class="code-num-header"><span class="code-num-lang">${escapeHtml(lang)}</span><button class="code-num-copy" title="Копировать">Копировать</button></div><div class="code-num-body"><table class="code-num-table"><tbody>${numberedLines}</tbody></table></div><div class="code-num-status"><span>${lineCount} ${lineCount === 1 ? 'строка' : lineCount < 5 ? 'строки' : 'строк'}</span><span>${charCount} ${charCount === 1 ? 'символ' : charCount < 5 ? 'символа' : 'символов'}</span></div></div>`;
+        } else {
+            raw = escapeHtml(raw);
+            icoSlots.forEach((ico, i) => { raw = raw.replace(`%%ICO_${i}%%`, ico); });
+            codeBlock = `<pre><code class="language-${lang}"${attrs}>${raw}</code></pre>`;
+        }
         if (lineHeight) {
             codeBlocks.push(`<div class="code-scroll" style="height:${lineHeight}px;overflow-y:auto">${codeBlock}</div>`);
         } else {
@@ -653,11 +663,12 @@ function renderInlineContent(text) {
         const idx = codeBlocks.length;
         let raw = code.trimEnd();
         const hasIco = header.includes('-ico');
+        const hasNum = header.includes('-num');
         const sizeMatch = header.match(/-s(\d+)/);
         const fontSize = sizeMatch ? sizeMatch[1] : '';
         const limitMatch = header.match(/-l(\d+)/);
         const lineHeight = limitMatch ? limitMatch[1] : '';
-        const lang = header.replace(/\s*-ico\s*/, '').replace(/\s*-s\d+\s*/, '').replace(/\s*-l\d+\s*/, '').trim();
+        const lang = header.replace(/\s*-ico\s*/, '').replace(/\s*-num\s*/, '').replace(/\s*-s\d+\s*/, '').replace(/\s*-l\d+\s*/, '').trim();
         if (hasIco) {
             raw = raw.replace(/\[\[ico:'([^']+)'(?:-(\d+))?\]\]/g, (_, src, h) => {
                 const icoIdx = icoSlots.length;
@@ -668,11 +679,20 @@ function renderInlineContent(text) {
                 return `%%ICO_${icoIdx}%%`;
             });
         }
-        raw = escapeHtml(raw);
-        icoSlots.forEach((ico, i) => { raw = raw.replace(`%%ICO_${i}%%`, ico); });
         let attrs = '';
         if (fontSize) attrs = ` style="font-size:${fontSize}px"`;
-        const codeBlock = `<pre><code class="language-${lang}"${attrs}>${raw}</code></pre>`;
+        let codeBlock;
+        if (hasNum) {
+            const lines = raw.split('\n');
+            const lineCount = lines.length;
+            const charCount = raw.length;
+            const numberedLines = lines.map((line, i) => `<tr><td class="code-num-gutter-cell">${i + 1}</td><td class="code-num-content-cell"><code class="language-${lang}"${attrs}>${escapeHtml(line)}</code></td></tr>`).join('');
+            codeBlock = `<div class="code-num" data-code="${escapeHtml(raw)}"><div class="code-num-header"><span class="code-num-lang">${escapeHtml(lang)}</span><button class="code-num-copy" title="Копировать">Копировать</button></div><div class="code-num-body"><table class="code-num-table"><tbody>${numberedLines}</tbody></table></div><div class="code-num-status"><span>${lineCount} ${lineCount === 1 ? 'строка' : lineCount < 5 ? 'строки' : 'строк'}</span><span>${charCount} ${charCount === 1 ? 'символ' : charCount < 5 ? 'символа' : 'символов'}</span></div></div>`;
+        } else {
+            raw = escapeHtml(raw);
+            icoSlots.forEach((ico, i) => { raw = raw.replace(`%%ICO_${i}%%`, ico); });
+            codeBlock = `<pre><code class="language-${lang}"${attrs}>${raw}</code></pre>`;
+        }
         if (lineHeight) {
             codeBlocks.push(`<div class="code-scroll" style="height:${lineHeight}px;overflow-y:auto">${codeBlock}</div>`);
         } else {
@@ -1089,6 +1109,7 @@ function initMdComponents(root = document) {
     initLevelingSliders(root);
     initTifSliders(root);
     initColorPickers(root);
+    initSyntaxHighlight(root);
     // Инициализируем кнопки копирования внутри динамически загруженного контента
     root.querySelectorAll('.copy-btn').forEach(btn => {
         if (!btn.dataset.initialized) {
@@ -1219,6 +1240,132 @@ function initColorPickers(root = document) {
             picker.addEventListener('input', () => { hex.textContent = picker.value; });
         }
     });
+}
+
+/* ========================================
+   Подсветка синтаксиса Python
+   ======================================== */
+
+const PY_KEYWORDS = new Set([
+  'False','None','True','and','as','assert','async','await','break','class','continue',
+  'def','del','elif','else','except','finally','for','from','global','if','import',
+  'in','is','lambda','nonlocal','not','or','pass','raise','return','try','while','with','yield'
+]);
+const PY_BUILTINS = new Set([
+  'print','len','range','str','int','float','list','dict','set','tuple','bool','type',
+  'open','input','enumerate','zip','map','filter','sorted','reversed','sum','min','max',
+  'abs','round','isinstance','issubclass','hasattr','getattr','setattr','delattr',
+  'super','property','staticmethod','classmethod','Exception','ValueError','TypeError',
+  'KeyError','IndexError','RuntimeError','StopIteration','FileNotFoundError','OSError',
+  'self','c4d','document','op','base','Vector','Matrix','Color','BaseObject','BaseTag',
+  'BaseMaterial','BaseShader','GeListNode','NodeData','SplineObject','PolygonObject',
+  'AtomArray','AliasTrans','BaseSelect','Description','SubDialog','GeDialog',
+  'GeModalDialog','GeUserArea','CommandData','ToolData','SplineData','MaterialData',
+  'BitmapLoaderImage','Misc','c4dutils','RegisterPlugin'
+]);
+
+function highlightPython(code) {
+  let out = '';
+  let i = 0;
+  const n = code.length;
+
+  function append(cls, text) {
+    out += `<span class="${cls}">${escapeHtml(text)}</span>`;
+  }
+
+  while (i < n) {
+    const rest = code.slice(i);
+
+    if (rest.startsWith('#')) {
+      const end = rest.search(/\n/);
+      const chunk = end === -1 ? rest : rest.slice(0, end);
+      append('hl-cmt', chunk);
+      i += chunk.length;
+      continue;
+    }
+
+    if (rest.startsWith('"""') || rest.startsWith("'''")) {
+      const q = rest.slice(0, 3);
+      let j = i + 3;
+      while (j < n) {
+        if (code.slice(j, j + 3) === q) { j += 3; break; }
+        j++;
+      }
+      append('hl-str', code.slice(i, j));
+      i = j;
+      continue;
+    }
+
+    if (rest[0] === '"' || rest[0] === "'") {
+      const q = rest[0];
+      let j = i + 1;
+      while (j < n) {
+        if (code[j] === '\\') { j += 2; continue; }
+        if (code[j] === q) { j++; break; }
+        if (code[j] === '\n') break;
+        j++;
+      }
+      append('hl-str', code.slice(i, j));
+      i = j;
+      continue;
+    }
+
+    const num = rest.match(/^(0x[0-9a-fA-F]+|0b[01]+|0o[0-7]+|\d+\.?\d*(?:[eE][+-]?\d+)?)/);
+    if (num) {
+      append('hl-num', num[0]);
+      i += num[0].length;
+      continue;
+    }
+
+    const ident = rest.match(/^[A-Za-z_][A-Za-z0-9_]*/);
+    if (ident) {
+      const w = ident[0];
+      if (PY_KEYWORDS.has(w)) append('hl-kw', w);
+      else if (PY_BUILTINS.has(w)) append('hl-bi', w);
+      else if (/^[A-Z]/.test(w)) append('hl-cls', w);
+      else if (i + w.length < n && code[i + w.length] === '(') append('hl-fn', w);
+      else out += escapeHtml(w);
+      i += w.length;
+      continue;
+    }
+
+    const deco = rest.match(/^@[A-Za-z_][A-Za-z0-9_.]*/);
+    if (deco) {
+      append('hl-dec', deco[0]);
+      i += deco[0].length;
+      continue;
+    }
+
+    if (/^[+\-*/%=<>!&|^~]/.test(rest)) {
+      const op = rest.match(/^[+\-*/%=<>!&|^~]+/)[0];
+      append('hl-op', op);
+      i += op.length;
+      continue;
+    }
+
+    out += escapeHtml(code[i]);
+    i++;
+  }
+  return out;
+}
+
+function initSyntaxHighlight(root = document) {
+  root.querySelectorAll('.code-num-content-cell code').forEach(el => {
+    const code = el.textContent;
+    el.innerHTML = highlightPython(code);
+  });
+  root.querySelectorAll('.code-num-copy').forEach(btn => {
+    if (btn.dataset.initialized) return;
+    btn.dataset.initialized = 'true';
+    btn.addEventListener('click', async () => {
+      const raw = btn.closest('.code-num').dataset.code;
+      try {
+        await navigator.clipboard.writeText(raw);
+        btn.textContent = '✓ Скопировано';
+        setTimeout(() => { btn.textContent = 'Копировать'; }, 2000);
+      } catch { btn.textContent = 'Ошибка'; }
+    });
+  });
 }
 
 /* ========================================
