@@ -476,8 +476,8 @@ function renderMarkdown(markdown) {
     });
 
     // Колонки: <column>...</column>
-    html = html.replace(/<column>([\s\S]*?)<\/column>/g, (_, inner) => {
-        return saveBlock(renderColumns(inner));
+    html = html.replace(/<column([^>]*)>([\s\S]*?)<\/column>/g, (_, params, inner) => {
+        return saveBlock(renderColumns(inner, params));
     });
 
     // Экранируем HTML в исходном тексте для безопасности
@@ -731,8 +731,8 @@ function renderInlineContent(text) {
     });
 
     // Колонки: <column>...</column>
-    html = html.replace(/<column>([\s\S]*?)<\/column>/g, (_, inner) => {
-        return renderColumns(inner);
+    html = html.replace(/<column([^>]*)>([\s\S]*?)<\/column>/g, (_, params, inner) => {
+        return renderColumns(inner, params);
     });
 
     html = html.replace(/^####\s+(.+)$/gm, '<h4>$1</h4>');
@@ -1936,7 +1936,7 @@ function renderLeveling(title, w, h, content, align, asc, asp) {
    Колонки: <column>...</column>
    ======================================== */
 
-function renderColumns(inner) {
+function renderColumns(inner, blockParams) {
     const cols = [];
     const colRegex = /<col([^>]*)>([\s\S]*?)<\/col>/g;
     let m;
@@ -1960,8 +1960,12 @@ function renderColumns(inner) {
 
     if (cols.length === 0) return '';
 
+    const totalMatch = (blockParams || '').match(/-l(\d+)/);
+    const totalWidth = totalMatch ? parseInt(totalMatch[1]) : 0;
+
     const alignMap = { 1: 'left', 2: 'center', 3: 'right' };
-    let out = '<div class="md-columns">';
+    const wrapStyle = totalWidth ? `width:${totalWidth}px;max-width:100%;` : '';
+    let out = `<div class="md-columns"${wrapStyle ? ` style="${wrapStyle}"` : ''}>`;
     cols.forEach(col => {
         const widthStyle = col.width ? `width:${col.width}px;flex:none;` : 'flex:1;min-width:0;';
         const titleHtml = col.title
