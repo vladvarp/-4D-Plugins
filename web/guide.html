@@ -109,6 +109,12 @@
                                 <li><a href="#leveling-three">Три фото</a></li>
                             </ul>
                         </li>
+                        <li><a href="#columns">Колонки</a>
+                            <ul>
+                                <li><a href="#columns-params">Параметры</a></li>
+                                <li><a href="#columns-example">Примеры</a></li>
+                            </ul>
+                        </li>
                         <li><a href="#inline-elements">Инлайн-элементы</a>
                             <ul>
                                 <li><a href="#inline-badge">Бейджи</a></li>
@@ -951,6 +957,110 @@ https://www.youtube.com/watch?v=dQw4w9WgXcQ
                             <span class="callout-icon">ℹ️</span>
                             <div class="callout-content">
                                 <p>Поддерживается от 2 до 3 фотографий. Разделители перетаскиваются мышью (или пальцем на мобильных устройствах). Подписи отображаются поверх изображений и автоматически позиционируются по центру каждой секции.</p>
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- Колонки -->
+                    <section id="columns">
+                        <h2>Колонки</h2>
+                        <p>
+                            Разделение контента на колонки. Количество колонок определяется числом
+                            <code>&lt;col&gt;</code> внутри блока <code>&lt;column&gt;</code>.
+                        </p>
+
+                        <h3 id="columns-params">Параметры колонки</h3>
+                        <p>Параметры указываются внутри тега <code>&lt;col&gt;</code>:</p>
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Параметр</th>
+                                    <th>Формат</th>
+                                    <th>Описание</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td><code>-n</code></td>
+                                    <td><code>-n'Заголовок'</code></td>
+                                    <td>Заголовок колонки (необязательный)</td>
+                                </tr>
+                                <tr>
+                                    <td><code>-l</code></td>
+                                    <td><code>-lЧИСЛО</code></td>
+                                    <td>Фиксированная ширина в пикселях. Колонки без <code>-l</code> делят оставшееся пространство поровну</td>
+                                </tr>
+                                <tr>
+                                    <td><code>-c</code></td>
+                                    <td><code>-c1</code> / <code>-c2</code> / <code>-c3</code></td>
+                                    <td>Выравнивание содержимого: <code>-c1</code> по левому (по умолчанию), <code>-c2</code> по центру, <code>-c3</code> по правому</td>
+                                </tr>
+                                <tr>
+                                    <td><code>-ct</code></td>
+                                    <td><code>-ct1</code> / <code>-ct2</code> / <code>-ct3</code></td>
+                                    <td>Выравнивание заголовка: <code>-ct1</code> по левому (по умолчанию), <code>-ct2</code> по центру, <code>-ct3</code> по правому</td>
+                                </tr>
+                            </tbody>
+                        </table>
+
+                        <h3 id="columns-example">Примеры</h3>
+
+                        <div class="code-example">
+                            <div class="code-example-header">
+                                <span class="code-example-label">Три равные колонки</span>
+                                <button class="copy-btn">Копировать</button>
+                            </div>
+                            <pre><code>&lt;column&gt;
+&lt;col -n'Первая'&gt;
+Содержимое первой колонки.
+&lt;/col&gt;
+&lt;col -n'Вторая'&gt;
+Содержимое второй колонки.
+&lt;/col&gt;
+&lt;col -n'Третья'&gt;
+Содержимое третьей колонки.
+&lt;/col&gt;
+&lt;/column&gt;</code></pre>
+                        </div>
+
+                        <div class="code-example">
+                            <div class="code-example-header">
+                                <span class="code-example-label">Фиксированные ширины</span>
+                                <button class="copy-btn">Копировать</button>
+                            </div>
+                            <pre><code>&lt;column&gt;
+&lt;col -n'Боковая панель' -l200&gt;
+Меню навигации
+&lt;/col&gt;
+&lt;col -n'Основной контент'&gt;
+Здесь размещается основной текст.
+Он займет всё оставшееся пространство.
+&lt;/col&gt;
+&lt;/column&gt;</code></pre>
+                        </div>
+
+                        <div class="code-example">
+                            <div class="code-example-header">
+                                <span class="code-example-label">Выравнивание и заголовки</span>
+                                <button class="copy-btn">Копировать</button>
+                            </div>
+                            <pre><code>&lt;column&gt;
+&lt;col -n'По левому' -c1 -ct1&gt;
+Текст слева
+&lt;/col&gt;
+&lt;col -n'По центру' -c2 -ct2&gt;
+Текст по центру
+&lt;/col&gt;
+&lt;col -n'По правому' -c3 -ct3&gt;
+Текст справа
+&lt;/col&gt;
+&lt;/column&gt;</code></pre>
+                        </div>
+
+                        <div class="callout callout-info">
+                            <span class="callout-icon">ℹ️</span>
+                            <div class="callout-content">
+                                <p>Содержимое колонок поддерживает весь Markdown-синтаксис: списки, код, жирный текст и т.д.</p>
                             </div>
                         </div>
                     </section>

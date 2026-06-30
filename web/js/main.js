@@ -475,6 +475,11 @@ function renderMarkdown(markdown) {
         return saveBlock(renderLeveling(title || 'Сравнение', parseInt(w) || 600, parseInt(h) || 400, content, align, asc, asp));
     });
 
+    // Колонки: <column>...</column>
+    html = html.replace(/<column>([\s\S]*?)<\/column>/g, (_, inner) => {
+        return saveBlock(renderColumns(inner));
+    });
+
     // Экранируем HTML в исходном тексте для безопасности
     // НО: сохраняем блоки кода отдельно, чтобы не сломать их
     const codeBlocks = [];
@@ -723,6 +728,11 @@ function renderInlineContent(text) {
 
     html = html.replace(/===leveling\s*(?:-n\[([^\]]*)\])?\s*(?:-s(\d+)[x*](\d+))?\s*(?:-c([1-3]))?\s*(?:-asc(\d+))?\s*(?:-asp(\d+))?\n([\s\S]*?)===/g, (_, title, w, h, align, asc, asp, content) => {
         return renderLeveling(title || 'Сравнение', parseInt(w) || 600, parseInt(h) || 400, content, align, asc, asp);
+    });
+
+    // Колонки: <column>...</column>
+    html = html.replace(/<column>([\s\S]*?)<\/column>/g, (_, inner) => {
+        return renderColumns(inner);
     });
 
     html = html.replace(/^####\s+(.+)$/gm, '<h4>$1</h4>');
@@ -1919,6 +1929,48 @@ function renderLeveling(title, w, h, content, align, asc, asp) {
     });
 
     out += `</div></div>`;
+    return out;
+}
+
+/* ========================================
+   Колонки: <column>...</column>
+   ======================================== */
+
+function renderColumns(inner) {
+    const cols = [];
+    const colRegex = /<col([^>]*)>([\s\S]*?)<\/col>/g;
+    let m;
+    while ((m = colRegex.exec(inner)) !== null) {
+        const params = m[1] || '';
+        const content = m[2].trim();
+
+        const nMatch = params.match(/-n'([^']*)'/);
+        const lMatch = params.match(/-l(\d+)/);
+        const cMatch = params.match(/-c([1-3])(?!t)/);
+        const ctMatch = params.match(/-ct([1-3])/);
+
+        cols.push({
+            title: nMatch ? nMatch[1] : '',
+            width: lMatch ? parseInt(lMatch[1]) : 0,
+            align: cMatch ? parseInt(cMatch[1]) : 1,
+            titleAlign: ctMatch ? parseInt(ctMatch[1]) : 1,
+            content: content
+        });
+    }
+
+    if (cols.length === 0) return '';
+
+    const alignMap = { 1: 'left', 2: 'center', 3: 'right' };
+    let out = '<div class="md-columns">';
+    cols.forEach(col => {
+        const widthStyle = col.width ? `width:${col.width}px;flex:none;` : 'flex:1;min-width:0;';
+        const titleHtml = col.title
+            ? `<div class="md-column-header" style="text-align:${alignMap[col.titleAlign]}">${escapeHtml(col.title)}</div>`
+            : '';
+        const contentHtml = renderInlineContent(col.content);
+        out += `<div class="md-column" style="${widthStyle}text-align:${alignMap[col.align]}">${titleHtml}<div class="md-column-content">${contentHtml}</div></div>`;
+    });
+    out += '</div>';
     return out;
 }
 
