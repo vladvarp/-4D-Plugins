@@ -964,6 +964,12 @@ img {
     color: var(--color-muted);
 }
 
+.md-column-content hr {
+    border: none;
+    border-top: 1px solid var(--color-border);
+    margin: 16px 0;
+}
+
 .md-column-content ul,
 .md-column-content ol {
     margin-bottom: 8px;

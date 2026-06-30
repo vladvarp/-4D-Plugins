@@ -738,7 +738,7 @@ function renderInlineContent(text) {
     html = html.replace(/^####\s+(.+)$/gm, '<h4>$1</h4>');
     html = html.replace(/^###\s+(.+)$/gm, '<h4>$1</h4>');
     html = html.replace(/^##\s+(.+)$/gm, '<h4>$1</h4>');
-    html = html.replace(/^---$/gm, '<hr>');
+    html = html.replace(/^\s*---\s*$/gm, '<hr>');
     html = html.replace(/\*\*\*(.+?)\*\*\*/g, '<strong><em>$1</em></strong>');
     html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
     html = html.replace(/\*(.+?)\*/g, '<em>$1</em>');
@@ -781,7 +781,7 @@ function applyStandardMarkdown(html) {
     html = html.replace(/^#\s+(.+)$/gm, '<h1>$1</h1>');
 
     // Горизонтальная линия
-    html = html.replace(/^---$/gm, '<hr>');
+    html = html.replace(/^\s*---\s*$/gm, '<hr>');
 
     // Жирный и курсив
     html = html.replace(/\*\*\*(.+?)\*\*\*/g, '<strong><em>$1</em></strong>');
@@ -1006,10 +1006,10 @@ function renderInlineSyntax(html) {
         return `<button class="md-photo-btn" data-photos="${photosJson}" onclick="openPhotoModal(this)">${escapeHtml(name)}</button>`;
     });
 
-    // Кнопка модального окна: [[mdb:'label'-n'id'-sW-bN]]
-    html = html.replace(/\[\[mdb:'([^']+)'-n'([^']+)'(?:-s(\d+))?(?:-b([1-9]))?\]\]/g, (_, label, id, w, btnStyle) => {
+    // Кнопка модального окна: [[mdb:'label'-n'id'-sW-bN]] (-s без значения = 100% ширины)
+    html = html.replace(/\[\[mdb:'([^']+)'-n'([^']+)'(?:-s(\d*))?(?:-b([1-9]))?\]\]/g, (_, label, id, w, btnStyle) => {
         const safeId = escapeHtml(id);
-        const style = w ? ` style="width:${parseInt(w)}px"` : '';
+        const style = w !== undefined ? (w ? ` style="width:${parseInt(w)}px"` : ' style="width:100%"') : '';
         const cls = btnStyle ? `md-modal-btn-b${btnStyle}` : 'md-modal-btn';
         return `<button class="${cls}"${style} onclick="openModal('${safeId}')">${escapeHtml(label)}</button>`;
     });
@@ -1027,11 +1027,11 @@ function renderInlineSyntax(html) {
         return `<label class="md-biil${clickable === '0' ? ' md-biil-static' : ''}"><input type="checkbox" id="${id}"${cAttr}${dAttr}><span class="md-biil-mark"></span></label>`;
     });
 
-    // Выпадающий список: [[ddl:'a','b','c'-s150-p1]]
-    html = html.replace(/\[\[ddl:((?:'[^']*'(?:,\s*'[^']*')*))(?:-s(\d+))?(?:-p(\d+))?\]\]/g, (_, itemsStr, w, selected) => {
+    // Выпадающий список: [[ddl:'a','b','c'-s150-p1]] (-s без значения = 100% ширины)
+    html = html.replace(/\[\[ddl:((?:'[^']*'(?:,\s*'[^']*')*))(?:-s(\d*))?(?:-p(\d+))?\]\]/g, (_, itemsStr, w, selected) => {
         const options = itemsStr.match(/'([^']*)'/g)?.map(o => o.replace(/^'|'$/g, '')) || [];
         const id = 'ddl-' + Math.random().toString(36).substr(2, 6);
-        const style = w ? ` style="width:${parseInt(w)}px"` : '';
+        const style = w !== undefined ? (w ? ` style="width:${parseInt(w)}px"` : ' style="width:100%"') : '';
         const selIdx = selected ? parseInt(selected) - 1 : 0;
         const optsHtml = options.map((o, i) => `<option value="${i}"${i === selIdx ? ' selected' : ''}>${escapeHtml(o)}</option>`).join('');
         return `<select class="md-ddl" id="${id}"${style}>${optsHtml}</select>`;
