@@ -16,7 +16,7 @@ github: https://github.com/vladvarp/-4D-Plugins
 
 ## О плагине
 
-===photo -n[Галерея] -s600*400 -c2 -asc1000 -asp1000
+===photo -s600*400 -c2 -asc1000 -asp1000
 [[p:'image/ActionRecorder/1.png']]
 [[p:'image/ActionRecorder/2.png']]
 [[p:'image/ActionRecorder/3.png']]
@@ -155,16 +155,10 @@ Action Recorder — инструмент для записи и воспроиз
 
 Каждый `.py` файл операции содержит:
 
-```python
+```python-num
 # Action: Имя операции
 # Recorded: 2026-06-29 14:30:00
-import c4d
-
-c4d.CallCommand(5159)  # Куб
-obj = doc.SearchObject('Куб')
-if obj:
-    obj.SetAbsPos(c4d.Vector(100.0, 0.0, 0.0))
-    c4d.EventAdd()
+# --- ваш код ---
 ```
 ::::
 
