@@ -22,6 +22,8 @@ github: https://github.com/vladvarp/-4D-Plugins
 [[p:'image/ActionRecorder/3.png']]
 ===
 
+[[mdb:'UI Action Recorder'-n'AR'-b8]] [[mdb:'UI Log'-n'ARL'-b8]]
+
 Action Recorder — инструмент для записи и воспроизведения операций Cinema 4D в виде Python-скриптов. Плагин перехватывает все изменения сцены (добавление/удаление объектов, трансформации, изменения параметров) и преобразует их в исполняемый код.
 
 Записанные операции сохраняются как `.py` файлы в папке `~/Documents/ActionRecorder/` и могут быть запущены повторно в любом проекте. Это позволяет автоматизировать рутинные задачи: создание стандартных объектов, позиционирование, настройку рендера.
@@ -180,67 +182,133 @@ if obj:
 ## Состав
 
 | Иконка | Иконка | Название | Назначение |
-|--------|--------|-----------------|------------|
+|--------|--------|----------|------------|
 | [[ico:'ico/ActionRecorder/Manager.png']] | Менеджер операций | Вкладка AR | Открытие менеджера |
-| [[ico:'ico/ActionRecorder/Log.png']] | Лог событий | Вкладка AR | Открытие окна лога |
-| [[ico:'ico/ActionRecorder/Play.png']] | Воспроизвести | Вкладка AR | Быстрый запуск последней операции |
+| [[ico:'ico/ActionRecorder/Log.png']]     | Лог событий       | Вкладка AR | Открытие окна лога |
+| [[ico:'ico/ActionRecorder/Play.png']]    | Воспроизвести     | Вкладка AR | Быстрый запуск последней операции |
 
 
 
-<mdc-n'ID1'-s500*800>
+
+<mdc-n'AR'-s950*100>
 icon: ico/ActionRecorder/Manager.png
-title: Action Recorder
-tagline: Записывай и воспроизводи операции Cinema 4D как Python-скрипты.
+title: Action Recorder — Менеджер операций
+tagline: Action Recorder — создание, удаление, запуск операций.
 
-Коллекция: [[ddl:'Коллекция','Другая коллекция'-s300]]
+<column-l900>
+  <col-l70>
+  Коллекция:
+  </col>
+  <col-l600-c1>
+  [[ddl:'Коллекция','Проект #1','Проект #2','Проект #3','Тестовые'-s-p3]]
+  </col>
+  <col-l200-c3>
+  [[mdb:'+ Новая'-n'0']] [[mdb:'✕ Удалить'-n'0']]
+  </col>
+</column>
 ---
-Операции:
-```
-> Операция1
-  Операция2
-  Создание кубов
-```
+<column-l900>
+  <col-l380>
+  Операции:
+  [[mdb:'Рендер 1000*1000'-n'0'-s170]]  [[mdb:'▶'-n'0']] [[mdb:'●'-n'0']] [[mdb:'✎'-n'0']] [[mdb:'✕'-n'0']]
+  [[mdb:'> Начальная сцена'-n'0'-s170]] [[mdb:'▶'-n'0']] [[mdb:'■'-n'0']] [[mdb:'✎'-n'0']] [[mdb:'✕'-n'0']]
+  [[mdb:'Чистка'-n'0'-s170]]            [[mdb:'▶'-n'0']] [[mdb:'●'-n'0']] [[mdb:'✎'-n'0']] [[mdb:'✕'-n'0']]
+  [[mdb:'Сортировка'-n'0'-s170]]        [[mdb:'▶'-n'0']] [[mdb:'●'-n'0']] [[mdb:'✎'-n'0']] [[mdb:'✕'-n'0']]
+  [[mdb:'Деформер'-n'0'-s170]]          [[mdb:'▶'-n'0']] [[mdb:'●'-n'0']] [[mdb:'✎'-n'0']] [[mdb:'✕'-n'0']]
+  [["1"]]
+  [[mdb:'+ Новый'-n'0'-s]]
+  ---
+  [[mdb:'Лог операций'-n'0'-s]]
+  [[mdb:'Протокол скрипта'-n'0'-s]]
+  </col>
+  <col>
+  Код операции:
+  ```-num-l380
+  # Action: Начальная сцена
+  # Created: 2026-06-29 16:00:21
+  # --- ваш код ---
+  obj = c4d.BaseObject(5103)  # Камера
+  obj.SetName('Камера')
+  obj.SetAbsPos(c4d.Vector(600.0000, 300.0000, -600.0000))
+  obj.SetAbsRot(c4d.Vector(0.7854, -0.3395, 0.0000))
+  doc.InsertObject(obj)
+  c4d.EventAdd()
+  obj = doc.SearchObject('Камера')
+  if obj:
+      obj.SetAbsPos(c4d.Vector(0.0000, 0.0000, 0.0000))
+      obj.SetAbsRot(c4d.Vector(0.0000, 0.0000, 0.0000))
+      c4d.EventAdd()
+  obj = doc.SearchObject('Камера')
+  if obj:
+      obj.SetAbsPos(c4d.Vector(0.0000, 0.0000, -362.3548))
+      c4d.EventAdd()
+  obj = doc.SearchObject('Камера')
+  if obj:
+      obj[1010] = 283.66798306452984  # param id=1010
+      c4d.EventAdd()
+  obj = doc.SearchObject('Камера')
+  if obj:
+      obj.SetAbsPos(c4d.Vector(0.0000, 147.2984, -362.3548))
+      c4d.EventAdd()
+  c4d.CallCommand(200000090)  # Вращать
+  obj = doc.SearchObject('Камера')
+  if obj:
+      obj.SetAbsRot(c4d.Vector(0.0000, -0.3256, 0.0000))
+      c4d.EventAdd()
+  c4d.CallCommand(5186)  # Прямоугольник
+  obj = doc.SearchObject('Прямоугольник')
+  if obj:
+      obj[2300] = 1  # param id=2300
+      c4d.EventAdd()
+  obj = doc.SearchObject('Прямоугольник')
+  if obj:
+      obj.SetAbsPos(c4d.Vector(0.0000, 200.0000, 0.0000))
+      c4d.EventAdd()
+  c4d.CallCommand(12236) # Конвертировать примитив
+  obj = doc.SearchObject('Прямоугольник')
+  if obj:
+      obj[1002] = 0  # param id=1002
+      c4d.EventAdd()
+  obj = doc.SearchObject('Прямоугольник')
+  if obj:
+      obj.SetAbsRot(c4d.Vector(0.0000, 1.5708, 0.0000))
+      c4d.EventAdd()
+  ```
+  ✓ Сохранено [["25"]] [[mdb:'↩ Восстановить'-n'0']] [[mdb:'Сохранить код ➜]'-n'0']]
+  </col>
+</column>
 ---
-[[mdb:'+ Новый'-n'0'-s210]] [[mdb:'Лог операций'-n'0'-s210]]
-[[mdb:'Протокол скрипта'-n'0'-s210]]
----
-Код операции:
-```python
-# Action: Операция1
-# Recorded: 2026-06-29 14:30:00
-import c4d
+`● Запись в "Начальная сцена"...`
+</mdc>
 
-c4d.CallCommand(5159)  # Куб
-obj = doc.SearchObject('Куб')
-if obj:
-    obj.SetAbsPos(c4d.Vector(100.0, 0.0, 0.0))
-    c4d.EventAdd()
-```
+<mdc-n'ARL'-s650*100>
+icon: ico/ActionRecorder/Log.png
+title: Action Recorder — Лог событий
+tagline: Action Recorder — просмотр лога команд в виде кода.
+<column>
+<col-l450>
+`● Лог активен — записываются все изменения сцены`
+</col>
+<col-c3-l130>
+[[mdb:'Очистить'-n'0']]
+</col>
+</column>
 ---
-[[mdb:'▶ Воспроизвести'-n'0'-s210]] [[mdb:'● Записать'-n'0'-s210]]
-[[mdb:'✎ Переименовать'-n'0'-s210]] [[mdb:'✕ Удалить'-n'0'-s210]]
----
-[[mdb:'Сохранить код'-n'0'-s210]] [[mdb:'↩ Восстановить'-n'0'-s210]]
-✓ Сохранено
+```-num
+# [06:44:29]
+rd = doc.GetActiveRenderData()
+rd[c4d.RDATA_XRES] = 1280
+rd[c4d.RDATA_YRES] = 1200
+c4d.EventAdd()
 
-::::details
-Скриншот
+# [06:44:33]
+obj = c4d.BaseObject(5103)  # Камера
+obj.SetName('Камера')
+obj.SetAbsPos(c4d.Vector(600.0000, 300.0000, -600.0000))
+obj.SetAbsRot(c4d.Vector(0.7854, -0.3395, 0.0000))
+doc.InsertObject(obj)
+c4d.EventAdd()
 ```
-Action Recorder — Менеджер операций
-┌──────────────────────────────────────────────────┐
-│ Коллекция: [Коллекция ▼]  [+ Новая] [✕ Удалить] │
-├──────────────┬───────────────────────────────────┤
-│ Операции:    │ Код операции:                     │
-│ > Операция1  │ # Action: Операция1               │
-│   Операция2  │ import c4d                        │
-│              │ c4d.CallCommand(5159)             │
-│              │ obj = doc.SearchObject('Куб')     │
-│ [+ Новый]    │ ...                               │
-│ Лог операций │ [Сохранить код] [Восстановить]    │
-│ Протокол     │ ✓ Сохранено                       │
-├──────────────┴───────────────────────────────────┤
-│ Выбран: Операция1                                │
-└──────────────────────────────────────────────────┘
-```
-::::
+---
+[[mdb:'Сохранить как операцию...'-n'0']]
 </mdc>
