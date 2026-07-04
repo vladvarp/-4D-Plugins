@@ -3,7 +3,7 @@ title: Action Recorder
 tagline: Записывай и воспроизводи операции Cinema 4D как Python-скрипты — фиксируй каждое действие сцены и повторяй его в один клик.
 version: v1.15
 author: V.Ar Production
-updated: Июнь 2026
+updated: Июль 2026
 icon: ico/ActionRecorder/Manager.png
 tags: [Автоматизация]
 license: GPL v3
