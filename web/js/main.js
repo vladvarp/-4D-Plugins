@@ -112,7 +112,7 @@ function initIndexPage() {
             description: 'Записывает действия пользователя в виде Python-кода, автоматически генерируются скрипты, которые можно сохранить, редактировать и запускать одной кнопкой.',
             icon: 'ico/ActionRecorder/Manager.png',
             tags: [`Автоматизация`],
-            version: 'v1.14',
+            version: 'v1.15',
             mdFile: 'plugins/action-recorder.md'
         }  
     ];

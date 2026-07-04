@@ -12,7 +12,7 @@ import base64
 import tempfile
 
 PLUGIN_ID   = 1069098
-VERS = 'v1.14'
+VERS = 'v1.15'
 LABLE =  'Action Recorder'
 PLUGIN_NAME = "About"
 PLUGIN_HELP = "Информация о плагине Action Recorder"

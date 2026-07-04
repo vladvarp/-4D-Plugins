@@ -192,10 +192,23 @@ def _load_last_info():
 
 # ─── Перехват команд Cinema 4D через MessageData ───────────────────────────────
 
+def _snapshot_container(bc):
+    """Выгружает все скалярные значения из BaseContainer."""
+    params = {}
+    try:
+        if bc:
+            for key, val in bc:
+                if isinstance(val, (int, float, bool, str)):
+                    params[key] = val
+    except Exception:
+        pass
+    return params
+
+
 def _scene_snapshot(doc):
     """
     Возвращает словарь-«отпечаток» текущего состояния сцены.
-    Ключи: уникальные идентификаторы объектов/материалов.
+    Ключи: уникальные идентификаторы объектов/материалов/тегов.
     Значения: dict с полными данными для генерации кода.
     """
     snap = {}
@@ -207,22 +220,34 @@ def _scene_snapshot(doc):
                     pos   = obj.GetAbsPos()
                     rot   = obj.GetAbsRot()
                     scale = obj.GetAbsScale()
+                    # Теги с полными атрибутами
                     tags = []
                     tag = obj.GetFirstTag()
+                    tag_idx = 0
                     while tag:
-                        tags.append({"type": tag.GetType(), "name": tag.GetName()})
+                        tag_uid = "{}_tag_{}_{}".format(uid, tag.GetType(), tag_idx)
+                        tag_params = _snapshot_container(tag.GetDataInstance())
+                        tags.append({
+                            "uid":    tag_uid,
+                            "type":   tag.GetType(),
+                            "name":   tag.GetName(),
+                            "idx":    tag_idx,
+                            "params": tag_params,
+                        })
+                        snap["tag_{}".format(tag_uid)] = {
+                            "kind":     "tag",
+                            "uid":      tag_uid,
+                            "tag_type": tag.GetType(),
+                            "name":     tag.GetName(),
+                            "obj_uid":  uid,
+                            "obj_name": obj.GetName(),
+                            "idx":      tag_idx,
+                            "params":   tag_params,
+                        }
+                        tag_idx += 1
                         tag = tag.GetNext()
-                    # Захватываем параметры BaseContainer объекта (для меш-операций: фаска, экструзия и пр.)
-                    params = {}
-                    try:
-                        bc = obj.GetDataInstance()
-                        if bc:
-                            for key, val in bc:
-                                # Сохраняем только скалярные типы, пригодные для сравнения и воспроизведения
-                                if isinstance(val, (int, float, bool, str)):
-                                    params[key] = val
-                    except Exception:
-                        pass
+                    # Параметры BaseContainer объекта
+                    params = _snapshot_container(obj.GetDataInstance())
 
                     snap["obj_{}".format(uid)] = {
                         "kind":   "object",
@@ -247,21 +272,22 @@ def _scene_snapshot(doc):
         mat = doc.GetFirstMaterial()
         while mat:
             uid = "{}_{}".format(mat.GetName(), mat.GetType())
+            mat_params = _snapshot_container(mat.GetDataInstance())
             snap["mat_{}".format(uid)] = {
-                "kind": "material",
-                "uid":  uid,
-                "name": mat.GetName(),
-                "type": mat.GetType(),
+                "kind":   "material",
+                "uid":    uid,
+                "name":   mat.GetName(),
+                "type":   mat.GetType(),
+                "params": mat_params,
             }
             mat = mat.GetNext()
 
         rd = doc.GetActiveRenderData()
         if rd:
+            render_params = _snapshot_container(rd.GetDataInstance())
             snap["render"] = {
-                "kind":   "render",
-                "xres":   int(rd[c4d.RDATA_XRES]),
-                "yres":   int(rd[c4d.RDATA_YRES]),
-                "fps":    int(rd[c4d.RDATA_FRAMERATE]) if rd[c4d.RDATA_FRAMERATE] else 0,
+                "kind":    "render",
+                "params":  render_params,
             }
     except Exception:
         pass
@@ -284,25 +310,18 @@ def _describe_change(old_snap, new_snap, doc):
         lines = []
 
         # ── Детекция «Make Editable» (C) ───────────────────────────────────
-        # Паттерн: объект с тем же именем и позицией исчез из снимка (примитив)
-        # и появился новый с типом 1007532 (полигональный объект).
-        # UID строится как "{name}_{type}_{parent}", поэтому смена типа даёт
-        # разные ключи — объект попадает одновременно в added_keys и removed_keys.
         make_editable_names = set()
-        removed_obj_by_name = {}   # name -> old snap entry
-        added_obj_by_name   = {}   # name -> new snap entry
+        removed_obj_by_name = {}
+        added_obj_by_name   = {}
         for k in removed_keys:
-            d = old_snap[k]
-            if d["kind"] == "object":
-                removed_obj_by_name[d["name"]] = d
+            if old_snap[k].get("kind") == "object":
+                removed_obj_by_name[old_snap[k]["name"]] = old_snap[k]
         for k in added_keys:
-            d = new_snap[k]
-            if d["kind"] == "object":
-                added_obj_by_name[d["name"]] = d
+            if new_snap[k].get("kind") == "object":
+                added_obj_by_name[new_snap[k]["name"]] = new_snap[k]
         for name in set(removed_obj_by_name.keys()) & set(added_obj_by_name.keys()):
             old_d = removed_obj_by_name[name]
             new_d = added_obj_by_name[name]
-            # Позиция совпадает и новый тип — полигональный объект (1007532)
             if old_d["pos"] == new_d["pos"] and new_d["type"] == 1007532:
                 make_editable_names.add(name)
                 lines.append("# Make Editable: {}".format(name))
@@ -315,10 +334,10 @@ def _describe_change(old_snap, new_snap, doc):
         # ── Добавлены объекты ──────────────────────────────────────────────
         for k in added_keys:
             d = new_snap[k]
-            if d["kind"] != "object":
+            if d.get("kind") != "object":
                 continue
             if d["name"] in make_editable_names:
-                continue  # уже обработан как Make Editable
+                continue
             obj_type = d["type"]
             obj_name = d["name"]
             px, py, pz = d["pos"]
@@ -337,16 +356,16 @@ def _describe_change(old_snap, new_snap, doc):
         # ── Удалены объекты ────────────────────────────────────────────────
         for k in removed_keys:
             d = old_snap[k]
-            if d["kind"] != "object":
+            if d.get("kind") != "object":
                 continue
             if d["name"] in make_editable_names:
-                continue  # уже обработан как Make Editable
+                continue
             obj_name = d["name"]
             lines.append("_obj = doc.SearchObject({!r})".format(obj_name))
             lines.append("if _obj: _obj.Remove()")
             lines.append("c4d.EventAdd()")
 
-        # ── Изменены объекты (позиция / поворот / масштаб) ─────────────────
+        # ── Изменены объекты (позиция / поворот / масштаб / параметры) ─────
         for k in common_keys:
             if not k.startswith("obj_"):
                 continue
@@ -365,7 +384,6 @@ def _describe_change(old_snap, new_snap, doc):
                 changed.append("obj.SetAbsScale(c4d.Vector({:.4f}, {:.4f}, {:.4f}))".format(sx, sy, sz))
             if o["name"] != n["name"]:
                 changed.append("obj.SetName({!r})".format(n["name"]))
-            # Изменения параметров BaseContainer (фаска, экструзия и другие меш-параметры)
             o_params = o.get("params", {})
             n_params = n.get("params", {})
             all_param_keys = set(o_params.keys()) | set(n_params.keys())
@@ -373,7 +391,7 @@ def _describe_change(old_snap, new_snap, doc):
                 oval = o_params.get(pk)
                 nval = n_params.get(pk)
                 if oval != nval and nval is not None:
-                    changed.append("obj[{}] = {!r}  # param id={}".format(pk, nval, pk))
+                    changed.append("obj[{}] = {!r}".format(pk, nval))
             if changed:
                 lines.append("obj = doc.SearchObject({!r})".format(obj_name))
                 lines.append("if obj:")
@@ -381,45 +399,141 @@ def _describe_change(old_snap, new_snap, doc):
                     lines.append("    " + ln)
                 lines.append("    c4d.EventAdd()")
 
+        # ── Добавлены теги ────────────────────────────────────────────────
+        for k in added_keys:
+            d = new_snap[k]
+            if d.get("kind") != "tag":
+                continue
+            obj_name = d["obj_name"]
+            tag_type = d["tag_type"]
+            tag_name = d["name"]
+            lines.append("_obj = doc.SearchObject({!r})".format(obj_name))
+            lines.append("if _obj:")
+            lines.append("    _tag = _obj.MakeTag({})".format(tag_type))
+            lines.append("    if _tag:")
+            lines.append("        _tag.SetName({!r})".format(tag_name))
+            # Устанавливаем атрибуты тега
+            for pk in sorted(d.get("params", {}).keys()):
+                lines.append("        _tag[{}] = {!r}".format(pk, d["params"][pk]))
+            lines.append("    c4d.EventAdd()")
+
+        # ── Удалены теги ──────────────────────────────────────────────────
+        for k in removed_keys:
+            d = old_snap[k]
+            if d.get("kind") != "tag":
+                continue
+            obj_name = d["obj_name"]
+            tag_type = d["tag_type"]
+            tag_name = d["name"]
+            lines.append("_obj = doc.SearchObject({!r})".format(obj_name))
+            lines.append("if _obj:")
+            lines.append("    for _t in _obj.GetTags():")
+            lines.append("        if _t.GetType() == {} and _t.GetName() == {!r}:".format(tag_type, tag_name))
+            lines.append("            _t.Remove()")
+            lines.append("            break")
+            lines.append("    c4d.EventAdd()")
+
+        # ── Изменены теги (атрибуты) ──────────────────────────────────────
+        for k in common_keys:
+            if not k.startswith("tag_"):
+                continue
+            o = old_snap[k]
+            n = new_snap[k]
+            o_params = o.get("params", {})
+            n_params = n.get("params", {})
+            all_param_keys = set(o_params.keys()) | set(n_params.keys())
+            changed = []
+            for pk in sorted(all_param_keys):
+                oval = o_params.get(pk)
+                nval = n_params.get(pk)
+                if oval != nval and nval is not None:
+                    changed.append("    _tag[{}] = {!r}".format(pk, nval))
+            if changed:
+                obj_name = n["obj_name"]
+                tag_type = n["tag_type"]
+                tag_name = n["name"]
+                lines.append("_obj = doc.SearchObject({!r})".format(obj_name))
+                lines.append("if _obj:")
+                lines.append("    for _t in _obj.GetTags():")
+                lines.append("        if _t.GetType() == {} and _t.GetName() == {!r}:".format(tag_type, tag_name))
+                lines.append("            _tag = _t")
+                lines.append("            break")
+                lines.append("    else:")
+                lines.append("        _tag = None")
+                lines.append("    if _tag:")
+                for ln in changed:
+                    lines.append(ln)
+                lines.append("        c4d.EventAdd()")
+
         # ── Добавлены материалы ────────────────────────────────────────────
         for k in added_keys:
             d = new_snap[k]
-            if d["kind"] != "material":
+            if d.get("kind") != "material":
                 continue
             mat_name = d["name"]
-            lines.append("mat = c4d.BaseMaterial(c4d.Mmaterial)")
+            mat_type = d.get("type", c4d.Mmaterial)
+            lines.append("mat = c4d.BaseMaterial({})  # {}".format(mat_type, mat_name))
             lines.append("mat.SetName({!r})".format(mat_name))
+            # Устанавливаем атрибуты материала
+            for pk in sorted(d.get("params", {}).keys()):
+                lines.append("mat[{}] = {!r}".format(pk, d["params"][pk]))
             lines.append("doc.InsertMaterial(mat)")
             lines.append("c4d.EventAdd()")
 
         # ── Удалены материалы ──────────────────────────────────────────────
         for k in removed_keys:
             d = old_snap[k]
-            if d["kind"] != "material":
+            if d.get("kind") != "material":
                 continue
             mat_name = d["name"]
             lines.append("_mat = doc.SearchMaterial({!r})".format(mat_name))
             lines.append("if _mat: _mat.Remove()")
             lines.append("c4d.EventAdd()")
 
+        # ── Изменены материалы (атрибуты) ─────────────────────────────────
+        for k in common_keys:
+            if not k.startswith("mat_"):
+                continue
+            o = old_snap[k]
+            n = new_snap[k]
+            o_params = o.get("params", {})
+            n_params = n.get("params", {})
+            all_param_keys = set(o_params.keys()) | set(n_params.keys())
+            mat_changes = []
+            for pk in sorted(all_param_keys):
+                oval = o_params.get(pk)
+                nval = n_params.get(pk)
+                if oval != nval and nval is not None:
+                    mat_changes.append("mat[{}] = {!r}".format(pk, nval))
+            # Переименование
+            if o.get("name") != n.get("name"):
+                mat_changes.append("mat.SetName({!r})".format(n["name"]))
+            if mat_changes:
+                mat_name = o["name"]
+                lines.append("mat = doc.SearchMaterial({!r})".format(mat_name))
+                lines.append("if mat:")
+                for ln in mat_changes:
+                    lines.append("    " + ln)
+                lines.append("    c4d.EventAdd()")
+
         # ── Изменены настройки рендера ─────────────────────────────────────
         if "render" in old_snap and "render" in new_snap:
-            o_r = old_snap["render"]
-            n_r = new_snap["render"]
+            o_p = old_snap["render"].get("params", {})
+            n_p = new_snap["render"].get("params", {})
+            all_param_keys = set(o_p.keys()) | set(n_p.keys())
             render_changes = []
-            if o_r["xres"] != n_r["xres"] or o_r["yres"] != n_r["yres"]:
-                render_changes.append(
-                    "rd[c4d.RDATA_XRES] = {}\nrd[c4d.RDATA_YRES] = {}".format(
-                        n_r["xres"], n_r["yres"]))
-            if o_r.get("fps") != n_r.get("fps") and n_r.get("fps"):
-                render_changes.append("rd[c4d.RDATA_FRAMERATE] = {}".format(n_r["fps"]))
+            for rk in sorted(all_param_keys):
+                oval = o_p.get(rk)
+                nval = n_p.get(rk)
+                if oval != nval and nval is not None:
+                    render_changes.append("rd[{}] = {!r}".format(rk, nval))
             if render_changes:
                 lines.append("rd = doc.GetActiveRenderData()")
                 lines.extend(render_changes)
                 lines.append("c4d.EventAdd()")
 
         if not lines:
-            return ""   # ничего значимого — не логируем
+            return ""
 
         return "\n".join(lines)
     except Exception:
