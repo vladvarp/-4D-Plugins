@@ -136,9 +136,16 @@ function renderPluginCards(container, plugins) {
     plugins.forEach(plugin => {
         const card = createPluginCard(plugin);
         container.appendChild(card);
+
+        // Загружаем рейтинг для карточки
+        const pluginId = plugin.mdFile.replace(/\//g, '_').replace(/\.md$/, '');
+        const ratingContainer = card.querySelector('.card-rating-placeholder');
+        loadCardRating(pluginId).then(rating => {
+            if (rating) {
+                renderCardRating(ratingContainer, rating);
+            }
+        });
     });
-
-
 }
 
 // Создаём DOM-элемент карточки плагина
@@ -164,7 +171,10 @@ function createPluginCard(plugin) {
             <p class="card-description">${escapeHtml(plugin.description)}</p>
         </div>
         <div class="card-footer">
-            <span class="card-version">${escapeHtml(plugin.version)}</span>
+            <div class="card-footer-left">
+                <span class="card-version">${escapeHtml(plugin.version)}</span>
+                <span class="card-rating-placeholder"></span>
+            </div>
             <span class="card-arrow" aria-hidden="true">
                 <svg viewBox="0 0 12 12" xmlns="http://www.w3.org/2000/svg">
                     <path d="M1 6h10M6 1l5 5-5 5" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
@@ -263,6 +273,9 @@ async function loadAndRenderPlugin(mdFile) {
 
         // Инициализируем комментарии Giscus
         initGiscus();
+
+        // Инициализируем систему оценок
+        initRatingSection();
 
     } catch (error) {
         console.error('Ошибка загрузки плагина:', error);
@@ -1439,6 +1452,155 @@ function initGiscus() {
     script.async = true;
 
     container.appendChild(script);
+}
+
+/* ========================================
+    Система оценок (Cloudflare Worker)
+======================================== */
+
+const RATINGS_API = 'https://c4d-ratings.neo3993.workers.dev/api/ratings';
+
+function getUserId() {
+    let id = localStorage.getItem('c4d_user_id');
+    if (!id) {
+        id = 'user_' + Math.random().toString(36).substr(2, 9) + Date.now().toString(36);
+        localStorage.setItem('c4d_user_id', id);
+    }
+    return id;
+}
+
+function getPluginIdFromUrl() {
+    const params = new URLSearchParams(window.location.search);
+    const md = params.get('md');
+    if (!md) return null;
+    return md.replace(/\//g, '_').replace(/\.md$/, '');
+}
+
+async function loadRatings(pluginId) {
+    try {
+        const res = await fetch(`${RATINGS_API}?plugin=${pluginId}`);
+        return await res.json();
+    } catch {
+        return { count: 0, sum: 0, users: {} };
+    }
+}
+
+async function submitRating(pluginId, rating) {
+    const userId = getUserId();
+    const res = await fetch(RATINGS_API, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pluginId, userId, rating }),
+    });
+    return await res.json();
+}
+
+function renderStarsDisplay(container, avg) {
+    container.innerHTML = '';
+    const rounded = Math.round(avg);
+    for (let i = 1; i <= 5; i++) {
+        const star = document.createElement('span');
+        star.className = i <= rounded ? 'star-filled' : 'star-empty';
+        star.textContent = '★';
+        container.appendChild(star);
+    }
+}
+
+function getRatingWord(count) {
+    if (count === 0) return '0 оценок';
+    if (count === 1) return '1 оценка';
+    if (count >= 2 && count <= 4) return `${count} оценки`;
+    return `${count} оценок`;
+}
+
+function initRatingSection() {
+    const pluginId = getPluginIdFromUrl();
+    if (!pluginId) return;
+
+    const section = document.getElementById('plugin-rating-section');
+    if (!section) return;
+
+    const starsContainer = document.getElementById('rating-stars');
+    const avgEl = document.getElementById('rating-avg');
+    const countEl = document.getElementById('rating-count');
+    const starsDisplay = document.getElementById('rating-stars-display');
+    const statusEl = document.getElementById('rating-status');
+    const buttons = starsContainer.querySelectorAll('.star-btn');
+
+    let currentRating = 0;
+    const userId = getUserId();
+
+    loadRatings(pluginId).then(data => {
+        const avg = data.count > 0 ? (data.sum / data.count) : 0;
+        avgEl.textContent = avg > 0 ? avg.toFixed(1) : '—';
+        countEl.textContent = getRatingWord(data.count);
+        renderStarsDisplay(starsDisplay, avg);
+
+        if (data.users[userId]) {
+            currentRating = data.users[userId];
+            highlightStars(buttons, currentRating);
+        }
+    });
+
+    buttons.forEach(btn => {
+        btn.addEventListener('mouseenter', () => {
+            const val = parseInt(btn.dataset.value);
+            highlightStars(buttons, val);
+        });
+
+        btn.addEventListener('mouseleave', () => {
+            highlightStars(buttons, currentRating);
+        });
+
+        btn.addEventListener('click', async () => {
+            const val = parseInt(btn.dataset.value);
+            if (val === currentRating) return;
+
+            statusEl.textContent = 'Отправка…';
+            const result = await submitRating(pluginId, val);
+            currentRating = val;
+            highlightStars(buttons, currentRating);
+            avgEl.textContent = result.avg;
+            countEl.textContent = getRatingWord(result.count);
+            renderStarsDisplay(starsDisplay, parseFloat(result.avg));
+            statusEl.textContent = '';
+        });
+    });
+}
+
+function highlightStars(buttons, value) {
+    buttons.forEach(btn => {
+        const v = parseInt(btn.dataset.value);
+        btn.classList.toggle('active', v <= value);
+        btn.classList.toggle('hovered', false);
+    });
+}
+
+// Загрузка рейтинга для карточки на главной
+async function loadCardRating(pluginId) {
+    try {
+        const res = await fetch(`${RATINGS_API}?plugin=${pluginId}`);
+        const data = await res.json();
+        if (data.count === 0) return null;
+        return { avg: (data.sum / data.count).toFixed(1), count: data.count };
+    } catch {
+        return null;
+    }
+}
+
+function renderCardRating(container, rating) {
+    if (!rating) return;
+    const rounded = Math.round(parseFloat(rating.avg));
+    let starsHtml = '';
+    for (let i = 1; i <= 5; i++) {
+        starsHtml += `<span class="${i <= rounded ? 'star-filled' : 'star-empty'}">★</span>`;
+    }
+    container.innerHTML = `
+        <div class="card-rating">
+            <div class="card-rating-stars">${starsHtml}</div>
+            <span class="card-rating-text">${rating.avg} (${rating.count})</span>
+        </div>
+    `;
 }
 
 /* ========================================

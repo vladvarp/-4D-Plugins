@@ -105,6 +105,30 @@
                 <!-- Правая колонка: боковая панель с мета-информацией -->
                 <aside class="plugin-sidebar" aria-label="Информация о совместимости">
 
+                    <!-- Секция рейтинга -->
+                    <section class="plugin-rating-section" id="plugin-rating-section" aria-label="Оценка плагина">
+                        <div class="rating-card">
+                            <div class="rating-header">
+                                <div class="rating-avg-wrap">
+                                    <span class="rating-avg" id="rating-avg">—</span>
+                                    <span class="rating-count" id="rating-count">0 оценок</span>
+                                </div>
+                                <div class="rating-stars-display" id="rating-stars-display"></div>
+                            </div>
+                            <div class="rating-action">
+                                <span class="rating-label">Ваша оценка</span>
+                                <div class="rating-stars" id="rating-stars">
+                                    <button class="star-btn" data-value="1" aria-label="1 звезда">★</button>
+                                    <button class="star-btn" data-value="2" aria-label="2 звезды">★</button>
+                                    <button class="star-btn" data-value="3" aria-label="3 звезды">★</button>
+                                    <button class="star-btn" data-value="4" aria-label="4 звезды">★</button>
+                                    <button class="star-btn" data-value="5" aria-label="5 звёзд">★</button>
+                                </div>
+                                <span class="rating-status" id="rating-status"></span>
+                            </div>
+                        </div>
+                    </section>
+
                     <!-- Блок совместимости -->
                     <div class="sidebar-block">
                         <div class="sidebar-block-title">Совместимость</div>
@@ -123,6 +147,8 @@
 
                 </aside>
             </div>
+
+
 
             <!-- Секция комментариев (Giscus) -->
             <section class="plugin-comments" id="plugin-comments" aria-label="Комментарии">
