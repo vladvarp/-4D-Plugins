@@ -3263,3 +3263,47 @@ img {
 .plugin-card:nth-child(4) { animation-delay: 0.20s; }
 .plugin-card:nth-child(5) { animation-delay: 0.25s; }
 .plugin-card:nth-child(6) { animation-delay: 0.30s; }
+
+/* ========================================
+    Секция комментариев (Giscus)
+======================================== */
+.plugin-comments {
+    margin-top: 60px;
+    padding-top: 40px;
+    border-top: 1px solid var(--color-border);
+    padding-bottom: 60px;
+}
+
+.comments-header {
+    margin-bottom: 32px;
+}
+
+.comments-title {
+    font-family: var(--font-display);
+    font-size: 24px;
+    font-weight: 600;
+    color: var(--color-text);
+    letter-spacing: -0.02em;
+}
+
+/* Стилизация iframe Giscus под тёмную тему сайта */
+.giscus {
+    border-radius: var(--radius-md);
+    overflow: hidden;
+}
+
+.giscus .giscus-frame {
+    border-radius: var(--radius-md);
+}
+
+/* Адаптив */
+@media (max-width: 768px) {
+    .plugin-comments {
+        margin-top: 40px;
+        padding-top: 32px;
+    }
+
+    .comments-title {
+        font-size: 20px;
+    }
+}

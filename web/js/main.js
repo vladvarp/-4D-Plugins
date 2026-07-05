@@ -261,6 +261,9 @@ async function loadAndRenderPlugin(mdFile) {
             document.title = `${meta.title} — C4D Plugins`;
         }
 
+        // Инициализируем комментарии Giscus
+        initGiscus();
+
     } catch (error) {
         console.error('Ошибка загрузки плагина:', error);
         if (loadingEl) loadingEl.style.display = 'none';
@@ -1408,7 +1411,38 @@ async function handleCopyClick(e) {
 }
 
 /* ========================================
-   Вспомогательные функции
+    Комментарии Giscus
+======================================== */
+
+function initGiscus() {
+    const container = document.querySelector('.giscus');
+    if (!container) return;
+
+    // Удаляем старый iframe если есть
+    const oldFrame = container.querySelector('iframe.giscus-frame');
+    if (oldFrame) oldFrame.remove();
+
+    const script = document.createElement('script');
+    script.src = 'https://giscus.app/client.js';
+    script.setAttribute('data-repo', 'vladvarp/-4D-Plugins');
+    script.setAttribute('data-repo-id', 'R_kgDOS0OzHg');
+    script.setAttribute('data-category', 'Comments');
+    script.setAttribute('data-category-id', 'DIC_kwDOS0OzHz4DAiJE');
+    script.setAttribute('data-mapping', 'pathname');
+    script.setAttribute('data-strict', '0');
+    script.setAttribute('data-reactions-enabled', '1');
+    script.setAttribute('data-emit-metadata', '0');
+    script.setAttribute('data-input-position', 'bottom');
+    script.setAttribute('data-theme', 'dark_dimmed');
+    script.setAttribute('data-lang', 'ru');
+    script.setAttribute('crossorigin', 'anonymous');
+    script.async = true;
+
+    container.appendChild(script);
+}
+
+/* ========================================
+    Вспомогательные функции
 ======================================== */
 
 // Безопасное обновление текста элемента по id
