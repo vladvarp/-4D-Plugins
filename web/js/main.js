@@ -1428,7 +1428,7 @@ function initGiscus() {
     script.setAttribute('data-repo-id', 'R_kgDOS0OzHg');
     script.setAttribute('data-category', 'Comments');
     script.setAttribute('data-category-id', 'DIC_kwDOS0OzHs4DAiJE');
-    script.setAttribute('data-mapping', 'pathname');
+    script.setAttribute('data-mapping', 'url');
     script.setAttribute('data-strict', '0');
     script.setAttribute('data-reactions-enabled', '1');
     script.setAttribute('data-emit-metadata', '0');
