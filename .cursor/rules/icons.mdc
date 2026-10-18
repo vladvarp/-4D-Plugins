@@ -1,0 +1,41 @@
+---
+description: Память агента — иконки C4D в c4d_icons, в код только плейсхолдер b64. Сайт отдельно.
+alwaysApply: true
+---
+
+# Иконки
+
+## Cinema 4D (меню плагина)
+
+Исходники **только** в `c4d_icons/`: PNG или генератор (`c4d_icons/generate.py`, функция `icon_*()`). Стиль как в `web/ICON_STYLE_GUIDE.md` (64×64, cyan/orange).
+
+**Агент не вставляет готовый base64 в `.pyp`.** Пользователь сам конвертирует файл из `c4d_icons/` и подставляет строку. В коде всегда такой каркас (`import base64`, `os`, `tempfile`):
+
+```python
+_ICON_B64 = (
+    "вставте код иконки"
+)
+
+def _make_icon():
+    png_data = base64.b64decode(_ICON_B64)
+    try:
+        bmp = c4d.bitmaps.BaseBitmap()
+    except AttributeError:
+        bmp = c4d.BaseBitmap()
+    tmp = tempfile.NamedTemporaryFile(suffix=".png", delete=False)
+    try:
+        tmp.write(png_data)
+        tmp.close()
+        bmp.InitWith(tmp.name)
+    finally:
+        os.unlink(tmp.name)
+    return bmp
+```
+
+Регистрация: `icon=_make_icon()`. Несколько иконок — `_ICON_LOG_B64` и т.п. с тем же плейсхолдером и одним `_make_icon(b64)` либо копиями функции. Не класть PNG рядом с `.pyp`. Не трогать уже вставленный пользователем b64.
+
+Новая иконка C4D: добавить PNG или `icon_*` в `c4d_icons/`, в плагине — плейсхолдер выше.
+
+## Сайт и инсталлятор (не путать с C4D)
+
+`web/generate_icons.py` → `web/ico/*.png`. Пути в md / `main.js`; URL в `uplist.json` `ico`. Скриншоты — `web/image/`.

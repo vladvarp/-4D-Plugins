@@ -1,0 +1,50 @@
+---
+description: Память агента — структура репозитория VAr Plugins (C4D). Дополнять при новых соглашениях.
+alwaysApply: true
+---
+
+# Структура репозитория
+
+Набор Python-плагинов Cinema 4D (цель: **R26**, Windows). Лицензия GPL v3. Сайт: `web/` (GitHub Pages). Установщик: `Plugins installer/Plugins installer.py`. Каталог обновлений: `update_data/uplist.json`.
+
+## Корневые папки
+
+- `Plugins/` — исходники. Одна папка = один пакет для инсталлятора (sparse-checkout по пути из JSON).
+- `Plugins installer/` — GUI-инсталлятор (PyQt6). Версия программы: `PROGRAM_VER`.
+- `update_data/uplist.json` — список авторов/плагинов для инсталлятора + `app.actual_version` инсталлятора.
+- `web/` — лендинг: `index.html`, `plugin.html`, `guide.html`, `js/main.js`, `plugins/*.md`, `ico/`, `image/`.
+- `Plugins/Test/` — локальные/отладочные плагины. **Не** в `uplist.json` и не на сайте.
+
+## Каталог плагинов (folder → JSON name → md)
+
+| Папка `Plugins/` | `uplist.json` name | `web/plugins/` | `web/js/main.js` title |
+|---|---|---|---|
+| VAr Tools | VAr Tools | VAr_Tools.md | VAr Tools |
+| Camera Resolution | Resolution Manager | camera-resolution-manager.md | Camera Resolution Manager |
+| Object Renamer PRO | Object Renamer PRO | object-renamer-pro.md | Object Renamer PRO |
+| Snapshot | Snapshot | snapshot.md | Snapshot |
+| Selection Sets | Selection Sets | SelectionSet.md | Selection Sets |
+| Floor Generator | Floor Generator | floor-generator.md | Floor Generator |
+| Cloud Wizard | Cloud Wizard | cloud-wizard.md | Cloud Wizard |
+| Action Recorder | Action Recorder | action-recorder.md | Action Recorder |
+
+Ключ инсталлятора = **имя папки**. Display name = строка 2 файла `ver` (иначе JSON `name`).
+
+## Пакет VAr Tools
+
+Команды/объекты/теги лежат в подпапках (`Animation`, `Tools`, `Objects`, `Tegs`, `Deformers`). Меню собирает `_menu.pyp` по plugin ID. About: `About.pyp`.
+
+## Соглашения кода
+
+- Плагины — `.pyp`, регистрация `c4d.plugins.Register*Plugin`. ID из диапазона Maxon Plugin Café (~1068xxx–1069xxx). **Не переиспользовать ID.** Новый ID — только уникальный и только если пользователь предоставил его зарегестрировав на сайте MAXON, в противном случае запросить у пользователя ID и оставить место в коде для ввода в ручную пользователем.
+- Новый пункт VAr Tools: ID в `.pyp` **и** в `_menu.pyp`.
+- Описание AM: `res/c4d_symbols.h` + `res/strings_ru/c4d_string.str`.
+- Иконки C4D: папка `c4d_icons/` + плейсхолдер `_ICON_B64` в `.pyp` (см. `icons.mdc`). Сайт: `web/generate_icons.py` → `web/ico/`.
+- Документация плагина: YAML frontmatter + кастомный markdown (`web/guide.html`). Каталог карточек — массив `plugins` в `web/js/main.js` (не читается из md).
+
+## Инсталлятор и релизы
+
+- `uplist.json` поле `url` — GitHub tree URL папки плагина. `version` в JSON обычно **пусто** (fallback). `info_url` — страница `plugin.html?md=...`.
+- Релиз инсталлятора: GitHub tag `C4D`, файл `4DPluginInstaller.exe`. Ссылки в README и frontmatter `download`.
+
+При изменении этих договорённостей — обновить это правило и `versioning.mdc`.
