@@ -96,6 +96,26 @@ def draw_star(d, cx, cy, r, color):
         pts.append((cx + r*SCALE*0.4*math.cos(a2), cy + r*SCALE*0.4*math.sin(a2)))
     d.polygon(pts, fill=color)
 
+def icon_tessera():
+    img = make(); d = ImageDraw.Draw(img)
+    d.rounded_rectangle([s(6), s(10), s(58), s(54)], radius=s(3), outline=CYAN, width=s(3))
+    d.rectangle([s(10), s(44), s(54), s(50)], fill=CYAN_D)
+    rows = [
+        (10, 14, 28, 20),
+        (30, 14, 54, 20),
+        (10, 22, 22, 28),
+        (24, 22, 54, 28),
+        (10, 30, 40, 36),
+        (42, 30, 54, 36),
+        (10, 38, 18, 44),
+        (20, 38, 54, 44),
+    ]
+    for i, box in enumerate(rows):
+        fill = ORANGE if i in (3, 5) else None
+        d.rectangle([s(box[0]), s(box[1]), s(box[2]), s(box[3])],
+                    fill=fill, outline=CYAN if fill is None else ORANGE, width=s(2))
+    save(img, "Tessera.png")
+
 def icon_floor_generator():
     img = make(); d = ImageDraw.Draw(img)
     size = s(6)
@@ -1134,6 +1154,7 @@ def main():
         icon_clean_empty_mat_tags, icon_clean_select_mat_tags, icon_clean_empty_polys,
         icon_clean_animation_keys,
         icon_action_recorder_log, icon_action_recorder_manager, icon_action_recorder_play,
+        icon_tessera,
     ]
     for fn in funcs:
         fn()

@@ -72,7 +72,15 @@
           "info_url": "https://vladvarp.github.io/-4D-Plugins/web/plugin.html?md=plugins%2Faction-recorder.md",
           "version": "",
           "ico": "https://vladvarp.github.io/-4D-Plugins/web/ico/ActionRecorder/Manager.png"
-        } 
+        },
+        {
+          "name": "Tessera",
+          "url": "https://github.com/vladvarp/-4D-Plugins/tree/main/Plugins/Tessera",
+          "info": "Процедурная облицовка пола, стены и потолка — 13 раскладок, подложка, Keep Intact, группы материалов.",
+          "info_url": "https://vladvarp.github.io/-4D-Plugins/web/plugin.html?md=plugins%2Ftessera.md",
+          "version": "",
+          "ico": "https://vladvarp.github.io/-4D-Plugins/web/ico/Tessera.png"
+        }
       ]
     }
   ]

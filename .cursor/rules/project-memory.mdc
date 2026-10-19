@@ -27,6 +27,7 @@ alwaysApply: true
 | Floor Generator | Floor Generator | floor-generator.md | Floor Generator |
 | Cloud Wizard | Cloud Wizard | cloud-wizard.md | Cloud Wizard |
 | Action Recorder | Action Recorder | action-recorder.md | Action Recorder |
+| Tessera | Tessera | tessera.md | Tessera |
 
 Ключ инсталлятора = **имя папки**. Display name = строка 2 файла `ver` (иначе JSON `name`).
 
@@ -36,7 +37,7 @@ alwaysApply: true
 
 ## Соглашения кода
 
-- Плагины — `.pyp`, регистрация `c4d.plugins.Register*Plugin`. ID из диапазона Maxon Plugin Café (~1068xxx–1069xxx). **Не переиспользовать ID.** Новый ID — только уникальный и только если пользователь предоставил его зарегестрировав на сайте MAXON, в противном случае запросить у пользователя ID и оставить место в коде для ввода в ручную пользователем.
+- Плагины — `.pyp`, регистрация `c4d.plugins.Register*Plugin` **всегда**, как у остальных пакетов. **Не** оборачивать в `if not PLUGIN_ID` / не печатать «вставьте ID» и не пропускать `Register*`. Пользователь сам подставляет число в `PLUGIN_ID = …`. Агент ID с Café не выдумывает и не блокирует регистрацию. **Не переиспользовать ID.**
 - Новый пункт VAr Tools: ID в `.pyp` **и** в `_menu.pyp`.
 - Описание AM: `res/c4d_symbols.h` + `res/strings_ru/c4d_string.str`.
 - Иконки C4D: папка `c4d_icons/` + плейсхолдер `_ICON_B64` в `.pyp` (см. `icons.mdc`). Сайт: `web/generate_icons.py` → `web/ico/`.

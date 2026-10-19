@@ -40,13 +40,35 @@ def save(img, name):
     print("  OK", os.path.relpath(path, OUT))
 
 
-# Новые иконки: def icon_<name>(): ...; save(img, "<name>.png")
-# и добавь вызов в main().
+def icon_tessera():
+    """Облицовка: доски разной длины + акцентный шеврон."""
+    img = make()
+    d = ImageDraw.Draw(img)
+    # основание
+    d.rounded_rectangle([s(6), s(10), s(58), s(54)], radius=s(3), outline=CYAN, width=s(3))
+    # подложка
+    d.rectangle([s(10), s(44), s(54), s(50)], fill=CYAN_D)
+    # планки разной длины
+    rows = [
+        (10, 14, 28, 20),
+        (30, 14, 54, 20),
+        (10, 22, 22, 28),
+        (24, 22, 54, 28),
+        (10, 30, 40, 36),
+        (42, 30, 54, 36),
+        (10, 38, 18, 44),
+        (20, 38, 54, 44),
+    ]
+    for i, box in enumerate(rows):
+        fill = ORANGE if i in (3, 5) else None
+        d.rectangle([s(box[0]), s(box[1]), s(box[2]), s(box[3])],
+                    fill=fill, outline=CYAN if fill is None else ORANGE, width=s(2))
+    save(img, "Tessera.png")
 
 
 def main():
     print("Generating 64x64 icons -> c4d_icons/ ...")
-    for fn in []:
+    for fn in [icon_tessera]:
         fn()
     print("Done.")
 

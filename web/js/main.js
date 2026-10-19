@@ -114,7 +114,16 @@ function initIndexPage() {
             tags: [`Автоматизация`],
             version: 'v1.15',
             mdFile: 'plugins/action-recorder.md'
-        }  
+        },
+        {
+            id: '9',
+            title: 'Tessera',
+            description: 'Процедурная облицовка любой плоскости: пол, стена, потолок. Тринадцать раскладок, подложка, Keep Intact и группы материалов.',
+            icon: 'ico/Tessera.png',
+            tags: [`Моделирование`, `Процедурный`, `Облицовка`],
+            version: 'v1.0.0',
+            mdFile: 'plugins/tessera.md'
+        }
     ];
 
     // Рендерим карточки плагинов
