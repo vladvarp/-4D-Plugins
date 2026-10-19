@@ -127,29 +127,19 @@ _ICON_B64 = "iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAAPgklEQVR4nO2ba3BV13X
 
 
 def _make_icon():
-    """Декодирует base64-иконку в BaseBitmap.
-    Если строка — заглушка '000', возвращает None."""
-    if _ICON_B64 == "000":
-        return None
+    png_data = base64.b64decode(_ICON_B64)
     try:
-        png_data = base64.b64decode(_ICON_B64)
-        try:
-            bmp = c4d.bitmaps.BaseBitmap()
-        except AttributeError:
-            bmp = c4d.BaseBitmap()
-        tmp = tempfile.NamedTemporaryFile(suffix=".png", delete=False)
-        try:
-            tmp.write(png_data)
-            tmp.close()
-            bmp.InitWith(tmp.name)
-        finally:
-            try:
-                os.unlink(tmp.name)
-            except Exception:
-                pass
-        return bmp
-    except Exception:
-        return None
+        bmp = c4d.bitmaps.BaseBitmap()
+    except AttributeError:
+        bmp = c4d.BaseBitmap()
+    tmp = tempfile.NamedTemporaryFile(suffix=".png", delete=False)
+    try:
+        tmp.write(png_data)
+        tmp.close()
+        bmp.InitWith(tmp.name)
+    finally:
+        os.unlink(tmp.name)
+    return bmp
 
 
 # ─── Генерация облака ─────────────────────────────────────────────────────────
