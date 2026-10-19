@@ -121,7 +121,7 @@ function initIndexPage() {
             description: 'Процедурная облицовка любой плоскости: пол, стена, потолок. Тринадцать раскладок, подложка, Keep Intact и группы материалов.',
             icon: 'ico/Tessera.png',
             tags: [`Моделирование`, `Процедурный`, `Облицовка`],
-            version: 'v1.0.0',
+            version: 'v1.0.1',
             mdFile: 'plugins/tessera.md'
         }
     ];

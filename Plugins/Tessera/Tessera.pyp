@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Tessera — Cinema 4D ObjectData Plugin v1.0.0
+Tessera — Cinema 4D ObjectData Plugin v1.0.1
 ============================================
 Процедурная облицовка любой плоскости: пол, стена, потолок.
 Работает без дочернего объекта (свой размер). Дочерний полигон —
@@ -24,7 +24,7 @@ import base64
 import tempfile
 
 PLUGIN_ID = 1071751
-PLUGIN_VER = "v1.0.0"
+PLUGIN_VER = "v1.0.1"
 PLUGIN_NAME = "Tessera"
 PLUGIN_HELP = "Процедурная облицовка: пол, стена, потолок — 13 раскладок, подложка, материалы"
 
@@ -203,6 +203,134 @@ def _is_convex(poly):
     return True
 
 
+def _pt_in_tri(p, a, b, c):
+    d1 = (p[0] - b[0]) * (a[1] - b[1]) - (a[0] - b[0]) * (p[1] - b[1])
+    d2 = (p[0] - c[0]) * (b[1] - c[1]) - (b[0] - c[0]) * (p[1] - c[1])
+    d3 = (p[0] - a[0]) * (c[1] - a[1]) - (c[0] - a[0]) * (p[1] - a[1])
+    has_neg = (d1 < -1e-12) or (d2 < -1e-12) or (d3 < -1e-12)
+    has_pos = (d1 > 1e-12) or (d2 > 1e-12) or (d3 > 1e-12)
+    return not (has_neg and has_pos)
+
+
+def _pt_key(p):
+    return (round(p[0], 6), round(p[1], 6))
+
+
+def _remove_collinear(poly):
+    n = len(poly)
+    if n < 4:
+        return poly
+    result = []
+    for i in range(n):
+        prev_p, cur_p, next_p = poly[i - 1], poly[i], poly[(i + 1) % n]
+        dx1, dy1 = cur_p[0] - prev_p[0], cur_p[1] - prev_p[1]
+        dx2, dy2 = next_p[0] - cur_p[0], next_p[1] - cur_p[1]
+        len1, len2 = math.hypot(dx1, dy1), math.hypot(dx2, dy2)
+        if len1 < 1e-9 or len2 < 1e-9:
+            continue
+        if abs(dx1 * dy2 - dy1 * dx2) / (len1 * len2) < 1e-6:
+            continue
+        result.append(cur_p)
+    return result if len(result) >= 3 else poly
+
+
+def _merge_fragments(fragments):
+    """Склеивает куски, разрезанные только диагоналями триангуляции вогнутого контура."""
+    if not fragments:
+        return []
+    if len(fragments) == 1:
+        return [_remove_collinear(fragments[0])]
+
+    edge_owner = {}
+    for fi, frag in enumerate(fragments):
+        n = len(frag)
+        for i in range(n):
+            a = _pt_key(frag[i])
+            b = _pt_key(frag[(i + 1) % n])
+            edge_owner.setdefault((a, b), []).append(fi)
+
+    shared = set()
+    for (a, b), owners in edge_owner.items():
+        if (b, a) in edge_owner:
+            for fi in owners:
+                for fj in edge_owner[(b, a)]:
+                    if fi != fj:
+                        shared.add((a, b))
+                        shared.add((b, a))
+    if not shared:
+        return [_remove_collinear(f) for f in fragments]
+
+    parent = list(range(len(fragments)))
+
+    def _find(x):
+        while parent[x] != x:
+            parent[x] = parent[parent[x]]
+            x = parent[x]
+        return x
+
+    def _union(x, y):
+        rx, ry = _find(x), _find(y)
+        if rx != ry:
+            parent[rx] = ry
+
+    for (a, b), owners in edge_owner.items():
+        if (b, a) not in edge_owner:
+            continue
+        for fi in owners:
+            for fj in edge_owner[(b, a)]:
+                if fi != fj:
+                    _union(fi, fj)
+
+    groups = {}
+    for fi in range(len(fragments)):
+        groups.setdefault(_find(fi), []).append(fi)
+
+    merged = []
+    for group in groups.values():
+        if len(group) == 1:
+            merged.append(fragments[group[0]])
+            continue
+        adj = {}
+        for fi in group:
+            frag = fragments[fi]
+            n = len(frag)
+            for i in range(n):
+                a_pt, b_pt = frag[i], frag[(i + 1) % n]
+                a, b = _pt_key(a_pt), _pt_key(b_pt)
+                if (a, b) in shared:
+                    continue
+                adj.setdefault(a, []).append((b, b_pt, a_pt))
+        if not adj:
+            merged.extend(fragments[fi] for fi in group)
+            continue
+        start = next(iter(adj))
+        loop, cur, ok = [], start, True
+        max_steps = sum(len(v) for v in adj.values()) + 1
+        steps = 0
+        while True:
+            steps += 1
+            opts = adj.get(cur)
+            if steps > max_steps or not opts:
+                ok = False
+                break
+            nxt_key, nxt_pt, cur_pt = opts[0]
+            loop.append(cur_pt)
+            opts.pop(0)
+            if not opts:
+                del adj[cur]
+            cur = nxt_key
+            if cur == start and len(loop) >= 3:
+                break
+            if len(loop) > 5000:
+                ok = False
+                break
+        if ok and len(loop) >= 3:
+            merged.append(loop)
+        else:
+            merged.extend(fragments[fi] for fi in group)
+    return [_remove_collinear(p) for p in merged]
+
+
 def _triangulate(poly):
     n = len(poly)
     if n < 3:
@@ -220,18 +348,13 @@ def _triangulate(poly):
         for i in range(m):
             i0, i1, i2 = idx[(i - 1) % m], idx[i], idx[(i + 1) % m]
             a, b, c = pts[i0], pts[i1], pts[i2]
-            if (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0]) <= 1e-12:
+            if (b[0] - a[0]) * (c[1] - b[1]) - (b[1] - a[1]) * (c[0] - b[0]) <= 1e-12:
                 continue
             ear = True
             for k in idx:
                 if k in (i0, i1, i2):
                     continue
-                p = pts[k]
-                d1 = (p[0] - b[0]) * (a[1] - b[1]) - (a[0] - b[0]) * (p[1] - b[1])
-                d2 = (p[0] - c[0]) * (b[1] - c[1]) - (b[0] - c[0]) * (p[1] - c[1])
-                d3 = (p[0] - a[0]) * (c[1] - a[1]) - (c[0] - a[0]) * (p[1] - a[1])
-                if not (((d1 < -1e-12) or (d2 < -1e-12) or (d3 < -1e-12)) and
-                        ((d1 > 1e-12) or (d2 > 1e-12) or (d3 > 1e-12))):
+                if _pt_in_tri(pts[k], a, b, c):
                     ear = False
                     break
             if ear:
@@ -242,6 +365,43 @@ def _triangulate(poly):
         if not clipped:
             break
     return tris
+
+
+def _triangulate_idx(pts_2d):
+    """Ear-clip: треугольники как локальные индексы. Не веер от вершины 0."""
+    n = len(pts_2d)
+    if n < 3:
+        return []
+    if n == 3:
+        return [(0, 1, 2)]
+    ccw = _area(pts_2d) >= 0
+    indices = list(range(n)) if ccw else list(range(n - 1, -1, -1))
+    triangles = []
+    max_iter = n * 4
+    while len(indices) > 2 and max_iter > 0:
+        max_iter -= 1
+        m = len(indices)
+        found = False
+        for i in range(m):
+            i0, i1, i2 = indices[(i - 1) % m], indices[i], indices[(i + 1) % m]
+            a, b, c = pts_2d[i0], pts_2d[i1], pts_2d[i2]
+            if (b[0] - a[0]) * (c[1] - b[1]) - (b[1] - a[1]) * (c[0] - b[0]) <= 1e-12:
+                continue
+            is_ear = True
+            for jdx in indices:
+                if jdx in (i0, i1, i2):
+                    continue
+                if _pt_in_tri(pts_2d[jdx], a, b, c):
+                    is_ear = False
+                    break
+            if is_ear:
+                triangles.append((i0, i1, i2))
+                indices.pop(i)
+                found = True
+                break
+        if not found:
+            break
+    return triangles
 
 
 def _clip_to(subject, boundary):
@@ -255,7 +415,7 @@ def _clip_to(subject, boundary):
         c = _clip_sh(subject, _ensure_ccw(tri))
         if c:
             out.append(c)
-    return out
+    return _merge_fragments(out)
 
 
 def _subtract_convex(poly, hole_ccw):
@@ -300,7 +460,7 @@ def _punch_holes(polys, holes):
                 for p in acc:
                     tmp.extend(_subtract_convex(p, piece))
                 acc = tmp
-            nxt.extend(acc)
+            nxt.extend(_merge_fragments(acc) if acc else [])
         current = nxt
     return current
 
@@ -627,32 +787,31 @@ def _build_tile_3d(tile, thick, bevel, seam, origin, uu, vv, nn, h_jit):
     if work is None:
         return [], [], []
     top = _inset(work, bev) if bev > 1e-6 else list(work)
-    if top is None:
+    if top is None or len(top) != len(work):
         top = list(work)
+        bev = 0.0
+    n = len(work)
     verts, tops, sides = [], [], []
     ib, ie, it = [], [], []
-    nn_use = n
-    # inset может сменить число вершин — берём min
-    nn_use = min(len(work), len(top), n)
-    work, top = work[:nn_use], top[:nn_use]
-    for i in range(nn_use):
+    for i in range(n):
         ib.append(len(verts))
         verts.append(_to3(work[i][0], work[i][1], origin, uu, vv, nn, 0.0))
-    for i in range(nn_use):
+    for i in range(n):
         ie.append(len(verts))
         verts.append(_to3(work[i][0], work[i][1], origin, uu, vv, nn, t - bev))
-    for i in range(nn_use):
+    for i in range(n):
         it.append(len(verts))
         verts.append(_to3(top[i][0], top[i][1], origin, uu, vv, nn, t))
-    if nn_use == 4:
+    if n == 4 and _is_convex(top):
         tops.append(tuple(it))
         sides.append(tuple(reversed(ib)))
     else:
-        for k in range(1, nn_use - 1):
-            tops.append((it[0], it[k], it[k + 1], it[k + 1]))
-            sides.append((ib[0], ib[k + 1], ib[k], ib[k]))
-    for i in range(nn_use):
-        j = (i + 1) % nn_use
+        for i0, i1, i2 in _triangulate_idx(top):
+            tops.append((it[i0], it[i1], it[i2], it[i2]))
+        for i0, i1, i2 in _triangulate_idx(work):
+            sides.append((ib[i0], ib[i2], ib[i1], ib[i1]))
+    for i in range(n):
+        j = (i + 1) % n
         sides.append((ib[i], ib[j], ie[j], ie[i]))
         sides.append((ie[i], ie[j], it[j], it[i]))
     return verts, tops, sides

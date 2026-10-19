@@ -1,7 +1,7 @@
 ---
 title: Tessera
 tagline: Процедурная облицовка любой плоскости — пол, стена, потолок. Тринадцать раскладок, подложка, Keep Intact и группы материалов.
-version: v1.0.0
+version: v1.0.1
 author: V.Ar Production
 updated: Октябрь 2026
 icon: ico/Tessera.png
